@@ -91,3 +91,32 @@ export const isAccountLinked = query({
         return !!link;
     },
 });
+
+export const updatePreset = mutation({
+    args: {
+        presetId: v.id("presets"),
+        updates: v.object({
+            name: v.optional(v.string()),
+            description: v.optional(v.string()),
+            delimiter: v.optional(v.string()),
+            hasHeader: v.optional(v.boolean()),
+            skipRows: v.optional(v.number()),
+            accountColumn: v.optional(v.string()),
+            amountMultiplier: v.optional(v.number()),
+            categoryColumn: v.optional(v.string()),
+            categoryGroupColumn: v.optional(v.string()),
+            dateColumn: v.optional(v.string()),
+            dateFormat: v.optional(v.string()),
+            descriptionColumn: v.optional(v.string()),
+            amountColumns: v.optional(v.array(v.string())),
+            amountProcessing: v.optional(v.any()),
+            transactionTypeColumn: v.optional(v.string()),
+        }),
+    },
+    handler: async (ctx, { presetId, updates }) => {
+        await ctx.db.patch(presetId, updates);
+        return await ctx.db.get(presetId);
+    },
+});
+
+

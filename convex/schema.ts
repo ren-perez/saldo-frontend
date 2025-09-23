@@ -12,6 +12,7 @@ export default defineSchema({
     accounts: defineTable({
         userId: v.id("users"),
         name: v.string(),
+        number: v.optional(v.string()),
         type: v.string(), // "checking" | "savings" | "credit"
         bank: v.string(),
         createdAt: v.string(),
@@ -45,35 +46,43 @@ export default defineSchema({
         .index("by_account", ["accountId"]),
 
     transactions: defineTable({
-        userId: v.string(),
-        accountId: v.string(),
+        userId: v.id("users"),
+        accountId: v.id("accounts"),
         amount: v.number(),
-        date: v.string(),
+        date: v.number(),           // ✅ Changed from v.string() to v.number() for timestamp
         description: v.string(),
-        categoryId: v.optional(v.string()),
-    }),
+        transactionType: v.optional(v.string()),
+        categoryId: v.optional(v.id("categories")),
+        createdAt: v.optional(v.number()),
+        updatedAt: v.optional(v.number()),
+    }).index("by_user", ["userId"])
+        .index("by_account", ["accountId"])
+        .index("by_date", ["date"])     // ✅ This will now work properly with numeric dates
+        .searchIndex("search_description", {
+            searchField: "description",
+            filterFields: ["userId", "accountId"],
+        }),
 
     categories: defineTable({
-        userId: v.string(),
+        userId: v.id("users"),
         name: v.string(),
-        groupId: v.optional(v.string()),
-    }),
+        // transactionType: v.optional(v.string()),
+        groupId: v.optional(v.id("category_groups")),
+        createdAt: v.optional(v.number()),
+    }).index("by_user", ["userId"])
+        .index("by_group", ["groupId"]),
 
     category_groups: defineTable({
-        userId: v.string(),
+        userId: v.id("users"),
         name: v.string(),
-    }),
+        createdAt: v.optional(v.number()),
+    }).index("by_user", ["userId"]),
 
     goals: defineTable({
-        userId: v.string(),
+        userId: v.id("users"),
         name: v.string(),
         target: v.number(),
         progress: v.number(),
-    }),
-
-    //   messages: defineTable({
-    //     author: v.string(),   // email or userId
-    //     body: v.string(),
-    //     createdAt: v.number(),
-    //   }),
+        createdAt: v.optional(v.number()),
+    }).index("by_user", ["userId"]),
 });

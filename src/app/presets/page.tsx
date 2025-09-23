@@ -1,130 +1,242 @@
+// src/app/presets/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "@/hooks/useConvexUser";
+import { EditPresetDialog } from "@/components/EditPresetDialog";
+import AppLayout from "@/components/AppLayout";
+import InitUser from "@/components/InitUser";
 
-function LinkedAccounts({ presetId, accounts }: { presetId: string, accounts: any[] }) {
-  const linkedAccounts = useQuery(api.presets.getPresetAccounts, { presetId });
-  const linkPreset = useMutation(api.presets.linkPresetToAccount);
-  const unlinkPreset = useMutation(api.presets.unlinkPresetFromAccount);
+function LinkedAccounts({ presetId, accounts }: { presetId: string; accounts: any[] }) {
+    const linkedAccounts = useQuery(api.presets.getPresetAccounts, { presetId });
+    const linkPreset = useMutation(api.presets.linkPresetToAccount);
+    const unlinkPreset = useMutation(api.presets.unlinkPresetFromAccount);
 
-  if (!linkedAccounts) return null;
+    if (!linkedAccounts) return null;
 
-  return (
-    <div className="mt-2">
-      <p className="font-semibold">Linked Accounts:</p>
-      <div className="flex flex-wrap gap-2">
-        {accounts?.map(acc => {
-          const isLinked = linkedAccounts.includes(acc._id);
-          return (
-            <label key={acc._id} className="flex items-center space-x-1">
-              <input
-                type="checkbox"
-                checked={isLinked}
-                onChange={async e => {
-                  if (e.target.checked) {
-                    await linkPreset({ presetId, accountId: acc._id });
-                  } else {
-                    await unlinkPreset({ presetId, accountId: acc._id });
-                  }
-                }}
-              />
-              <span>
-                {acc.bank} {acc.name}
-              </span>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
+    return (
+        <div className="mt-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Linked Accounts:</h4>
+            <div className="space-y-2">
+                {accounts?.map((acc) => {
+                    const isLinked = linkedAccounts.includes(acc._id);
+                    return (
+                        <label key={acc._id} className="flex items-center space-x-2 text-sm">
+                            <input
+                                type="checkbox"
+                                checked={isLinked}
+                                onChange={async (e) => {
+                                    if (e.target.checked) {
+                                        await linkPreset({ presetId, accountId: acc._id });
+                                    } else {
+                                        await unlinkPreset({ presetId, accountId: acc._id });
+                                    }
+                                }}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <span className="text-gray-700">
+                                {acc.bank} {acc.name}
+                            </span>
+                        </label>
+                    );
+                })}
+            </div>
+            {(!accounts || accounts.length === 0) && (
+                <p className="text-sm text-gray-500 italic">No accounts available to link</p>
+            )}
+        </div>
+    );
 }
 
 export default function PresetsPage() {
-  const { convexUser } = useConvexUser();
+    const { convexUser } = useConvexUser();
 
-  const presets = useQuery(
-    convexUser ? api.presets.listPresets : "skip",
-    convexUser ? { userId: convexUser._id } : "skip"
-  );
-  const accounts = useQuery(
-    convexUser ? api.accounts.listAccounts : "skip",
-    convexUser ? { userId: convexUser._id } : "skip"
-  );
+    const presets = useQuery(
+        convexUser ? api.presets.listPresets : "skip",
+        convexUser ? { userId: convexUser._id } : "skip"
+    );
+    const accounts = useQuery(
+        convexUser ? api.accounts.listAccounts : "skip",
+        convexUser ? { userId: convexUser._id } : "skip"
+    );
 
-  const createPreset = useMutation(api.presets.createPreset);
-  const deletePreset = useMutation(api.presets.deletePreset);
+    const createPreset = useMutation(api.presets.createPreset);
+    const deletePreset = useMutation(api.presets.deletePreset);
+    const updatePreset = useMutation(api.presets.updatePreset);
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+    const [name, setName] = useState("");
+    const [description, setDescription] = useState("");
+    const [editingPreset, setEditingPreset] = useState<any | null>(null);
 
-  if (!convexUser) return <p>Sign in required</p>;
+    if (!convexUser) {
+        return (
+            <AppLayout>
+                <div className="flex items-center justify-center h-64">
+                    <p className="text-lg">Sign in required</p>
+                </div>
+            </AppLayout>
+        );
+    }
 
-  return (
-    <div className="p-6 space-y-6">
-      <h2 className="text-xl font-bold">Presets</h2>
+    return (
+        <AppLayout>
+            <InitUser />
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900">CSV Import Presets</h1>
+                    <p className="text-gray-600">Configure how to import your bank statements</p>
+                </div>
 
-      {/* Create Form */}
-      <form
-        onSubmit={async e => {
-          e.preventDefault();
-          await createPreset({
-            userId: convexUser._id,
-            name,
-            description,
-            delimiter: ",",
-            hasHeader: true,
-            skipRows: 0,
-            accountColumn: "Account Number",
-            amountMultiplier: 1,
-            dateColumn: "Transaction Date",
-            dateFormat: "%m/%d/%y",
-            descriptionColumn: "Transaction Description",
-            amountColumns: ["Transaction Amount"],
-            amountProcessing: { debit_values: ["Debit"], credit_values: ["Credit"] },
-          });
-          setName("");
-          setDescription("");
-        }}
-        className="space-x-2"
-      >
-        <input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="Preset name"
-          className="border p-1"
-        />
-        <input
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          placeholder="Description"
-          className="border p-1"
-        />
-        <button type="submit" className="border px-2">
-          Add
-        </button>
-      </form>
+                {/* Quick Start Guide */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+                    <h3 className="font-medium text-blue-900 mb-2">💡 Quick Start</h3>
+                    <p className="text-sm text-blue-700 mb-2">
+                        Presets define how to parse your CSV files. Each bank exports data differently.
+                    </p>
+                    <div className="text-xs text-blue-600">
+                        <strong>Tip:</strong> Create a preset, then link it to your accounts for easy importing.
+                    </div>
+                </div>
 
-      {/* List Presets */}
-      <ul className="space-y-4">
-        {presets?.map(preset => (
-          <li key={preset._id} className="border p-2">
-            <div className="flex justify-between">
-              <span className="font-bold">{preset.name}</span>
-              <button
-                onClick={() => deletePreset({ presetId: preset._id })}
-                className="text-red-500"
-              >
-                Delete
-              </button>
+                {/* Create Form */}
+                <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+                    <h2 className="text-lg font-medium text-gray-900 mb-4">Create New Preset</h2>
+                    <form
+                        onSubmit={async (e) => {
+                            e.preventDefault();
+                            await createPreset({
+                                userId: convexUser._id,
+                                name,
+                                description,
+                                delimiter: ",",
+                                hasHeader: true,
+                                skipRows: 0,
+                                accountColumn: "Account Number",
+                                amountMultiplier: 1,
+                                dateColumn: "Transaction Date",
+                                dateFormat: "%m/%d/%y",
+                                descriptionColumn: "Transaction Description",
+                                amountColumns: ["Transaction Amount"],
+                                amountProcessing: { debit_values: ["Debit"], credit_values: ["Credit"] },
+                            });
+                            setName("");
+                            setDescription("");
+                        }}
+                        className="space-y-4"
+                    >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Preset Name
+                                </label>
+                                <input
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="e.g., Capital One Checking"
+                                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Description
+                                </label>
+                                <input
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    placeholder="Brief description of this format"
+                                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+                        >
+                            Create Preset
+                        </button>
+                    </form>
+                </div>
+
+                {/* Presets List */}
+                <div className="bg-white rounded-lg shadow-sm border">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h2 className="text-lg font-medium text-gray-900">Your Presets</h2>
+                    </div>
+                    <div className="p-6">
+                        {(!presets || presets.length === 0) ? (
+                            <div className="text-center py-8">
+                                <div className="text-4xl mb-4">⚙️</div>
+                                <p className="text-gray-500 mb-4">No presets yet</p>
+                                <p className="text-sm text-gray-400">Create your first preset above to configure CSV imports</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {presets.map((preset) => (
+                                    <div key={preset._id} className="border border-gray-200 rounded-lg p-4">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h3 className="text-lg font-medium text-gray-900">{preset.name}</h3>
+                                                <p className="text-sm text-gray-600">{preset.description}</p>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => setEditingPreset(preset)}
+                                                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm("Are you sure you want to delete this preset?")) {
+                                                            deletePreset({ presetId: preset._id });
+                                                        }
+                                                    }}
+                                                    className="text-red-600 hover:text-red-700 text-sm font-medium"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Preset Details */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-gray-600 mb-4 bg-gray-50 p-3 rounded">
+                                            <div><strong>Delimiter:</strong> "{preset.delimiter}"</div>
+                                            <div><strong>Header:</strong> {preset.hasHeader ? "Yes" : "No"}</div>
+                                            <div><strong>Skip:</strong> {preset.skipRows} rows</div>
+                                            <div><strong>Multiplier:</strong> {preset.amountMultiplier}</div>
+                                            <div><strong>Date:</strong> {preset.dateColumn}</div>
+                                            <div><strong>Amount:</strong> {preset.amountColumns.join(", ")}</div>
+                                            <div><strong>Description:</strong> {preset.descriptionColumn}</div>
+                                            <div><strong>Category:</strong> {preset.categoryColumn || "None"}</div>
+                                        </div>
+
+                                        <LinkedAccounts presetId={preset._id} accounts={accounts ?? []} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Edit Dialog */}
+                {editingPreset && (
+                    <EditPresetDialog
+                        open={!!editingPreset}
+                        preset={editingPreset}
+                        onClose={() => setEditingPreset(null)}
+                        onSave={async (updates) => {
+                            const { _id, ...rest } = updates; // REMOVE _id from updates
+                            await updatePreset({ presetId: _id, updates: rest });
+                            setEditingPreset(null);
+                        }}
+                    />
+                )}
             </div>
-            <p className="text-sm">{preset.description}</p>
-            <LinkedAccounts presetId={preset._id} accounts={accounts ?? []} />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+        </AppLayout>
+    );
 }
