@@ -2,24 +2,30 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+const normalizeDescription = (description: string): string => {
+    return description.toLowerCase().trim().replace(/\s+/g, ' ');
+};
+
+const createDeduplicationKey = (accountId: string, amount: number, description: string): string => {
+    return `${accountId}:${amount}:${normalizeDescription(description)}`;
+};
+
 export const importTransactions = mutation({
     args: {
         userId: v.id("users"),
         accountId: v.id("accounts"),
         transactions: v.array(v.object({
-            date: v.number(),        // timestamp
+            date: v.number(),
             amount: v.number(),
             description: v.string(),
             category: v.optional(v.string()),
             transactionType: v.optional(v.string()),
+            rawData: v.any(),
         })),
-        dateRange: v.optional(v.object({
-            startDate: v.number(),   // timestamp
-            endDate: v.number(),     // timestamp
-        })),
+        sessionId: v.string(),
     },
     handler: async (ctx, args) => {
-        const { userId, accountId, transactions, dateRange } = args;
+        const { userId, accountId, transactions, sessionId } = args;
 
         // Verify account belongs to user
         const account = await ctx.db.get(accountId);
@@ -27,68 +33,104 @@ export const importTransactions = mutation({
             throw new Error("Account not found or not owned by user");
         }
 
-        let deletedUnmodified = 0;
-        let preservedUserEdited = 0;
+        // Get all existing transactions for this account to check for duplicates
+        const existingTransactions = await ctx.db
+            .query("transactions")
+            .withIndex("by_account", (q) => q.eq("accountId", accountId))
+            .collect();
 
-        // If we have a date range, implement the override logic
-        if (dateRange) {
-            // 1. Get existing transactions in the date range
-            const existingTransactions = await ctx.db
-                .query("transactions")
-                .withIndex("by_account", (q) => q.eq("accountId", accountId))
-                .filter((q) => 
-                    q.and(
-                        q.gte(q.field("date"), dateRange.startDate),
-                        q.lte(q.field("date"), dateRange.endDate)
-                    )
-                )
-                .collect();
-
-            // 2. Identify user-edited transactions
-            // A transaction is considered "user-edited" if:
-            // - It has a categoryId (user assigned a category)
-            // - It has been updated after initial creation (updatedAt > createdAt)
-            // For now, we'll use the simple categoryId check
-            const userEditedTransactions = existingTransactions.filter(transaction => 
-                transaction.categoryId !== undefined
-            );
-
-            // 3. Delete unmodified transactions in date range
-            const transactionsToDelete = existingTransactions.filter(transaction => 
-                !userEditedTransactions.some(edited => edited._id === transaction._id)
-            );
-
-            for (const transaction of transactionsToDelete) {
-                await ctx.db.delete(transaction._id);
-            }
-
-            deletedUnmodified = transactionsToDelete.length;
-            preservedUserEdited = userEditedTransactions.length;
+        // Build deduplication lookup
+        const existingTransactionKeys = new Map<string, any>();
+        for (const existing of existingTransactions) {
+            const key = createDeduplicationKey(accountId, existing.amount, existing.description);
+            existingTransactionKeys.set(key, existing);
         }
 
-        // 4. Insert all new transactions from file
-        const insertedTransactions = [];
-        for (const transaction of transactions) {
-            const inserted = await ctx.db.insert("transactions", {
+        const inserted: string[] = [];
+        const possibleDuplicates = [];
+        const errors: Array<{ rowIndex: number; message: string }> = [];
+
+        // Process each transaction
+        for (let i = 0; i < transactions.length; i++) {
+            const transaction = transactions[i];
+
+            try {
+                // Validate transaction data
+                if (!transaction.description || transaction.description.trim() === '') {
+                    errors.push({ rowIndex: i, message: 'Description is required' });
+                    continue;
+                }
+
+                if (typeof transaction.amount !== 'number' || isNaN(transaction.amount)) {
+                    errors.push({ rowIndex: i, message: 'Invalid amount' });
+                    continue;
+                }
+
+                if (typeof transaction.date !== 'number' || isNaN(transaction.date)) {
+                    errors.push({ rowIndex: i, message: 'Invalid date' });
+                    continue;
+                }
+
+                // Check for duplicates
+                const deduplicationKey = createDeduplicationKey(accountId, transaction.amount, transaction.description);
+                const existingTransaction = existingTransactionKeys.get(deduplicationKey);
+
+                if (existingTransaction) {
+                    // Possible duplicate found
+                    possibleDuplicates.push({
+                        existingId: existingTransaction._id,
+                        newTransaction: {
+                            date: transaction.date,
+                            amount: transaction.amount,
+                            description: transaction.description,
+                            transactionType: transaction.transactionType,
+                            rawData: transaction.rawData,
+                        },
+                    });
+                } else {
+                    // No duplicate, insert new transaction
+                    const insertedId = await ctx.db.insert("transactions", {
+                        userId,
+                        accountId,
+                        date: transaction.date,
+                        amount: transaction.amount,
+                        description: transaction.description,
+                        transactionType: transaction.transactionType,
+                        categoryId: undefined,
+                        createdAt: Date.now(),
+                    });
+                    inserted.push(insertedId);
+                }
+            } catch (error) {
+                errors.push({
+                    rowIndex: i,
+                    message: `Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`
+                });
+            }
+        }
+
+        // Store import session for duplicate resolution if needed
+        if (possibleDuplicates.length > 0 || errors.length > 0) {
+            await ctx.db.insert("import_sessions", {
+                sessionId,
                 userId,
                 accountId,
-                date: transaction.date,
-                amount: transaction.amount,
-                description: transaction.description,
-                transactionType: transaction.transactionType,
-                categoryId: undefined, // Will be set later when categorizing
+                duplicates: possibleDuplicates,
+                errors,
+                summary: {
+                    inserted: inserted.length,
+                    totalErrors: errors.length,
+                },
                 createdAt: Date.now(),
+                isResolved: possibleDuplicates.length === 0, // If no duplicates, mark as resolved
             });
-            insertedTransactions.push(inserted);
         }
 
         return {
-            success: true,
-            insertedCount: insertedTransactions.length,
-            deletedUnmodified,
-            preservedUserEdited,
-            transactionIds: insertedTransactions,
-            summary: `Imported ${insertedTransactions.length} transactions. ${deletedUnmodified} unmodified transactions were replaced. ${preservedUserEdited} user-edited transactions were preserved.`
+            inserted: inserted.length,
+            possibleDuplicates,
+            errors,
+            sessionId: possibleDuplicates.length > 0 ? sessionId : undefined,
         };
     },
 });
@@ -491,5 +533,98 @@ export const deleteAllTransactions = mutation({
             success: true,
             deletedCount: transactions.length,
         };
+    },
+});
+
+export const mergeTransaction = mutation({
+    args: {
+        existingTransactionId: v.id("transactions"),
+        newTransactionData: v.object({
+            date: v.number(),
+            amount: v.number(),
+            description: v.string(),
+            transactionType: v.optional(v.string()),
+            rawData: v.any(),
+        }),
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        const { existingTransactionId, newTransactionData, userId } = args;
+
+        // Get the existing transaction
+        const existingTransaction = await ctx.db.get(existingTransactionId);
+        if (!existingTransaction) {
+            throw new Error("Transaction not found");
+        }
+
+        // Verify the transaction belongs to the user
+        if (existingTransaction.userId !== userId) {
+            throw new Error("Transaction not owned by user");
+        }
+
+        // Merge: preserve user edits (category, type if manually set) but update file-driven values
+        const mergedTransaction = {
+            ...existingTransaction,
+            date: newTransactionData.date,
+            amount: newTransactionData.amount,
+            description: newTransactionData.description,
+            // Only update transactionType if user hasn't manually set one (preserve user edits)
+            transactionType: existingTransaction.updatedAt
+                ? existingTransaction.transactionType // Keep existing if user edited
+                : newTransactionData.transactionType, // Use new if never edited
+            updatedAt: Date.now(),
+        };
+
+        await ctx.db.replace(existingTransactionId, mergedTransaction);
+
+        return { success: true };
+    },
+});
+
+export const loadImportSession = query({
+    args: {
+        sessionId: v.string(),
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        const { sessionId, userId } = args;
+
+        const session = await ctx.db
+            .query("import_sessions")
+            .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+            .first();
+
+        if (!session || session.userId !== userId) {
+            return null;
+        }
+
+        return session;
+    },
+});
+
+export const resolveImportSession = mutation({
+    args: {
+        sessionId: v.string(),
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        const { sessionId, userId } = args;
+
+        const session = await ctx.db
+            .query("import_sessions")
+            .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+            .first();
+
+        if (!session || session.userId !== userId) {
+            throw new Error("Session not found or not owned by user");
+        }
+
+        // Mark session as resolved
+        await ctx.db.replace(session._id, {
+            ...session,
+            isResolved: true,
+        });
+
+        return { success: true };
     },
 });

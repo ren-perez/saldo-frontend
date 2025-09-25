@@ -15,6 +15,7 @@ export default function Navigation() {
         { href: "/import-csv", label: "Import CSV", icon: "📤" },
         { href: "/transactions", label: "Transactions", icon: "💰" },
         { href: "/categories", label: "Categories", icon: "🏷️" },
+        { href: "/reflection", label: "Reflection", icon: "🔍" },
     ];
 
     return (

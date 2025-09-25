@@ -58,3 +58,16 @@ export const deleteCategory = mutation({
         return categoryId;
     },
 });
+
+// 📌 List all category groups for a user
+export const listCategoryGroups = query({
+    args: { userId: v.id("users") },
+    handler: async (ctx, { userId }) => {
+        return await ctx.db
+            .query("category_groups")
+            .withIndex("by_user")
+            .filter((row) => row.eq(row.field("userId"), userId))
+            .order("asc")
+            .collect();
+    },
+});

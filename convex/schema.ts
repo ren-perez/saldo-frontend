@@ -86,4 +86,31 @@ export default defineSchema({
         progress: v.number(),
         createdAt: v.optional(v.number()),
     }).index("by_user", ["userId"]),
+
+    import_sessions: defineTable({
+        sessionId: v.string(),
+        userId: v.id("users"),
+        accountId: v.id("accounts"),
+        duplicates: v.array(v.object({
+            existingId: v.id("transactions"),
+            newTransaction: v.object({
+                date: v.number(),
+                amount: v.number(),
+                description: v.string(),
+                transactionType: v.optional(v.string()),
+                rawData: v.any(),
+            }),
+        })),
+        errors: v.array(v.object({
+            rowIndex: v.number(),
+            message: v.string(),
+        })),
+        summary: v.object({
+            inserted: v.number(),
+            totalErrors: v.number(),
+        }),
+        createdAt: v.number(),
+        isResolved: v.boolean(),
+    }).index("by_session", ["sessionId"])
+      .index("by_user", ["userId"]),
 });

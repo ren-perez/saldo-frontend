@@ -1,12 +1,13 @@
 // src/app/import-csv/page.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Papa from "papaparse";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
+import DuplicateReview from "@/components/DuplicateReview";
 import { Button } from "@/components/ui/button";
 import {
   processTransactions,
@@ -30,6 +31,10 @@ export default function CsvImporterPage() {
   );
   const [processingStats, setProcessingStats] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [importPhase, setImportPhase] = useState<
+    "upload" | "preview" | "reviewing" | "completed"
+  >("upload");
 
   const accounts = useQuery(
     api.accounts.listAccounts,
@@ -43,12 +48,52 @@ export default function CsvImporterPage() {
 
   const importTransactions = useMutation(api.transactions.importTransactions);
 
+  // Load import session if we have a sessionId
+  const importSession = useQuery(
+    api.transactions.loadImportSession,
+    currentSessionId && convexUser
+      ? { sessionId: currentSessionId, userId: convexUser._id }
+      : "skip"
+  );
+
+  // Get existing transactions for duplicate review (only load when needed)
+  const existingTransactions = useQuery(
+    api.transactions.listTransactions,
+    importSession && selectedAccount && convexUser
+      ? {
+          userId: convexUser._id,
+          accountId: selectedAccount as any,
+          limit: 1000 // Get more for duplicate matching
+        }
+      : "skip"
+  );
+
+  // Check for existing session on load
+  useEffect(() => {
+    const sessionId = localStorage.getItem('import_session_id');
+    if (sessionId && convexUser) {
+      setCurrentSessionId(sessionId);
+      setImportPhase("reviewing");
+    }
+  }, [convexUser]);
+
+  const resetImportState = () => {
+    setFile(null);
+    setPreviewTransactions([]);
+    setValidationErrors([]);
+    setProcessingStats(null);
+    setCurrentSessionId(null);
+    setImportPhase("upload");
+    localStorage.removeItem('import_session_id');
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       setFile(e.target.files[0]);
       setPreviewTransactions([]);
       setValidationErrors([]);
       setProcessingStats(null);
+      setImportPhase("upload");
     }
   };
 
@@ -95,6 +140,7 @@ export default function CsvImporterPage() {
         setValidationErrors(result.errors);
         setPreviewTransactions(result.transactions.slice(0, 10));
         setProcessingStats(result.stats);
+        setImportPhase("preview");
         setIsProcessing(false);
       },
       error: (error) => {
@@ -130,38 +176,42 @@ export default function CsvImporterPage() {
             return;
           }
 
-          const transactionsForConvex = result.transactions.map((t) => ({
+          // Generate a session ID for this import
+          const sessionId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+          const transactionsForConvex = result.transactions.map((t, index) => ({
             date: new Date(t.date).getTime(),
             amount: t.amount,
             description: t.description,
             category: t.category,
             transactionType: t.transactionType,
+            rawData: { ...t, originalRowIndex: index }, // Store original row data
           }));
-
-          const dateRange = getDateRange(result.transactions);
 
           const importResult = await importTransactions({
             userId: convexUser._id,
             accountId: selectedAccount as any,
             transactions: transactionsForConvex,
-            dateRange: dateRange
-              ? {
-                  startDate: new Date(dateRange.startDate).getTime(),
-                  endDate: new Date(dateRange.endDate).getTime(),
-                }
-              : undefined,
+            sessionId,
           });
 
-          alert(
-            importResult.summary ||
-              `Successfully imported ${importResult.insertedCount} transactions!`
-          );
+          if (importResult.possibleDuplicates && importResult.possibleDuplicates.length > 0) {
+            // Store session ID for persistence
+            localStorage.setItem('import_session_id', sessionId);
+            setCurrentSessionId(sessionId);
+            setImportPhase("reviewing");
+          } else {
+            // No duplicates, show success
+            alert(
+              `Successfully imported ${importResult.inserted} transactions!${
+                importResult.errors.length > 0
+                  ? ` ${importResult.errors.length} rows had errors.`
+                  : ""
+              }`
+            );
+            setImportPhase("completed");
+          }
 
-          setFile(null);
-          setPreviewTransactions([]);
-          setValidationErrors([]);
-          setProcessingStats(null);
-          setSelectedAccount(null);
           setIsProcessing(false);
         },
       });
@@ -174,6 +224,12 @@ export default function CsvImporterPage() {
       );
       setIsProcessing(false);
     }
+  };
+
+  const handleSessionResolved = () => {
+    localStorage.removeItem('import_session_id');
+    setImportPhase("completed");
+    alert("Import completed successfully!");
   };
 
   if (!convexUser) {
@@ -190,9 +246,39 @@ export default function CsvImporterPage() {
     <AppLayout>
       <InitUser />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
+        <div className="mb-8 flex items-center justify-between">
           <h1 className="text-3xl font-bold">CSV Transaction Importer</h1>
+          {importPhase !== "upload" && (
+            <Button onClick={resetImportState} variant="outline" size="sm">
+              Start New Import
+            </Button>
+          )}
         </div>
+
+        {/* Show duplicate review phase */}
+        {importPhase === "reviewing" && importSession && existingTransactions && (
+          <DuplicateReview
+            session={importSession}
+            existingTransactions={existingTransactions}
+            onSessionResolved={handleSessionResolved}
+          />
+        )}
+
+        {/* Show completion message */}
+        {importPhase === "completed" && (
+          <div className="mb-6 p-4 rounded-md border bg-green-50 dark:bg-green-950/20">
+            <h2 className="text-xl font-semibold text-green-700 dark:text-green-300 mb-2">
+              ✅ Import Completed Successfully!
+            </h2>
+            <p className="text-green-600 dark:text-green-400">
+              All transactions have been processed and imported to your account.
+            </p>
+          </div>
+        )}
+
+        {/* Show upload/preview phase only when not in reviewing/completed state */}
+        {importPhase !== "reviewing" && importPhase !== "completed" && (
+          <>
 
         {/* Account Selection */}
         <div className="mb-6">
@@ -374,22 +460,24 @@ export default function CsvImporterPage() {
           </Button>
         )}
 
-        {/* Instructions */}
-        <div className="p-6 rounded-md border bg-muted">
-          <h3 className="text-lg font-medium mb-4">Instructions:</h3>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <div>1. Select the account you want to import transactions for</div>
-            <div>2. Make sure the account has a preset linked to it</div>
-            <div>3. Choose your CSV file</div>
-            <div>4. Click "Preview CSV" to validate and normalize the data</div>
-            <div>5. Review the normalized transactions preview</div>
-            <div>6. If validation passes, click "Import All Transactions"</div>
-            <div className="text-yellow-600 dark:text-yellow-400 mt-2">
-              ⚠️ Re-importing will replace existing transactions in the date
-              range while preserving any you've categorized.
+            {/* Instructions */}
+            <div className="p-6 rounded-md border bg-muted">
+              <h3 className="text-lg font-medium mb-4">Instructions:</h3>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div>1. Select the account you want to import transactions for</div>
+                <div>2. Make sure the account has a preset linked to it</div>
+                <div>3. Choose your CSV file</div>
+                <div>4. Click "Preview CSV" to validate and normalize the data</div>
+                <div>5. Review the normalized transactions preview</div>
+                <div>6. If validation passes, click "Import All Transactions"</div>
+                <div>7. Review any duplicate transactions if found</div>
+                <div className="text-yellow-600 dark:text-yellow-400 mt-2">
+                  ⚠️ Import process now includes duplicate detection based on account, amount, and description.
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </AppLayout>
   );
