@@ -117,6 +117,13 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-300;
   }
+}
+
+body {
+  /* background-color: inherit;
+  color: inherit; */
+  font-family: var(--font-manrope), var(--font-geist-sans), sans-serif;
+  /* transition: inherit; */
 }

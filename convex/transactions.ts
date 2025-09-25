@@ -93,6 +93,158 @@ export const importTransactions = mutation({
     },
 });
 
+export const listTransactionsPaginated = query({
+    args: {
+        userId: v.id("users"),
+        accountId: v.optional(v.id("accounts")),
+        transactionType: v.optional(v.string()),
+        categoryId: v.optional(v.string()), // Changed to string to handle special values
+        groupId: v.optional(v.string()), // Added for group filtering
+        searchTerm: v.optional(v.string()),
+        startDate: v.optional(v.number()), // timestamp
+        endDate: v.optional(v.number()),   // timestamp
+        page: v.number(),
+        pageSize: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const { 
+            userId, 
+            accountId, 
+            transactionType, 
+            categoryId, 
+            groupId,
+            searchTerm, 
+            startDate, 
+            endDate, 
+            page, 
+            pageSize 
+        } = args;
+
+        // Build base query
+        let query = ctx.db
+            .query("transactions")
+            .withIndex("by_user", (q) => q.eq("userId", userId));
+
+        // Apply account filter at database level if specified
+        if (accountId) {
+            query = ctx.db
+                .query("transactions")
+                .withIndex("by_account", (q) => q.eq("accountId", accountId));
+        }
+
+        // Get all matching transactions
+        let allTransactions = await query.collect();
+
+        // Get categories and groups for filtering
+        const categories = await ctx.db
+            .query("categories")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+
+        const categoryGroups = await ctx.db
+            .query("category_groups")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+
+        // Apply additional filters
+        let filteredTransactions = allTransactions.filter((transaction) => {
+            // Account filter (if not already applied at DB level)
+            if (accountId && !query.toString().includes("by_account")) {
+                if (transaction.accountId !== accountId) {
+                    return false;
+                }
+            }
+
+            // Transaction type filter
+            if (transactionType) {
+                if (transactionType === "untyped") {
+                    // Show transactions with no type
+                    if (transaction.transactionType !== undefined) {
+                        return false;
+                    }
+                } else {
+                    // Show transactions with specific type
+                    if (transaction.transactionType !== transactionType) {
+                        return false;
+                    }
+                }
+            }
+
+            // Category filter - Updated to handle "NONE" value from frontend
+            if (categoryId !== undefined) {
+                if (categoryId === "NONE") {
+                    // Show uncategorized transactions (no categoryId)
+                    if (transaction.categoryId !== undefined) {
+                        return false;
+                    }
+                } else {
+                    // Show transactions with specific category
+                    if (transaction.categoryId !== categoryId) {
+                        return false;
+                    }
+                }
+            }
+
+            // Group filter - Updated to handle "NONE" value from frontend
+            if (groupId !== undefined) {
+                if (groupId === "NONE") {
+                    // Show transactions with no group (either no category or category has no group)
+                    if (transaction.categoryId) {
+                        const transactionCategory = categories.find(cat => cat._id === transaction.categoryId);
+                        if (transactionCategory && transactionCategory.groupId) {
+                            return false;
+                        }
+                    }
+                    // If no categoryId, it automatically has no group, so include it
+                } else {
+                    // Show transactions with specific group
+                    if (!transaction.categoryId) {
+                        return false; // No category means no group
+                    }
+                    const transactionCategory = categories.find(cat => cat._id === transaction.categoryId);
+                    if (!transactionCategory || transactionCategory.groupId !== groupId) {
+                        return false;
+                    }
+                }
+            }
+
+            // Date range filters
+            if (startDate && transaction.date < startDate) {
+                return false;
+            }
+            if (endDate && transaction.date > endDate) {
+                return false;
+            }
+
+            // Search filter
+            if (searchTerm) {
+                const searchLower = searchTerm.toLowerCase();
+                if (!transaction.description.toLowerCase().includes(searchLower)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        // Sort by date (newest first)
+        filteredTransactions.sort((a, b) => b.date - a.date);
+
+        // Apply pagination
+        const startIndex = (page - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+        return {
+            data: paginatedTransactions,
+            total: filteredTransactions.length,
+            page,
+            pageSize,
+            hasMore: endIndex < filteredTransactions.length,
+        };
+    },
+});
+
 export const listTransactions = query({
     args: {
         userId: v.id("users"),
@@ -150,84 +302,17 @@ export const listTransactions = query({
     },
 });
 
-// Paginated query (this one was already correct)
-export const listTransactionsPaginated = query({
-    args: {
-        userId: v.id("users"),
-        accountId: v.optional(v.id("accounts")),
-        transactionType: v.optional(v.string()),
-        searchTerm: v.optional(v.string()),
-        startDate: v.optional(v.number()), // timestamp
-        endDate: v.optional(v.number()),   // timestamp
-        page: v.number(),
-        pageSize: v.number(),
-    },
-    handler: async (ctx, args) => {
-        const { userId, accountId, transactionType, searchTerm, startDate, endDate, page, pageSize } = args;
-
-        // Build base query
-        let query = ctx.db
-            .query("transactions")
-            .withIndex("by_user", (q) => q.eq("userId", userId));
-
-        // Apply account filter
-        if (accountId) {
-            query = ctx.db
-                .query("transactions")
-                .withIndex("by_account", (q) => q.eq("accountId", accountId));
-        }
-
-        // Get all matching transactions (we'll filter in memory for complex filters)
-        let allTransactions = await query.collect();
-
-        // Apply additional filters
-        let filteredTransactions = allTransactions.filter((transaction) => {
-            // Transaction type filter
-            if (transactionType && transaction.transactionType !== transactionType) {
-                return false;
-            }
-
-            // Date range filters - now working with numeric timestamps
-            if (startDate && transaction.date < startDate) {
-                return false;
-            }
-            if (endDate && transaction.date > endDate) {
-                return false;
-            }
-
-            // Search filter
-            if (searchTerm) {
-                const searchLower = searchTerm.toLowerCase();
-                if (!transaction.description.toLowerCase().includes(searchLower)) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-
-        // Sort by date (newest first)
-        filteredTransactions.sort((a, b) => b.date - a.date);
-
-        // Apply pagination
-        const startIndex = (page - 1) * pageSize;
-        const endIndex = startIndex + pageSize;
-        const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
-
-        return {
-            data: paginatedTransactions,
-            total: filteredTransactions.length,
-            page,
-            pageSize,
-            hasMore: endIndex < filteredTransactions.length,
-        };
-    },
-});
-
 export const deleteTransaction = mutation({
     args: { transactionId: v.id("transactions") },
     handler: async (ctx, { transactionId }) => {
+        // Get the transaction first to verify it exists
+        const transaction = await ctx.db.get(transactionId);
+        if (!transaction) {
+            throw new Error("Transaction not found");
+        }
+        
         await ctx.db.delete(transactionId);
+        return { success: true };
     },
 });
 
@@ -239,6 +324,9 @@ export const updateTransaction = mutation({
             categoryId: v.optional(v.id("categories")),
             description: v.optional(v.string()),
             amount: v.optional(v.number()),
+            // Special flags to explicitly clear fields
+            clearTransactionType: v.optional(v.boolean()),
+            clearCategoryId: v.optional(v.boolean()),
         }),
     },
     handler: async (ctx, args) => {
@@ -250,11 +338,99 @@ export const updateTransaction = mutation({
             throw new Error("Transaction not found");
         }
 
-        // Update transaction with timestamp to track user modifications
-        await ctx.db.patch(transactionId, {
-            ...updates,
+        // Build the update object
+        const patchData: any = {
             updatedAt: Date.now(), // Track when user made changes
-        });
+        };
+
+        // Handle clearing transaction type
+        if (updates.clearTransactionType) {
+            patchData.transactionType = undefined;
+        } else if (updates.transactionType !== undefined) {
+            patchData.transactionType = updates.transactionType;
+        }
+
+        // Handle clearing category
+        if (updates.clearCategoryId) {
+            patchData.categoryId = undefined;
+        } else if (updates.categoryId !== undefined) {
+            patchData.categoryId = updates.categoryId;
+        }
+
+        // Handle other fields normally
+        if (updates.description !== undefined) {
+            patchData.description = updates.description;
+        }
+        
+        if (updates.amount !== undefined) {
+            patchData.amount = updates.amount;
+        }
+
+        // Use replace instead of patch to ensure undefined values are set
+        const updatedTransaction = {
+            ...transaction,
+            ...patchData,
+        };
+
+        await ctx.db.replace(transactionId, updatedTransaction);
+
+        return { success: true };
+    },
+});
+
+// Update transaction by setting category through group selection
+export const updateTransactionByGroup = mutation({
+    args: {
+        transactionId: v.id("transactions"),
+        groupId: v.optional(v.id("category_groups")),
+        categoryId: v.optional(v.id("categories")),
+        clearGroup: v.optional(v.boolean()),
+    },
+    handler: async (ctx, args) => {
+        const { transactionId, groupId, categoryId, clearGroup } = args;
+
+        // Get existing transaction
+        const transaction = await ctx.db.get(transactionId);
+        if (!transaction) {
+            throw new Error("Transaction not found");
+        }
+
+        let finalCategoryId = categoryId;
+
+        // If clearing group, clear category as well
+        if (clearGroup) {
+            finalCategoryId = undefined;
+        }
+        // If only group is specified, keep existing category if it belongs to the group,
+        // otherwise find the first category in that group
+        else if (groupId && !categoryId) {
+            const currentCategory = transaction.categoryId ?
+                await ctx.db.get(transaction.categoryId) : null;
+
+            // If current category belongs to the selected group, keep it
+            if (currentCategory && currentCategory.groupId === groupId) {
+                finalCategoryId = currentCategory._id;
+            } else {
+                // Otherwise, find the first category in that group
+                const categoriesInGroup = await ctx.db
+                    .query("categories")
+                    .withIndex("by_group", (q) => q.eq("groupId", groupId))
+                    .collect();
+
+                if (categoriesInGroup.length > 0) {
+                    finalCategoryId = categoriesInGroup[0]._id;
+                }
+            }
+        }
+
+        // Update the transaction
+        const updatedTransaction = {
+            ...transaction,
+            categoryId: finalCategoryId,
+            updatedAt: Date.now(),
+        };
+
+        await ctx.db.replace(transactionId, updatedTransaction);
 
         return { success: true };
     },

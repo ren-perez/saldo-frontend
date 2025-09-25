@@ -7,12 +7,14 @@ export const createCategory = mutation({
         userId: v.id("users"),
         name: v.string(),
         groupId: v.optional(v.id("category_groups")),
+        transactionType: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const categoryId = await ctx.db.insert("categories", {
             userId: args.userId,
             name: args.name,
             groupId: args.groupId || undefined,
+            transactionType: args.transactionType || undefined,
             createdAt: Date.now(),
         });
         return categoryId;
@@ -39,6 +41,7 @@ export const updateCategory = mutation({
         updates: v.object({
             name: v.optional(v.string()),
             groupId: v.optional(v.id("category_groups")),
+            transactionType: v.optional(v.string()),
         }),
     },
     handler: async (ctx, { categoryId, updates }) => {

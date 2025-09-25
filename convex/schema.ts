@@ -66,11 +66,12 @@ export default defineSchema({
     categories: defineTable({
         userId: v.id("users"),
         name: v.string(),
-        // transactionType: v.optional(v.string()),
+        transactionType: v.optional(v.string()), // "income" | "expense" | "transfer"
         groupId: v.optional(v.id("category_groups")),
         createdAt: v.optional(v.number()),
     }).index("by_user", ["userId"])
-        .index("by_group", ["groupId"]),
+        .index("by_group", ["groupId"])
+        .index("by_type", ["transactionType"]),
 
     category_groups: defineTable({
         userId: v.id("users"),
