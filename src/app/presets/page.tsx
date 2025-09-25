@@ -4,13 +4,32 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import { useConvexUser } from "@/hooks/useConvexUser";
 import { EditPresetDialog } from "@/components/EditPresetDialog";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import { Button } from "@/components/ui/button";
 
-function LinkedAccounts({ presetId, accounts }: { presetId: string; accounts: any[] }) {
+type AmountProcessingTypeA = {
+  amount_column: string;
+  amount_multiplier: number;
+  credit_values: string[];
+  debit_values: string[];
+  transaction_type_column: string;
+};
+
+type AmountProcessingTypeB = {
+  credit_column: string;
+  credit_multiplier: number;
+  debit_column: string;
+  debit_multiplier: number;
+};
+
+export type AmountProcessing = AmountProcessingTypeA | AmountProcessingTypeB;
+
+
+function LinkedAccounts({ presetId, accounts }: { presetId: Id<"presets">; accounts: Array<{ _id: Id<"accounts">; name: string; bank: string }> }) {
   const linkedAccounts = useQuery(api.presets.getPresetAccounts, { presetId });
   const linkPreset = useMutation(api.presets.linkPresetToAccount);
   const unlinkPreset = useMutation(api.presets.unlinkPresetFromAccount);
@@ -55,11 +74,11 @@ export default function PresetsPage() {
   const { convexUser } = useConvexUser();
 
   const presets = useQuery(
-    convexUser ? api.presets.listPresets : "skip",
+    api.presets.listPresets,
     convexUser ? { userId: convexUser._id } : "skip"
   );
   const accounts = useQuery(
-    convexUser ? api.accounts.listAccounts : "skip",
+    api.accounts.listAccounts,
     convexUser ? { userId: convexUser._id } : "skip"
   );
 
@@ -69,7 +88,29 @@ export default function PresetsPage() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [editingPreset, setEditingPreset] = useState<any | null>(null);
+  // const [editingPreset, setEditingPreset] = useState<{
+  //   _id: Id<"presets">;
+  //   name: string;
+  //   description: string;
+  //   [key: string]: unknown;
+  // } | null>(null);
+  const [editingPreset, setEditingPreset] = useState<{
+    _id: Id<"presets">;
+    name: string;
+    description: string;
+    delimiter: string;
+    hasHeader: boolean;
+    skipRows: number;
+    amountMultiplier: number;
+    dateColumn: string;
+    dateFormat: string;
+    descriptionColumn: string;
+    amountColumns: string[];
+    categoryColumn?: string;
+    accountColumn?: string;
+    amountProcessing: AmountProcessing;
+    [key: string]: unknown;
+  } | null>(null);
 
   if (!convexUser) {
     return (
@@ -203,7 +244,7 @@ export default function PresetsPage() {
 
                     {/* Preset Details */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-muted-foreground mb-4 bg-muted p-3 rounded">
-                      <div><strong>Delimiter:</strong> "{preset.delimiter}"</div>
+                      <div><strong>Delimiter:</strong> &quot;{preset.delimiter}&quot;</div>
                       <div><strong>Header:</strong> {preset.hasHeader ? "Yes" : "No"}</div>
                       <div><strong>Skip:</strong> {preset.skipRows} rows</div>
                       <div><strong>Multiplier:</strong> {preset.amountMultiplier}</div>
@@ -213,7 +254,7 @@ export default function PresetsPage() {
                       <div><strong>Category:</strong> {preset.categoryColumn || "None"}</div>
                     </div>
 
-                    <LinkedAccounts presetId={preset._id} accounts={accounts ?? []} />
+                    <LinkedAccounts presetId={preset._id as Id<"presets">} accounts={accounts ?? []} />
                   </div>
                 ))}
               </div>
@@ -229,7 +270,7 @@ export default function PresetsPage() {
             onClose={() => setEditingPreset(null)}
             onSave={async (updates) => {
               const { _id, ...rest } = updates;
-              await updatePreset({ presetId: _id, updates: rest });
+              await updatePreset({ presetId: _id as Id<"presets">, updates: rest });
               setEditingPreset(null);
             }}
           />

@@ -35,12 +35,12 @@ export default function CategoriesPage() {
 
   // Queries
   const categories = useQuery(
-    convexUser ? api.categories.listCategories : "skip" as any,
+    convexUser ? api.categories.listCategories : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
   );
 
   const categoryGroups = useQuery(
-    convexUser ? api.categoryGroups.listCategoryGroups : "skip" as any,
+    convexUser ? api.categoryGroups.listCategoryGroups : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
   );
 
@@ -63,9 +63,18 @@ export default function CategoriesPage() {
     name: "",
   });
 
-  // Edit states
-  const [editingCategory, setEditingCategory] = useState<any>(null);
-  const [editingGroup, setEditingGroup] = useState<any>(null);
+  // Edit states - Fixed type definitions
+  const [editingCategory, setEditingCategory] = useState<{
+    _id: Id<"categories">;
+    name: string;
+    groupId?: Id<"category_groups">;
+    transactionType?: string;
+  } | null>(null);
+  
+  const [editingGroup, setEditingGroup] = useState<{
+    _id: Id<"category_groups">;
+    name: string;
+  } | null>(null);
 
   if (!convexUser) {
     return (
@@ -242,20 +251,20 @@ export default function CategoriesPage() {
                             <Input
                               value={editingCategory.name}
                               onChange={(e) =>
-                                setEditingCategory((p: any) => ({
+                                setEditingCategory((p) => p ? ({
                                   ...p,
                                   name: e.target.value,
-                                }))
+                                }) : null)
                               }
                               required
                             />
                             <Select
                               value={editingCategory.groupId || "none"}
                               onValueChange={(val) =>
-                                setEditingCategory((p: any) => ({
+                                setEditingCategory((p) => p ? ({
                                   ...p,
-                                  groupId: val === "none" ? undefined : val,
-                                }))
+                                  groupId: val === "none" ? undefined : (val as Id<"category_groups">),
+                                }) : null)
                               }
                             >
                               <SelectTrigger>
@@ -334,7 +343,7 @@ export default function CategoriesPage() {
                     placeholder="e.g., Bills, Food & Dining"
                     required
                   />
-                  <Button type="submit" variant="success">
+                  <Button type="submit">
                     Add Group
                   </Button>
                 </form>
@@ -366,10 +375,10 @@ export default function CategoriesPage() {
                               <Input
                                 value={editingGroup.name}
                                 onChange={(e) =>
-                                  setEditingGroup((p: any) => ({
+                                  setEditingGroup((p) => p ? ({
                                     ...p,
                                     name: e.target.value,
-                                  }))
+                                  }) : null)
                                 }
                                 required
                               />

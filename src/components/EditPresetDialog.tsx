@@ -22,7 +22,7 @@ interface Preset {
     dateFormat: string;
     descriptionColumn: string;
     amountColumns: string[];
-    amountProcessing: Record<string, any>;
+    amountProcessing: Record<string, unknown>;
     transactionTypeColumn?: string;
 }
 

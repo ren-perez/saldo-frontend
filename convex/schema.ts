@@ -33,7 +33,7 @@ export default defineSchema({
         dateFormat: v.string(),
         descriptionColumn: v.string(),
         amountColumns: v.array(v.string()),
-        amountProcessing: v.any(), // JSON object
+        amountProcessing: v.any(), // Complex JSON object - keeping v.any() for Convex compatibility
         transactionTypeColumn: v.optional(v.string()),
         createdAt: v.string(),
     }).index("by_user", ["userId"]),
@@ -98,7 +98,7 @@ export default defineSchema({
                 amount: v.number(),
                 description: v.string(),
                 transactionType: v.optional(v.string()),
-                rawData: v.any(),
+                rawData: v.any(), // Raw CSV data - keeping v.any() for Convex compatibility
             }),
         })),
         errors: v.array(v.object({

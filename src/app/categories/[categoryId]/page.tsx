@@ -270,7 +270,7 @@ export default function CategoryTransactionsPage() {
             <div className="text-center">
               <div className="text-muted-foreground">
                 <p className="text-lg">No transactions found</p>
-                <p>This category doesn't have any transactions yet.</p>
+                <p>This category doesn&rsquo;t have any transactions yet.</p>
               </div>
             </div>
           </Card>

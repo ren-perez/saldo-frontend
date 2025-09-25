@@ -2,6 +2,7 @@
 "use client";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import { useConvexUser } from "@/hooks/useConvexUser";
 import { useState } from "react";
 import { EditAccountDialog } from "@/components/EditAccountDialog";
@@ -14,21 +15,22 @@ import { Plus } from "lucide-react";
 export default function AccountsPage() {
     const { convexUser } = useConvexUser();
     const accounts = useQuery(
-        convexUser ? api.accounts.listAccounts : "skip" as any,
+        convexUser ? api.accounts.listAccounts : ("skip" as never),
         convexUser ? { userId: convexUser._id } : "skip"
     );
 
-    const createAccount = useMutation(api.accounts.createAccount);
     const updateAccount = useMutation(api.accounts.updateAccount);
     const deleteAccount = useMutation(api.accounts.deleteAccount);
 
-    const [name, setName] = useState("");
-    const [bank, setBank] = useState("");
-    const [number, setNumber] = useState("");
-    const [type, setType] = useState("checking");
-
     const [openAdd, setOpenAdd] = useState(false);
-    const [editing, setEditing] = useState<any>(null);
+    const [editing, setEditing] = useState<{
+        _id: string;
+        name: string;
+        number?: string;
+        type: string;
+        bank: string;
+        createdAt: string;
+    } | null>(null);
 
     if (!convexUser) {
         return (
@@ -199,8 +201,9 @@ export default function AccountsPage() {
                     account={editing}
                     onClose={() => setEditing(null)}
                     onSave={async updates => {
+                        if (!editing) return;
                         await updateAccount({
-                            accountId: editing._id,
+                            accountId: editing._id as Id<"accounts">,
                             ...updates
                         });
                         setEditing(null);

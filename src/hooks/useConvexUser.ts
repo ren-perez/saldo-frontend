@@ -8,7 +8,7 @@ export function useConvexUser() {
   const { user } = useUser();
 
   const convexUser = useQuery(
-    user ? api.users.getUserByClerkId : "undefined" as any,
+    user ? api.users.getUserByClerkId : ("skip" as never),
     user ? { clerkId: user.id } : "skip"
   );
 

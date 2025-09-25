@@ -1,6 +1,7 @@
 // convex/transactions.ts
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
 const normalizeDescription = (description: string): string => {
     return description.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -20,7 +21,7 @@ export const importTransactions = mutation({
             description: v.string(),
             category: v.optional(v.string()),
             transactionType: v.optional(v.string()),
-            rawData: v.any(),
+            rawData: v.any(), // Raw CSV data - keeping v.any() for Convex compatibility
         })),
         sessionId: v.string(),
     },
@@ -40,7 +41,12 @@ export const importTransactions = mutation({
             .collect();
 
         // Build deduplication lookup
-        const existingTransactionKeys = new Map<string, any>();
+        const existingTransactionKeys = new Map<string, {
+            _id: Id<"transactions">;
+            amount: number;
+            description: string;
+            [key: string]: unknown;
+        }>();
         for (const existing of existingTransactions) {
             const key = createDeduplicationKey(accountId, existing.amount, existing.description);
             existingTransactionKeys.set(key, existing);
@@ -175,7 +181,7 @@ export const listTransactionsPaginated = query({
         }
 
         // Get all matching transactions
-        let allTransactions = await query.collect();
+        const allTransactions = await query.collect();
 
         // Get categories and groups for filtering
         const categories = await ctx.db
@@ -183,13 +189,9 @@ export const listTransactionsPaginated = query({
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect();
 
-        const categoryGroups = await ctx.db
-            .query("category_groups")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
 
         // Apply additional filters
-        let filteredTransactions = allTransactions.filter((transaction) => {
+        const filteredTransactions = allTransactions.filter((transaction) => {
             // Account filter (if not already applied at DB level)
             if (accountId && !query.toString().includes("by_account")) {
                 if (transaction.accountId !== accountId) {
@@ -381,7 +383,7 @@ export const updateTransaction = mutation({
         }
 
         // Build the update object
-        const patchData: any = {
+        const patchData: Record<string, unknown> = {
             updatedAt: Date.now(), // Track when user made changes
         };
 
@@ -544,7 +546,7 @@ export const mergeTransaction = mutation({
             amount: v.number(),
             description: v.string(),
             transactionType: v.optional(v.string()),
-            rawData: v.any(),
+            rawData: v.any(), // Raw CSV data - keeping v.any() for Convex compatibility
         }),
         userId: v.id("users"),
     },

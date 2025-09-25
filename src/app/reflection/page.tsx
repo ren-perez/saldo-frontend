@@ -2,6 +2,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
@@ -17,8 +18,6 @@ import {
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -32,6 +31,29 @@ import {
 import { format, addMonths, subMonths } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+
+type TrendTransaction = {
+  description: string;
+  amount: number;
+  accountName?: string;
+  categoryName?: string;
+  transactionType?: string;
+};
+
+type TrendTooltipData = {
+  income: number;
+  expense: number;
+  transactionCount: number;
+  transactions?: TrendTransaction[];
+};
+
+type LegendEntry = {
+    name: string
+    value: number
+    color: string
+    dataKey?: string
+  }
+
 
 export default function ReflectionPage() {
   const { convexUser } = useConvexUser();
@@ -80,14 +102,24 @@ export default function ReflectionPage() {
       : "skip"
   );
 
+  // const categoryTrend = useQuery(
+  //   api.reflections.getCategoryTrend,
+  //   convexUser
+  //     ? {
+  //         userId: convexUser._id,
+  //         ...dateRange,
+  //         categoryId: dailyChartCategoryId,
+  //       }
+  //     : "skip"
+  // );
   const categoryTrend = useQuery(
     api.reflections.getCategoryTrend,
     convexUser
       ? {
-          userId: convexUser._id,
-          ...dateRange,
-          categoryId: dailyChartCategoryId,
-        }
+        userId: convexUser._id,
+        ...dateRange,
+        ...(dailyChartCategoryId ? { categoryId: dailyChartCategoryId as Id<"categories"> } : {}),
+      }
       : "skip"
   );
 
@@ -107,11 +139,11 @@ export default function ReflectionPage() {
     api.reflections.getTimeBasedBreakdown,
     convexUser
       ? {
-          userId: convexUser._id,
-          ...dateRange,
-          filterType: topExpensesType,
-          filterId: topExpensesFilterId,
-        }
+        userId: convexUser._id,
+        ...dateRange,
+        filterType: topExpensesType,
+        filterId: topExpensesFilterId,
+      }
       : "skip"
   );
 
@@ -162,12 +194,18 @@ export default function ReflectionPage() {
   ];
 
   // Enhanced tooltip for trend chart with income/expense breakdown
-  const TrendTooltip = ({ active, payload, label }: any) => {
+  const TrendTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: Array<{ payload: TrendTooltipData; value: number }>;
+    label?: string;
+  }) => {
     if (active && payload && payload.length) {
       const data = payload[0]?.payload;
       return (
         <div className="bg-background border rounded-lg p-4 shadow-lg max-w-sm">
-          <p className="font-medium mb-2">{formatDateWithDay(label)}</p>
+          {label && (
+            <p className="font-medium mb-2">{formatDateWithDay(label)}</p>
+          )}
 
           {/* Income/Expense Summary */}
           <div className="space-y-1 mb-3">
@@ -181,11 +219,10 @@ export default function ReflectionPage() {
             </div>
             <div className="flex justify-between text-sm border-t pt-1">
               <span>Net:</span>
-              <span className={`font-semibold ${
-                (data?.income || 0) - (data?.expense || 0) >= 0
-                  ? "text-green-600"
-                  : "text-red-600"
-              }`}>
+              <span className={`font-semibold ${(data?.income || 0) - (data?.expense || 0) >= 0
+                ? "text-green-600"
+                : "text-red-600"
+                }`}>
                 {formatCurrency((data?.income || 0) - (data?.expense || 0))}
               </span>
             </div>
@@ -200,7 +237,7 @@ export default function ReflectionPage() {
             <div className="border-t pt-2">
               <p className="text-xs font-medium text-muted-foreground mb-1">Top Transactions:</p>
               <div className="space-y-1 max-h-32 overflow-y-auto">
-                {data.transactions.slice(0, 3).map((tx: any, idx: number) => (
+                {data.transactions.slice(0, 3).map((tx: TrendTransaction, idx: number) => (
                   <div key={idx} className="text-xs">
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0 mr-2">
@@ -211,13 +248,12 @@ export default function ReflectionPage() {
                           {tx.accountName} • {tx.categoryName}
                         </div>
                       </div>
-                      <div className={`font-semibold flex-shrink-0 ${
-                        tx.amount >= 0
-                          ? "text-green-600"
-                          : tx.transactionType === "transfer"
+                      <div className={`font-semibold flex-shrink-0 ${tx.amount >= 0
+                        ? "text-green-600"
+                        : tx.transactionType === "transfer"
                           ? "text-gray-600"
                           : "text-red-600"
-                      }`}>
+                        }`}>
                         {formatCurrency(Math.abs(tx.amount))}
                       </div>
                     </div>
@@ -238,12 +274,16 @@ export default function ReflectionPage() {
   };
 
   // Standard tooltip for other charts
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: Array<LegendEntry>;
+    label?: string;
+  }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-background border rounded-lg p-2 shadow-lg">
           <p className="font-medium">{`${label}`}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry: LegendEntry, index: number) => (
             <p
               key={index}
               className="text-sm"
@@ -348,11 +388,10 @@ export default function ReflectionPage() {
                   Net Difference
                 </p>
                 <p
-                  className={`text-3xl font-bold ${
-                    monthlySummary.netDifference >= 0
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
+                  className={`text-3xl font-bold ${monthlySummary.netDifference >= 0
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                    }`}
                 >
                   {formatCurrency(monthlySummary.netDifference)}
                 </p>
@@ -397,12 +436,12 @@ export default function ReflectionPage() {
                     tickLine={false}
                   />
                   <YAxis
-                    tickFormatter={(value) => value >= 1000 ? `$${(value/1000).toFixed(1)}k` : `$${value}`}
+                    tickFormatter={(value) => value >= 1000 ? `$${(value / 1000).toFixed(1)}k` : `$${value}`}
                     tick={{ fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip content={TrendTooltip} />
+                  <Tooltip content={<TrendTooltip />} />
                   <Bar dataKey="income" fill="#22c55e" name="Income" radius={[2, 2, 0, 0]} />
                   <Bar dataKey="expense" fill="#ef4444" name="Expenses" radius={[2, 2, 0, 0]} />
                   <Legend />
@@ -465,12 +504,12 @@ export default function ReflectionPage() {
                     tickLine={false}
                   />
                   <YAxis
-                    tickFormatter={(value) => value >= 1000 ? `$${(value/1000).toFixed(1)}k` : `$${value}`}
+                    tickFormatter={(value) => value >= 1000 ? `$${(value / 1000).toFixed(1)}k` : `$${value}`}
                     tick={{ fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip content={CustomTooltip} />
+                  <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="expense" fill="#3b82f6" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -504,7 +543,7 @@ export default function ReflectionPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: any) => [formatCurrency(value), "Amount"]}
+                      formatter={(value: number) => [formatCurrency(value), "Amount"]}
                       contentStyle={{ zIndex: 1000 }}
                       wrapperStyle={{ zIndex: 1000 }}
                     />

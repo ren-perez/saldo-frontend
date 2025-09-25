@@ -15,8 +15,9 @@ interface EditAccountDialogProps {
         _id: string;
         name: string;
         bank: string;
-        number: string;
+        number?: string;
         type: string;
+        createdAt: string;
     } | null;
 }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Papa from "papaparse";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
@@ -13,7 +14,6 @@ import {
   processTransactions,
   validatePreset,
   validateCsvHeaders,
-  getDateRange,
   type PresetConfig,
   type ValidationError,
   type NormalizedTransaction,
@@ -21,7 +21,8 @@ import {
 
 export default function CsvImporterPage() {
   const { convexUser } = useConvexUser();
-  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  // const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<Id<"accounts"> | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewTransactions, setPreviewTransactions] = useState<
     NormalizedTransaction[]
@@ -29,7 +30,12 @@ export default function CsvImporterPage() {
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
     []
   );
-  const [processingStats, setProcessingStats] = useState<any>(null);
+  const [processingStats, setProcessingStats] = useState<{
+    totalRows: number;
+    validRows: number;
+    errorRows: number;
+    warningRows: number;
+  } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [importPhase, setImportPhase] = useState<
@@ -41,9 +47,13 @@ export default function CsvImporterPage() {
     convexUser ? { userId: convexUser._id } : "skip"
   );
 
+  // const preset = useQuery(
+  //   api.accounts.getAccountPreset,
+  //   selectedAccount ? { accountId: selectedAccount as string } : "skip"
+  // );
   const preset = useQuery(
     api.accounts.getAccountPreset,
-    selectedAccount ? { accountId: selectedAccount as any } : "skip"
+    selectedAccount ? { accountId: selectedAccount } : "skip"
   );
 
   const importTransactions = useMutation(api.transactions.importTransactions);
@@ -57,14 +67,24 @@ export default function CsvImporterPage() {
   );
 
   // Get existing transactions for duplicate review (only load when needed)
+  // const existingTransactions = useQuery(
+  //   api.transactions.listTransactions,
+  //   importSession && selectedAccount && convexUser
+  //     ? {
+  //       userId: convexUser._id,
+  //       accountId: selectedAccount as string,
+  //       limit: 1000 // Get more for duplicate matching
+  //     }
+  //     : "skip"
+  // );
   const existingTransactions = useQuery(
     api.transactions.listTransactions,
     importSession && selectedAccount && convexUser
       ? {
-          userId: convexUser._id,
-          accountId: selectedAccount as any,
-          limit: 1000 // Get more for duplicate matching
-        }
+        userId: convexUser._id,
+        accountId: selectedAccount as Id<"accounts">, // ✅ Correct cast
+        limit: 1000
+      }
       : "skip"
   );
 
@@ -113,7 +133,7 @@ export default function CsvImporterPage() {
       delimiter: preset.delimiter,
       skipEmptyLines: true,
       complete: (results) => {
-        const rows = results.data as any[];
+        const rows = results.data as Record<string, unknown>[];
 
         if (rows.length === 0) {
           setValidationErrors([
@@ -167,7 +187,7 @@ export default function CsvImporterPage() {
         delimiter: preset.delimiter,
         skipEmptyLines: true,
         complete: async (results) => {
-          const rows = results.data as any[];
+          const rows = results.data as Record<string, unknown>[];
           const result = processTransactions(rows, preset as PresetConfig);
 
           if (result.errors.length > 0) {
@@ -190,7 +210,7 @@ export default function CsvImporterPage() {
 
           const importResult = await importTransactions({
             userId: convexUser._id,
-            accountId: selectedAccount as any,
+            accountId: selectedAccount as Id<"accounts">,
             transactions: transactionsForConvex,
             sessionId,
           });
@@ -203,10 +223,9 @@ export default function CsvImporterPage() {
           } else {
             // No duplicates, show success
             alert(
-              `Successfully imported ${importResult.inserted} transactions!${
-                importResult.errors.length > 0
-                  ? ` ${importResult.errors.length} rows had errors.`
-                  : ""
+              `Successfully imported ${importResult.inserted} transactions!${importResult.errors.length > 0
+                ? ` ${importResult.errors.length} rows had errors.`
+                : ""
               }`
             );
             setImportPhase("completed");
@@ -218,8 +237,7 @@ export default function CsvImporterPage() {
     } catch (error) {
       console.error("Import error:", error);
       alert(
-        `Error importing transactions: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Error importing transactions: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
       setIsProcessing(false);
@@ -280,185 +298,186 @@ export default function CsvImporterPage() {
         {importPhase !== "reviewing" && importPhase !== "completed" && (
           <>
 
-        {/* Account Selection */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">Select Account</label>
-          <select
-            value={selectedAccount || ""}
-            onChange={(e) => setSelectedAccount(e.target.value || null)}
-            className="w-full p-2 border rounded-md bg-background text-foreground border-border"
-          >
-            <option value="">Choose an account...</option>
-            {accounts?.map((account) => (
-              <option key={account._id} value={account._id}>
-                {account.name} ({account.bank})
-              </option>
-            ))}
-          </select>
-        </div>
+            {/* Account Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Select Account</label>
+              <select
+                value={selectedAccount || ""}
+                // onChange={(e) => setSelectedAccount(e.target.value || null)}
+                onChange={(e) => setSelectedAccount(e.target.value ? e.target.value as Id<"accounts"> : null)}
+                className="w-full p-2 border rounded-md bg-background text-foreground border-border"
+              >
+                <option value="">Choose an account...</option>
+                {accounts?.map((account) => (
+                  <option key={account._id} value={account._id}>
+                    {account.name} ({account.bank})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Preset Info */}
-        {selectedAccount && preset && (
-          <div className="mb-6 p-4 rounded-md border bg-muted">
-            <h3 className="text-lg font-medium">Using Preset: {preset.name}</h3>
-            <p className="text-muted-foreground">{preset.description}</p>
-            <div className="text-sm text-muted-foreground mt-2 space-y-1">
-              <div>
-                Delimiter: "{preset.delimiter}" | Headers:{" "}
-                {preset.hasHeader ? "Yes" : "No"} | Skip rows:{" "}
-                {preset.skipRows || 0}
+            {/* Preset Info */}
+            {selectedAccount && preset && (
+              <div className="mb-6 p-4 rounded-md border bg-muted">
+                <h3 className="text-lg font-medium">Using Preset: {preset.name}</h3>
+                <p className="text-muted-foreground">{preset.description}</p>
+                <div className="text-sm text-muted-foreground mt-2 space-y-1">
+                  <div>
+                    Delimiter: &quot;{preset.delimiter}&quot; | Headers:{" "}
+                    {preset.hasHeader ? "Yes" : "No"} | Skip rows:{" "}
+                    {preset.skipRows || 0}
+                  </div>
+                  <div>Date format: {preset.dateFormat}</div>
+                </div>
               </div>
-              <div>Date format: {preset.dateFormat}</div>
+            )}
+
+            {selectedAccount && !preset && (
+              <div className="mb-6 p-4 rounded-md border bg-yellow-100/10 text-yellow-700 dark:text-yellow-400">
+                <h3 className="text-lg font-medium">
+                  No preset linked to this account. Please create and link a preset
+                  first.
+                </h3>
+              </div>
+            )}
+
+            {/* File Upload */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Select CSV File</label>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                className="w-full p-2 border rounded-md bg-background text-foreground border-border"
+              />
             </div>
-          </div>
-        )}
 
-        {selectedAccount && !preset && (
-          <div className="mb-6 p-4 rounded-md border bg-yellow-100/10 text-yellow-700 dark:text-yellow-400">
-            <h3 className="text-lg font-medium">
-              No preset linked to this account. Please create and link a preset
-              first.
-            </h3>
-          </div>
-        )}
+            {/* Preview Button */}
+            <Button
+              onClick={handlePreview}
+              disabled={!file || !preset || isProcessing}
+              className="mb-6"
+            >
+              {isProcessing ? "Processing..." : "Preview CSV"}
+            </Button>
 
-        {/* File Upload */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">Select CSV File</label>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleFileChange}
-            className="w-full p-2 border rounded-md bg-background text-foreground border-border"
-          />
-        </div>
-
-        {/* Preview Button */}
-        <Button
-          onClick={handlePreview}
-          disabled={!file || !preset || isProcessing}
-          className="mb-6"
-        >
-          {isProcessing ? "Processing..." : "Preview CSV"}
-        </Button>
-
-        {/* Processing Stats */}
-        {processingStats && (
-          <div className="mb-6 p-4 rounded-md border bg-muted">
-            <h3 className="text-lg font-medium">Processing Summary</h3>
-            <div className="mt-2 text-sm text-muted-foreground">
-              <div>Total rows processed: {processingStats.totalRows || 0}</div>
-              <div>Valid transactions: {processingStats.validRows || 0}</div>
-              {(processingStats.errorRows || 0) > 0 && (
-                <div>Rows with errors: {processingStats.errorRows || 0}</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Validation Errors */}
-        {validationErrors.length > 0 && (
-          <div className="mb-6 p-4 rounded-md border bg-destructive/10">
-            <h3 className="text-lg font-medium text-destructive">
-              Validation Errors ({validationErrors.length}):
-            </h3>
-            <div className="mt-2 max-h-64 overflow-y-auto">
-              {validationErrors.slice(0, 20).map((error, i) => (
-                <div key={i} className="text-sm text-destructive py-1">
-                  {error.row > 0 ? `Row ${error.row}: ` : ""}
-                  {error.column && `[${error.column}] `}
-                  {error.error}
-                  {error.value !== null && error.value !== undefined && (
-                    <span className="font-mono bg-destructive/20 px-1 ml-2">
-                      "{error.value}"
-                    </span>
+            {/* Processing Stats */}
+            {processingStats && (
+              <div className="mb-6 p-4 rounded-md border bg-muted">
+                <h3 className="text-lg font-medium">Processing Summary</h3>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  <div>Total rows processed: {processingStats.totalRows || 0}</div>
+                  <div>Valid transactions: {processingStats.validRows || 0}</div>
+                  {(processingStats.errorRows || 0) > 0 && (
+                    <div>Rows with errors: {processingStats.errorRows || 0}</div>
                   )}
                 </div>
-              ))}
-              {validationErrors.length > 20 && (
-                <div className="text-sm text-muted-foreground mt-2">
-                  ... and {validationErrors.length - 20} more errors
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* Preview Table */}
-        {previewTransactions.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-4">
-              Normalized Transaction Preview (first 10):
-            </h3>
-            <div className="overflow-x-auto border rounded-md border-border">
-              <table className="min-w-full divide-y divide-border">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Type
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewTransactions.map((transaction, i) => (
-                    <tr
-                      key={i}
-                      className={i % 2 === 0 ? "bg-background" : "bg-muted"}
-                    >
-                      <td className="px-4 py-3 text-sm">{transaction.date}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span
-                          className={
-                            transaction.amount >= 0
-                              ? "text-green-600 dark:text-green-400"
-                              : "text-red-600 dark:text-red-400"
-                          }
-                        >
-                          ${transaction.amount.toFixed(2)}
+            {/* Validation Errors */}
+            {validationErrors.length > 0 && (
+              <div className="mb-6 p-4 rounded-md border bg-destructive/10">
+                <h3 className="text-lg font-medium text-destructive">
+                  Validation Errors ({validationErrors.length}):
+                </h3>
+                <div className="mt-2 max-h-64 overflow-y-auto">
+                  {validationErrors.slice(0, 20).map((error, i) => (
+                    <div key={i} className="text-sm text-destructive py-1">
+                      {error.row > 0 ? `Row ${error.row}: ` : ""}
+                      {error.column && `[${error.column}] `}
+                      {error.error}
+                      {error.value !== null && error.value !== undefined && (
+                        <span className="font-mono bg-destructive/20 px-1 ml-2">
+                          &quot;{String(error.value)}&quot;
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm max-w-xs truncate">
-                        {transaction.description}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {transaction.category || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {transaction.transactionType || "-"}
-                      </td>
-                    </tr>
+                      )}
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                  {validationErrors.length > 20 && (
+                    <div className="text-sm text-muted-foreground mt-2">
+                      ... and {validationErrors.length - 20} more errors
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-        {/* Import Button */}
-        {previewTransactions.length > 0 && validationErrors.length === 0 && (
-          <Button
-            onClick={handleImport}
-            disabled={isProcessing}
-            // variant="success"
-            className="mb-6"
-          >
-            {isProcessing
-              ? "Importing..."
-              : `Import All ${processingStats?.validRows || 0} Transactions`}
-          </Button>
-        )}
+            {/* Preview Table */}
+            {previewTransactions.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-4">
+                  Normalized Transaction Preview (first 10):
+                </h3>
+                <div className="overflow-x-auto border rounded-md border-border">
+                  <table className="min-w-full divide-y divide-border">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                          Description
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                          Category
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                          Type
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewTransactions.map((transaction, i) => (
+                        <tr
+                          key={i}
+                          className={i % 2 === 0 ? "bg-background" : "bg-muted"}
+                        >
+                          <td className="px-4 py-3 text-sm">{transaction.date}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span
+                              className={
+                                transaction.amount >= 0
+                                  ? "text-green-600 dark:text-green-400"
+                                  : "text-red-600 dark:text-red-400"
+                              }
+                            >
+                              ${transaction.amount.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm max-w-xs truncate">
+                            {transaction.description}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {transaction.category || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {transaction.transactionType || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Import Button */}
+            {previewTransactions.length > 0 && validationErrors.length === 0 && (
+              <Button
+                onClick={handleImport}
+                disabled={isProcessing}
+                // variant="success"
+                className="mb-6"
+              >
+                {isProcessing
+                  ? "Importing..."
+                  : `Import All ${processingStats?.validRows || 0} Transactions`}
+              </Button>
+            )}
 
             {/* Instructions */}
             <div className="p-6 rounded-md border bg-muted">
@@ -467,9 +486,9 @@ export default function CsvImporterPage() {
                 <div>1. Select the account you want to import transactions for</div>
                 <div>2. Make sure the account has a preset linked to it</div>
                 <div>3. Choose your CSV file</div>
-                <div>4. Click "Preview CSV" to validate and normalize the data</div>
+                <div>4. Click &quot;Preview CSV&quot; to validate and normalize the data</div>
                 <div>5. Review the normalized transactions preview</div>
-                <div>6. If validation passes, click "Import All Transactions"</div>
+                <div>6. If validation passes, click &quot;Import All Transactions&quot;</div>
                 <div>7. Review any duplicate transactions if found</div>
                 <div className="text-yellow-600 dark:text-yellow-400 mt-2">
                   ⚠️ Import process now includes duplicate detection based on account, amount, and description.

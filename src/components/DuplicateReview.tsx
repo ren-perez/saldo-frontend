@@ -2,25 +2,34 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+interface ExistingTransaction {
+  _id: Id<"transactions">;
+  amount: number;
+  description: string;
+  date: number;
+  categoryId?: Id<"categories"> | null; // added
+}
+
 interface DuplicateTransaction {
-  existingId: string;
+  existingId: Id<"transactions">;
   newTransaction: {
     date: number;
     amount: number;
     description: string;
     transactionType?: string;
-    rawData: any;
+    rawData: Record<string, unknown>;
   };
 }
 
 interface ImportSession {
   _id: string;
   sessionId: string;
-  userId: string;
-  accountId: string;
+  userId: Id<"users">;
+  accountId: Id<"accounts">;
   duplicates: DuplicateTransaction[];
   errors: Array<{ rowIndex: number; message: string }>;
   summary: {
@@ -33,7 +42,7 @@ interface ImportSession {
 
 interface DuplicateReviewProps {
   session: ImportSession;
-  existingTransactions: any[];
+  existingTransactions: ExistingTransaction[];
   onSessionResolved: () => void;
 }
 
@@ -70,9 +79,9 @@ export default function DuplicateReview({
     try {
       const duplicate = session.duplicates[duplicateIndex];
       await mergeTransaction({
-        existingTransactionId: duplicate.existingId as any,
+        existingTransactionId: duplicate.existingId,
         newTransactionData: duplicate.newTransaction,
-        userId: session.userId as any,
+        userId: session.userId,
       });
 
       setResolvedDuplicates((prev) => new Set(prev).add(duplicateIndex));
@@ -96,7 +105,7 @@ export default function DuplicateReview({
     try {
       await resolveImportSession({
         sessionId: session.sessionId,
-        userId: session.userId as any,
+        userId: session.userId,
       });
       onSessionResolved();
     } catch (error) {

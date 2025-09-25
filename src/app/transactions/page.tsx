@@ -7,6 +7,7 @@ import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import { Search, X, Filter, Download, RefreshCw, Trash2 } from "lucide-react";
+import { Id } from "../../../convex/_generated/dataModel";
 
 import {
     Select,
@@ -137,7 +138,7 @@ function CategoryCombobox({
 
 export default function TransactionsPage() {
     const { convexUser } = useConvexUser();
-    const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+    const [selectedAccount, setSelectedAccount] = useState<Id<"accounts"> | null>(null);
     const [search, setSearch] = useState("");
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
     const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -213,7 +214,7 @@ export default function TransactionsPage() {
         setCurrentPage(1);
     };
 
-    const handleDeleteTransaction = async (transactionId: string) => {
+    const handleDeleteTransaction = async (transactionId: Id<"transactions">) => {
         try {
             await deleteTransaction({ transactionId });
         } catch (error) {
@@ -442,7 +443,7 @@ export default function TransactionsPage() {
                                     value={selectedAccount || "ALL_ACCOUNTS"}
                                     onValueChange={(value) =>
                                         handleFilterChange(() =>
-                                            setSelectedAccount(value === "ALL_ACCOUNTS" ? null : value)
+                                            setSelectedAccount(value === "ALL_ACCOUNTS" ? null : value as Id<"accounts">)
                                         )
                                     }
                                 >
@@ -702,7 +703,7 @@ export default function TransactionsPage() {
                                                         onValueChange={(value) =>
                                                             updateTransactionByGroup({
                                                                 transactionId: transaction._id,
-                                                                groupId: value === "NONE" ? undefined : value,
+                                                                groupId: value === "NONE" ? undefined : value as Id<"category_groups">,
                                                                 clearGroup: value === "NONE",
                                                             })
                                                         }
@@ -719,7 +720,7 @@ export default function TransactionsPage() {
                                                                 transactionId: transaction._id,
                                                                 updates: value === "NONE"
                                                                     ? { clearCategoryId: true }
-                                                                    : { categoryId: value },
+                                                                    : { categoryId: value as Id<"categories"> },
                                                             })
                                                         }
                                                         options={getFilteredCategoryOptions(transaction.transactionType, group?._id)}
