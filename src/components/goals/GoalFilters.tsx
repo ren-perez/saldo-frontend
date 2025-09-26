@@ -24,19 +24,19 @@ import {
     ChevronDown,
     X,
     Search,
-    Calendar,
+    // Calendar,
     CreditCard,
     Target
 } from 'lucide-react';
 
 interface FilterOptions {
     accounts: Array<{
-        id: number;
+        id: string; // Changed from number to string to match Convex Id types
         name: string;
         account_type: string;
     }>;
-    monthly_plans: Array<{
-        id: number;
+    monthly_plans?: Array<{
+        id: string; // Changed from number to string to match Convex Id types
         name: string;
         month: number;
         year: number;
@@ -45,7 +45,7 @@ interface FilterOptions {
 
 interface Filters {
     account_id: string;
-    monthly_plan_id: string;
+    // monthly_plan_id: string;
     status?: string;
     search?: string;
 }
@@ -77,7 +77,6 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
         setSearchTerm('');
         onFiltersChange({
             account_id: '',
-            monthly_plan_id: '',
             status: '',
             search: ''
         });
@@ -100,13 +99,14 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
         }
     };
 
-    const formatMonthlyPlan = (plan: FilterOptions['monthly_plans'][0]) => {
-        const monthNames = [
-            'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'
-        ];
-        return `${monthNames[plan.month - 1]} ${plan.year}`;
-    };
+    // const formatMonthlyPlan = (plan: NonNullable<FilterOptions['monthly_plans']>[0]) => {
+    //     if (!plan) return '';
+    //     const monthNames = [
+    //         'January', 'February', 'March', 'April', 'May', 'June',
+    //         'July', 'August', 'September', 'October', 'November', 'December'
+    //     ];
+    //     return `${monthNames[plan.month - 1]} ${plan.year}`;
+    // };
 
     return (
         <div className="mb-6 space-y-4">
@@ -140,7 +140,7 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
                     <CollapsibleContent className="mt-4">
                         <Card>
                             <CardContent className="pt-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                                     {/* Account Filter */}
                                     <div className="space-y-2">
                                         <Label className="flex items-center gap-2">
@@ -156,7 +156,7 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="__all__">All accounts</SelectItem>
-                                                {filterOptions?.accounts?.length > 0 ? (
+                                                {filterOptions?.accounts && filterOptions.accounts.length > 0 ? (
                                                     filterOptions.accounts.map((account) => (
                                                         <SelectItem key={account.id} value={account.id.toString()}>
                                                             <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
                                     </div>
 
                                     {/* Monthly Plan Filter */}
-                                    <div className="space-y-2">
+                                    {/* <div className="space-y-2">
                                         <Label className="flex items-center gap-2">
                                             <Calendar className="h-4 w-4" />
                                             Monthly Plan
@@ -205,7 +205,7 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
 
                                             </SelectContent>
                                         </Select>
-                                    </div>
+                                    </div> */}
 
                                     {/* Status Filter */}
                                     <div className="space-y-2">
@@ -292,17 +292,6 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
                             <X
                                 className="h-3 w-3 cursor-pointer hover:bg-destructive/10 rounded"
                                 onClick={() => handleFilterChange('account_id', '')}
-                            />
-                        </Badge>
-                    )}
-
-                    {filters.monthly_plan_id && (
-                        <Badge variant="secondary" className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            Plan: {formatMonthlyPlan(filterOptions?.monthly_plans?.find(p => p.id.toString() === filters.monthly_plan_id)!)}
-                            <X
-                                className="h-3 w-3 cursor-pointer hover:bg-destructive/10 rounded"
-                                onClick={() => handleFilterChange('monthly_plan_id', '')}
                             />
                         </Badge>
                     )}

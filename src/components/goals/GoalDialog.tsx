@@ -22,52 +22,52 @@ import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
-import { DollarSign, Calendar, AlertCircle } from "lucide-react"
+import { 
+    // DollarSign, 
+    Calendar, AlertCircle } from "lucide-react"
+import type { Goal } from "@/types/goals"
+import type { Id } from "../../../convex/_generated/dataModel"
+import Image from "next/image"
 
-interface Goal {
-    id: number
-    name: string
-    note?: string
-    total_amount: number
-    monthly_contribution: number
-    due_date: string
-    color: string
-    emoji: string
-    priority: number
-    priority_label: string
-    tracking_type: string
-    calculation_type: string
-    linked_account: {
-        id: number
-        name: string
-        account_type: string
-        balance?: number
-    } | null
-    image?: string
-    monthly_plans: Array<{
-        id: number
-        name: string
-        month: number
-        year: number
-        allocated_amount: number
-    }>
-}
 
-interface GoalFormData {
-    name: string
-    note: string
-    total_amount: string
-    due_date: string
-    monthly_contribution: string
-    calculation_type: string
-    tracking_type: string
-    linked_account_id: number | null
-    color: string
-    emoji: string
-    priority: number
-    image: File | null
-    imageChanged: boolean
-}
+// interface Goal {
+//     id: number
+//     name: string
+//     note?: string
+//     total_amount: number
+//     monthly_contribution: number
+//     due_date: string
+//     color: string
+//     emoji: string
+//     priority: number
+//     priority_label: string
+//     tracking_type: string
+//     calculation_type: string
+//     linked_account: {
+//         id: number
+//         name: string
+//         account_type: string
+//         balance?: number
+//     } | null
+//     image?: string
+// }
+
+// interface GoalFormData {
+//     name: string
+//     note: string
+//     total_amount: string
+//     due_date: string
+//     monthly_contribution: string
+//     calculation_type: string
+//     tracking_type: string
+//     linked_account_id: Id<"accounts"> | null
+//     color: string
+//     emoji: string
+//     priority: number
+//     image: File | null
+//     imageChanged: boolean
+// }
+
 
 interface GoalDialogProps {
     open: boolean
@@ -95,9 +95,9 @@ export function GoalDialog({
         monthly_contribution: "",
         calculation_type: "DUE_DATE",
         tracking_type: "MANUAL",
-        linked_account_id: null as number | null,
+        linked_account_id: null as Id<"accounts"> | null,
         color: "#3b82f6",
-        emoji: "🎯",
+        emoji: "",
         priority: 3,
         image: null as File | null,
         imageChanged: false,
@@ -117,7 +117,10 @@ export function GoalDialog({
     const updateGoalMutation = useMutation(api.goals.updateGoal)
 
     // Get selected account details
-    const selectedAccount = accounts.find((account) => account.id === formData.linked_account_id)
+    // const selectedAccount = accounts.find((account) => account.id === formData.linked_account_id)
+    const selectedAccount = accounts.find(
+        (account) => account.id.toString() === formData.linked_account_id
+    )
 
     // Quick date options (in months from now)
     const quickDateOptions = [
@@ -279,13 +282,13 @@ export function GoalDialog({
             if (mode === "edit" && editingGoal) {
                 const result = await updateGoalMutation({
                     ...submitData,
-                    goalId: editingGoal.id.toString(),
+                    goalId: editingGoal.id,
                 })
-                onUpdateGoal(result)
+                onUpdateGoal(result as Goal)
                 toast.success("Goal updated successfully")
             } else {
                 const result = await createGoalMutation(submitData)
-                onCreateGoal(result)
+                onCreateGoal(result as Goal)
                 toast.success("Goal created successfully")
             }
             onOpenChange(false)
@@ -323,7 +326,7 @@ export function GoalDialog({
         }))
     }
 
-    const formatBalance = (balance: any): string => {
+    const formatBalance = (balance?: number): string => {
         if (balance === null || balance === undefined) return "0.00"
         const numBalance = typeof balance === 'number' ? balance : parseFloat(balance)
         return isNaN(numBalance) ? "0.00" : numBalance.toFixed(2)
@@ -390,8 +393,8 @@ export function GoalDialog({
                                 </SelectTrigger>
                                 <SelectContent>
                                     {priorityOptions.map((option, index) => (
-                                        <SelectItem 
-                                            key={`priority-${index}`} 
+                                        <SelectItem
+                                            key={`priority-${index}`}
                                             value={option.value?.toString() || '0'}
                                         >
                                             {option.label}
@@ -403,18 +406,23 @@ export function GoalDialog({
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 items-center">
-                        
+
                         <div className="space-y-2">
                             <Label htmlFor="image">
                                 {isEditing ? 'Update Image' : 'Image'}
                             </Label>
                             {isEditing && editingGoal?.image && !formData.imageChanged && (
                                 <div className="flex items-center gap-2 p-2 border rounded">
-                                    <img
+                                    <Image
                                         src={editingGoal.image}
                                         alt="Current goal image"
                                         className="w-12 h-12 object-cover rounded"
                                     />
+                                    {/* <img
+                                        src={editingGoal.image}
+                                        alt="Current goal image"
+                                        className="w-12 h-12 object-cover rounded"
+                                    /> */}
                                     <span className="text-sm text-muted-foreground">Current image</span>
                                     <Button
                                         type="button"
@@ -427,18 +435,18 @@ export function GoalDialog({
                                 </div>
                             )}
                         </div>
-                            <Input
-                                id="image"
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileChange}
-                            />
-                            {formData.imageChanged && formData.image === null && (
-                                <p className="text-sm text-muted-foreground">Image will be removed</p>
-                            )}
-                            {formData.image && (
-                                <p className="text-sm text-muted-foreground">New image selected: {formData.image.name}</p>
-                            )}
+                        <Input
+                            id="image"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                        />
+                        {formData.imageChanged && formData.image === null && (
+                            <p className="text-sm text-muted-foreground">Image will be removed</p>
+                        )}
+                        {formData.image && (
+                            <p className="text-sm text-muted-foreground">New image selected: {formData.image.name}</p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -611,7 +619,7 @@ export function GoalDialog({
                                     setFormData((prev) => ({
                                         ...prev,
                                         tracking_type: "LINKED_ACCOUNT",
-                                        linked_account_id: parseInt(value),
+                                        linked_account_id: value as Id<"accounts">,
                                     }))
                                 }
                             }}
@@ -622,8 +630,8 @@ export function GoalDialog({
                             <SelectContent>
                                 <SelectItem value="MANUAL">Manual Tracking</SelectItem>
                                 {accounts.map((account, index) => (
-                                    <SelectItem 
-                                        key={`account-${index}`} 
+                                    <SelectItem
+                                        key={`account-${index}`}
                                         value={account.id?.toString() || '0'}
                                     >
                                         {account.name} ({account.account_type})

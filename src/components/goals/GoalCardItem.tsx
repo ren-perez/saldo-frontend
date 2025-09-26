@@ -13,36 +13,7 @@ import Link from "next/link"
 import { EnhancedImage } from "@/components/enhanced-image"
 import { useState } from "react"
 import { AddContributionDialog } from "@/components/goals/AddContributionDialog"
-
-interface Goal {
-    id: number
-    name: string
-    note?: string
-    total_amount: number
-    current_amount: number
-    monthly_contribution: number
-    due_date?: string
-    color: string
-    emoji: string
-    tracking_type: string
-    linked_account: {
-        id: number
-        name: string
-        account_type: string
-    } | null
-    image?: string
-    priority_label: string
-    priority: number
-    monthly_plans?: MonthlyPlanData[]
-}
-
-interface MonthlyPlanData {
-    id: number
-    name: string
-    month: number
-    year: number
-    allocated_amount: number
-}
+import { Goal } from "@/types/goals"
 
 interface GoalCardItemProps {
     goal: Goal
@@ -58,7 +29,6 @@ const priorityColors = {
     3: "bg-green-500",
 }
 
-
 export function GoalCardItem({
     goal,
     onEditGoal,
@@ -70,7 +40,7 @@ export function GoalCardItem({
     const deleteGoalMutation = useMutation(api.goals.deleteGoal)
     const [showAddContribution, setShowAddContribution] = useState(false)
 
-    const progressPercentage = getProgressPercentage(goal.current_amount, goal.total_amount);
+    const progressPercentage = getProgressPercentage(goal.current_amount || 0, goal.total_amount);
 
     const handleDeleteGoal = async () => {
         const confirmed = window.confirm(`Are you sure you want to delete "${goal.name}"? This action cannot be undone.`)
@@ -80,7 +50,7 @@ export function GoalCardItem({
         try {
             await deleteGoalMutation({
                 userId: convexUser._id,
-                goalId: goal.id.toString()
+                goalId: goal.id
             })
             toast.success("Goal deleted successfully")
         } catch (error) {
@@ -95,9 +65,9 @@ export function GoalCardItem({
 
                 <GoalCardHeader>
                     <div className="relative h-48 w-full">
-                        {goal.image ? (
+                        {goal.image_url ? (
                             <EnhancedImage
-                                src={goal.image}
+                                src={goal.image_url}
                                 alt={goal.name}
                                 width={300}
                                 height={200}
@@ -117,13 +87,12 @@ export function GoalCardItem({
                                 variant="secondary"
                                 className={`${goal.is_completed
                                         ? "bg-slate-600" // or another class for 'Achieved'
-                                        : priorityColors[goal.priority as keyof typeof priorityColors]
+                                        : priorityColors[goal.priority as keyof typeof priorityColors] || "bg-gray-500"
                                     } text-white`}
                             >
                                 {goal.is_completed ? "Completed" : goal.priority_label}
                             </Badge>
                         </div>
-
 
                         <div className="absolute top-3 right-3 z-20">
                             <DropdownMenu>
@@ -161,8 +130,6 @@ export function GoalCardItem({
                     </div>
                 </GoalCardHeader>
 
-
-
                 <GoalCardContent>
                     <div className="space-y-4 flex flex-col justify-between h-full">
                         <div className="flex justify-between items-start">
@@ -195,7 +162,7 @@ export function GoalCardItem({
                             <div className="flex justify-between items-center text-sm">
                                 <span className="text-muted-foreground">Progress</span>
                                 <span className="font-medium">
-                                    {formatCurrency(Math.ceil(goal.current_amount))} / {formatCurrency(Math.ceil(goal.total_amount))}
+                                    {formatCurrency(Math.ceil(goal.current_amount || 0))} / {formatCurrency(Math.ceil(goal.total_amount))}
                                 </span>
 
                             </div>

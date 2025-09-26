@@ -12,63 +12,7 @@ import { GoalFilters } from "@/components/goals/GoalFilters"
 import { GoalCardItem } from "@/components/goals/GoalCardItem"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"
-
-interface Goal {
-  id: string;
-  name: string;
-  total_amount: number;
-  monthly_contribution: number;
-  due_date: string;
-  color: string;
-  emoji: string;
-  tracking_type: string;
-  linked_account: {
-    id: string;
-    name: string;
-    account_type: string;
-  } | null;
-  monthly_plans: Array<{
-    id: string;
-    name: string;
-    month: number;
-    year: number;
-    allocated_amount: number;
-  }>;
-  image_url?: string;
-}
-
-interface FilterOptions {
-  accounts: Array<{
-    id: string;
-    name: string;
-    account_type: string;
-  }>;
-  monthly_plans: Array<{
-    id: string;
-    name: string;
-    month: number;
-    year: number;
-  }>;
-}
-
-interface Filters {
-  account_id: string;
-  monthly_plan_id: string;
-  status?: string;
-  search?: string;
-}
-
-// Helper function to safely convert string ID to number
-const safeParseInt = (value: string | undefined): number => {
-  if (!value) return 0;
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? 0 : parsed;
-}
-
-// Helper function to safely convert number ID to string
-const safeToString = (value: number | string): string => {
-  return value?.toString() || '0';
-}
+import { Goal, FilterOptions, Filters } from "@/types/goals"
 
 export default function GoalsPage() {
   const { convexUser } = useConvexUser()
@@ -76,7 +20,6 @@ export default function GoalsPage() {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [filters, setFilters] = useState<Filters>({
     account_id: "",
-    monthly_plan_id: "",
     status: "",
     search: ""
   })
@@ -86,10 +29,11 @@ export default function GoalsPage() {
     convexUser ? api.goals.getGoals : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
   ) || []
+  
   const filterOptions = useQuery(
     convexUser ? api.goals.getFilterOptions : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
-  ) || { accounts: [], monthly_plans: [] }
+  ) || { accounts: [] }
 
   // Mutations
   const createGoal = useMutation(api.goals.createGoal)
@@ -122,12 +66,12 @@ export default function GoalsPage() {
     return Math.min(Math.round((current / target) * 100), 100)
   }
 
-  const handleCreateGoal = async (goalData: any) => {
+  const handleCreateGoal = async (goalData: Goal) => {
     // Goal data already contains userId from GoalDialog
     console.log('Goal created:', goalData)
   }
 
-  const handleUpdateGoal = async (goalData: any) => {
+  const handleUpdateGoal = async (goalData: Goal) => {
     // Goal data already contains userId from GoalDialog
     console.log('Goal updated:', goalData)
   }
@@ -152,12 +96,8 @@ export default function GoalsPage() {
     if (filters.search && !goal.name.toLowerCase().includes(filters.search.toLowerCase())) {
       return false
     }
-    if (filters.account_id && filters.account_id !== "__all__" && goal.linked_account?.id !== filters.account_id) {
+    if (filters.account_id && filters.account_id !== "__all__" && goal.linked_account_id !== filters.account_id) {
       return false
-    }
-    if (filters.monthly_plan_id && filters.monthly_plan_id !== "__all__") {
-      const hasMatchingPlan = goal.monthly_plans.some(plan => plan.id === filters.monthly_plan_id)
-      if (!hasMatchingPlan) return false
     }
     return true
   })
@@ -247,36 +187,9 @@ export default function GoalsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredGoals.map((goal: Goal) => (
               <GoalCardItem
-                key={goal.id} // Use the original string ID as key
-                goal={{
-                  ...goal,
-                  id: safeParseInt(goal.id), // Safely convert string to number
-                  current_amount: 0, // Add missing required field
-                  priority: 3, // Add missing required field
-                  priority_label: "Medium", // Add missing required field
-                  image: goal.image_url, // Map image_url to image
-                  linked_account: goal.linked_account ? {
-                    ...goal.linked_account,
-                    id: safeParseInt(goal.linked_account.id) // Safely convert string to number
-                  } : null,
-                  monthly_plans: goal.monthly_plans?.map(plan => ({
-                    ...plan,
-                    id: safeParseInt(plan.id) // Safely convert string to number
-                  })) || []
-                }}
-                onEditGoal={(goal) => handleEditGoal({
-                  ...goal,
-                  id: safeToString(goal.id), // Convert back to string
-                  image_url: goal.image,
-                  linked_account: goal.linked_account ? {
-                    ...goal.linked_account,
-                    id: safeToString(goal.linked_account.id)
-                  } : null,
-                  monthly_plans: goal.monthly_plans?.map(plan => ({
-                    ...plan,
-                    id: safeToString(plan.id)
-                  })) || []
-                })}
+                key={goal.id}
+                goal={goal}
+                onEditGoal={handleEditGoal}
                 formatCurrency={formatCurrency}
                 formatDate={formatDate}
                 getProgressPercentage={getProgressPercentage}
@@ -291,19 +204,7 @@ export default function GoalsPage() {
           onOpenChange={handleDialogClose}
           onCreateGoal={handleCreateGoal}
           onUpdateGoal={handleUpdateGoal}
-          editingGoal={editingGoal ? {
-            ...editingGoal,
-            id: safeParseInt(editingGoal.id), // Safely convert for existing component
-            image: editingGoal.image_url,
-            linked_account: editingGoal.linked_account ? {
-              ...editingGoal.linked_account,
-              id: safeParseInt(editingGoal.linked_account.id)
-            } : null,
-            monthly_plans: editingGoal.monthly_plans?.map(plan => ({
-              ...plan,
-              id: safeParseInt(plan.id)
-            })) || []
-          } : null}
+          editingGoal={editingGoal}
           mode={editingGoal ? "edit" : "create"}
         />
       </div>

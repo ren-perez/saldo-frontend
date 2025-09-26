@@ -14,24 +14,15 @@ import { toast } from "sonner"
 import { useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
+import { Goal } from "@/types/goals"
 
-interface Goal {
-    id: number
-    name: string
-    total_amount: number
-    current_amount: number
-    tracking_type: string
-    emoji: string
-    color: string
-}
-
-interface Contribution {
-    id: number
-    amount: number
-    note: string
-    contribution_date: string
-    created_at: string
-}
+// interface Contribution {
+//     id: number
+//     amount: number
+//     note: string
+//     contribution_date: string
+//     created_at: string
+// }
 
 interface AddContributionDialogProps {
     goal: Goal

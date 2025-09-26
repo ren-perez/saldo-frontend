@@ -166,7 +166,9 @@ export const createGoal = mutation({
     userId: v.id("users"),
     name: v.string(),
     note: v.optional(v.string()),
+    // total_amount: v.union(v.string(), v.number()),
     total_amount: v.union(v.string(), v.number()),
+    current_amount: v.optional(v.number()),
     monthly_contribution: v.union(v.string(), v.number()),
     due_date: v.optional(v.string()),
     calculation_type: v.optional(v.string()),
@@ -175,6 +177,7 @@ export const createGoal = mutation({
     color: v.string(),
     emoji: v.string(),
     priority: v.union(v.string(), v.number()),
+    priority_label: v.optional(v.string()),
     image: v.optional(v.any()), // File object - you might want to handle image upload separately
     imageChanged: v.optional(v.boolean()),
   },
@@ -236,7 +239,8 @@ export const createGoal = mutation({
 
     const goalId = await ctx.db.insert("goals", goalData);
 
-    return { _id: goalId, id: parseInt(goalId), ...args };
+    // return { _id: goalId, id: parseInt(goalId), ...args };
+    return { id: goalId, ...args };
   },
 });
 

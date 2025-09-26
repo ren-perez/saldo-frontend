@@ -177,7 +177,7 @@ function TransferInboxPage() {
               <ArrowRightLeft className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">No Pending Transfers</h3>
               <p className="text-muted-foreground">
-                All your transactions look good! We couldn't find any potential transfer pairs
+                All your transactions look good! We couldn&#39;t find any potential transfer pairs
                 that need review.
               </p>
             </CardContent>

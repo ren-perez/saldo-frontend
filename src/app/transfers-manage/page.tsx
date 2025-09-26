@@ -5,9 +5,15 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
+import { Id } from "../../../convex/_generated/dataModel"; // adjust path if needed
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card, CardContent,
+  // CardDescription, 
+  // CardTitle,
+  CardHeader,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +21,7 @@ import {
   ArrowRightLeft,
   Unlink,
   RotateCcw,
-  Trash2,
+  // Trash2,
   CheckCircle,
   XCircle,
   Calendar
@@ -63,7 +69,25 @@ function TransfersManagePage() {
     }
   };
 
-  const handleUnignoreTransfer = async (outgoingTxId: string, incomingTxId: string) => {
+  // const handleUnpairTransfers = async (transferPairId: Id<"transfer_pairs">) => {
+  //   if (!convexUser) return;
+
+  //   try {
+  //     await unpairTransfers({
+  //       userId: convexUser._id,
+  //       transferPairId,
+  //     });
+  //   } catch (error) {
+  //     console.error("Failed to unpair transfers:", error);
+  //   }
+  // };
+
+
+
+  const handleUnignoreTransfer = async (
+    outgoingTxId: Id<"transactions">,
+    incomingTxId: Id<"transactions">
+  ) => {
     if (!convexUser) return;
 
     try {
@@ -73,9 +97,24 @@ function TransfersManagePage() {
         incomingTransactionId: incomingTxId,
       });
     } catch (error) {
-      console.error('Failed to restore transfer suggestion:', error);
+      console.error("Failed to restore transfer suggestion:", error);
     }
   };
+
+
+  // const handleUnignoreTransfer = async (outgoingTxId: string, incomingTxId: string) => {
+  //   if (!convexUser) return;
+
+  //   try {
+  //     await unignoreTransferSuggestion({
+  //       userId: convexUser._id,
+  //       outgoingTransactionId: outgoingTxId,
+  //       incomingTransactionId: incomingTxId,
+  //     });
+  //   } catch (error) {
+  //     console.error('Failed to restore transfer suggestion:', error);
+  //   }
+  // };
 
   if (!convexUser) {
     return (
@@ -137,7 +176,7 @@ function TransfersManagePage() {
                   <CheckCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-medium mb-2">No Paired Transfers</h3>
                   <p className="text-muted-foreground mb-4">
-                    You haven't paired any transfers yet. Review pending suggestions to get started.
+                    You haven&#39;t paired any transfers yet. Review pending suggestions to get started.
                   </p>
                   <Button asChild>
                     <Link href="/transfers-inbox">
@@ -239,7 +278,7 @@ function TransfersManagePage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Unpair Transfer?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will unlink these transactions and remove their "transfer" status.
+                                {"This will unlink these transactions and remove their \"transfer\" status."}
                                 The transactions will remain in your account but will no longer be
                                 treated as a transfer pair.
                               </AlertDialogDescription>
@@ -271,7 +310,7 @@ function TransfersManagePage() {
                   <XCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-medium mb-2">No Ignored Suggestions</h3>
                   <p className="text-muted-foreground">
-                    You haven't ignored any transfer suggestions yet.
+                    You haven&#39;t ignored any transfer suggestions yet.
                   </p>
                 </CardContent>
               </Card>
