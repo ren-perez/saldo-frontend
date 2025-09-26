@@ -10,6 +10,8 @@ import { NotebookText, Plus, Target } from "lucide-react"
 import { GoalDialog } from "@/components/goals/GoalDialog"
 import { GoalFilters } from "@/components/goals/GoalFilters"
 import { GoalCardItem } from "@/components/goals/GoalCardItem"
+import AppLayout from "@/components/AppLayout"
+import InitUser from "@/components/InitUser"
 
 interface Goal {
   id: string;
@@ -193,115 +195,118 @@ export default function GoalsPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 px-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Target className="h-8 w-8 text-primary" />
-            Goals
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Track your financial goals and stay motivated on your journey
-          </p>
-        </div>
-
-        <Button onClick={handleCreateNewGoal} className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Goal
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <GoalFilters
-        filters={filters}
-        onFiltersChange={setFilters}
-        filterOptions={filterOptions}
-      />
-
-      {/* Goals Grid */}
-      {filteredGoals.length === 0 ? (
-        <Card className="p-12 text-center">
-          <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
-            <Target className="h-12 w-12 text-muted-foreground" />
+    <AppLayout>
+      <InitUser />
+      <div className="container mx-auto py-6 px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+              <Target className="h-8 w-8 text-primary" />
+              Goals
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Track your financial goals and stay motivated on your journey
+            </p>
           </div>
-          <h3 className="text-xl font-semibold mb-2">No goals found</h3>
-          <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-            {goals.length === 0
-              ? "Start your financial journey by creating your first goal. Set targets, track progress, and achieve your dreams!"
-              : "No goals match your current filters. Try adjusting your search criteria or clearing the filters."
-            }
-          </p>
-          {goals.length === 0 && (
-            <Button onClick={handleCreateNewGoal} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create Your First Goal
-            </Button>
-          )}
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredGoals.map((goal: Goal) => (
-            <GoalCardItem
-              key={goal.id} // Use the original string ID as key
-              goal={{
-                ...goal,
-                id: safeParseInt(goal.id), // Safely convert string to number
-                current_amount: 0, // Add missing required field
-                priority: 3, // Add missing required field
-                priority_label: "Medium", // Add missing required field
-                image: goal.image_url, // Map image_url to image
-                linked_account: goal.linked_account ? {
-                  ...goal.linked_account,
-                  id: safeParseInt(goal.linked_account.id) // Safely convert string to number
-                } : null,
-                monthly_plans: goal.monthly_plans?.map(plan => ({
-                  ...plan,
-                  id: safeParseInt(plan.id) // Safely convert string to number
-                })) || []
-              }}
-              onEditGoal={(goal) => handleEditGoal({
-                ...goal,
-                id: safeToString(goal.id), // Convert back to string
-                image_url: goal.image,
-                linked_account: goal.linked_account ? {
-                  ...goal.linked_account,
-                  id: safeToString(goal.linked_account.id)
-                } : null,
-                monthly_plans: goal.monthly_plans?.map(plan => ({
-                  ...plan,
-                  id: safeToString(plan.id)
-                })) || []
-              })}
-              formatCurrency={formatCurrency}
-              formatDate={formatDate}
-              getProgressPercentage={getProgressPercentage}
-            />
-          ))}
-        </div>
-      )}
 
-      {/* Goal Dialog */}
-      <GoalDialog
-        open={showGoalDialog}
-        onOpenChange={handleDialogClose}
-        onCreateGoal={handleCreateGoal}
-        onUpdateGoal={handleUpdateGoal}
-        editingGoal={editingGoal ? {
-          ...editingGoal,
-          id: safeParseInt(editingGoal.id), // Safely convert for existing component
-          image: editingGoal.image_url,
-          linked_account: editingGoal.linked_account ? {
-            ...editingGoal.linked_account,
-            id: safeParseInt(editingGoal.linked_account.id)
-          } : null,
-          monthly_plans: editingGoal.monthly_plans?.map(plan => ({
-            ...plan,
-            id: safeParseInt(plan.id)
-          })) || []
-        } : null}
-        mode={editingGoal ? "edit" : "create"}
-      />
-    </div>
+          <Button onClick={handleCreateNewGoal} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Goal
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <GoalFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          filterOptions={filterOptions}
+        />
+
+        {/* Goals Grid */}
+        {filteredGoals.length === 0 ? (
+          <Card className="p-12 text-center">
+            <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
+              <Target className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No goals found</h3>
+            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+              {goals.length === 0
+                ? "Start your financial journey by creating your first goal. Set targets, track progress, and achieve your dreams!"
+                : "No goals match your current filters. Try adjusting your search criteria or clearing the filters."
+              }
+            </p>
+            {goals.length === 0 && (
+              <Button onClick={handleCreateNewGoal} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Your First Goal
+              </Button>
+            )}
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredGoals.map((goal: Goal) => (
+              <GoalCardItem
+                key={goal.id} // Use the original string ID as key
+                goal={{
+                  ...goal,
+                  id: safeParseInt(goal.id), // Safely convert string to number
+                  current_amount: 0, // Add missing required field
+                  priority: 3, // Add missing required field
+                  priority_label: "Medium", // Add missing required field
+                  image: goal.image_url, // Map image_url to image
+                  linked_account: goal.linked_account ? {
+                    ...goal.linked_account,
+                    id: safeParseInt(goal.linked_account.id) // Safely convert string to number
+                  } : null,
+                  monthly_plans: goal.monthly_plans?.map(plan => ({
+                    ...plan,
+                    id: safeParseInt(plan.id) // Safely convert string to number
+                  })) || []
+                }}
+                onEditGoal={(goal) => handleEditGoal({
+                  ...goal,
+                  id: safeToString(goal.id), // Convert back to string
+                  image_url: goal.image,
+                  linked_account: goal.linked_account ? {
+                    ...goal.linked_account,
+                    id: safeToString(goal.linked_account.id)
+                  } : null,
+                  monthly_plans: goal.monthly_plans?.map(plan => ({
+                    ...plan,
+                    id: safeToString(plan.id)
+                  })) || []
+                })}
+                formatCurrency={formatCurrency}
+                formatDate={formatDate}
+                getProgressPercentage={getProgressPercentage}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Goal Dialog */}
+        <GoalDialog
+          open={showGoalDialog}
+          onOpenChange={handleDialogClose}
+          onCreateGoal={handleCreateGoal}
+          onUpdateGoal={handleUpdateGoal}
+          editingGoal={editingGoal ? {
+            ...editingGoal,
+            id: safeParseInt(editingGoal.id), // Safely convert for existing component
+            image: editingGoal.image_url,
+            linked_account: editingGoal.linked_account ? {
+              ...editingGoal.linked_account,
+              id: safeParseInt(editingGoal.linked_account.id)
+            } : null,
+            monthly_plans: editingGoal.monthly_plans?.map(plan => ({
+              ...plan,
+              id: safeParseInt(plan.id)
+            })) || []
+          } : null}
+          mode={editingGoal ? "edit" : "create"}
+        />
+      </div>
+    </AppLayout>
   )
 }
