@@ -53,11 +53,13 @@ export default defineSchema({
         description: v.string(),
         transactionType: v.optional(v.string()),
         categoryId: v.optional(v.id("categories")),
+        transfer_pair_id: v.optional(v.string()),  // For linking transfer pairs
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     }).index("by_user", ["userId"])
         .index("by_account", ["accountId"])
         .index("by_date", ["date"])     // ✅ This will now work properly with numeric dates
+        .index("by_transfer_pair", ["transfer_pair_id"])  // For querying paired transfers
         .searchIndex("search_description", {
             searchField: "description",
             filterFields: ["userId", "accountId"],
@@ -82,10 +84,46 @@ export default defineSchema({
     goals: defineTable({
         userId: v.id("users"),
         name: v.string(),
-        target: v.number(),
-        progress: v.number(),
+        total_amount: v.number(),
+        current_amount: v.optional(v.number()),
+        monthly_contribution: v.number(),
+        due_date: v.optional(v.string()),
+        color: v.string(),
+        emoji: v.string(),
+        note: v.optional(v.string()),
+        priority: v.optional(v.number()),
+        priority_label: v.optional(v.string()),
+        tracking_type: v.string(), // "MANUAL" | "LINKED_ACCOUNT"
+        calculation_type: v.optional(v.string()), // "DUE_DATE" | "MONTHLY_CONTRIBUTION"
+        linked_account_id: v.optional(v.id("accounts")),
+        image_url: v.optional(v.string()),
+        is_completed: v.optional(v.boolean()),
         createdAt: v.optional(v.number()),
-    }).index("by_user", ["userId"]),
+        updatedAt: v.optional(v.number()),
+    }).index("by_user", ["userId"])
+      .index("by_account", ["linked_account_id"])
+      .index("by_completion", ["is_completed"]),
+
+    goal_contributions: defineTable({
+        userId: v.id("users"),
+        goalId: v.id("goals"),
+        amount: v.number(),
+        note: v.optional(v.string()),
+        contribution_date: v.string(),
+        createdAt: v.number(),
+    }).index("by_user", ["userId"])
+      .index("by_goal", ["goalId"]),
+
+    goal_monthly_plans: defineTable({
+        userId: v.id("users"),
+        goalId: v.id("goals"),
+        name: v.string(),
+        month: v.number(),
+        year: v.number(),
+        allocated_amount: v.number(),
+        createdAt: v.optional(v.number()),
+    }).index("by_user", ["userId"])
+      .index("by_goal", ["goalId"]),
 
     import_sessions: defineTable({
         sessionId: v.string(),
@@ -113,4 +151,13 @@ export default defineSchema({
         isResolved: v.boolean(),
     }).index("by_session", ["sessionId"])
       .index("by_user", ["userId"]),
+
+    ignored_transfer_pairs: defineTable({
+        userId: v.id("users"),
+        outgoingTransactionId: v.id("transactions"),
+        incomingTransactionId: v.id("transactions"),
+        createdAt: v.number(),
+    }).index("by_user", ["userId"])
+      .index("by_outgoing", ["outgoingTransactionId"])
+      .index("by_incoming", ["incomingTransactionId"]),
 });

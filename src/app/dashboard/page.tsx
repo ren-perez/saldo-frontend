@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
+import TransfersDashboardCard from "@/components/TransfersDashboardCard";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -137,6 +138,14 @@ export default function DashboardPage() {
       monthlySpending
     };
   }, [allTransactions, accounts, categories]);
+
+  // Get potential transfers count
+  const potentialTransfers = useQuery(
+    api.transfers.getPotentialTransfers,
+    convexUser ? { userId: convexUser._id } : "skip"
+  );
+
+  const pendingTransferCount = potentialTransfers?.length || 0;
 
   if (isLoading) {
     return (
@@ -292,6 +301,11 @@ export default function DashboardPage() {
                   <div className="text-2xl">📊</div>
                 </div>
               </div>
+            </div>
+
+            {/* Transfers Inbox Card */}
+            <div className="mb-8">
+              <TransfersDashboardCard pendingTransferCount={pendingTransferCount} />
             </div>
 
             <div className="grid lg:grid-cols-2 gap-8 mb-8">

@@ -127,3 +127,25 @@ body {
   font-family: var(--font-manrope), var(--font-geist-sans), sans-serif;
   /* transition: inherit; */
 }
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Ensure proper mobile sidebar behavior */
+@layer components {
+  [data-mobile="true"] {
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+
+  [data-mobile="true"] .flex.h-full.w-full.flex-col {
+    height: 100% !important;
+    overflow: hidden;
+  }
+}

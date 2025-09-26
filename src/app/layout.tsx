@@ -4,6 +4,7 @@ import './globals.css'
 import { ClerkProvider } from '@clerk/nextjs'
 import ConvexClientProvider from '@/components/ConvexClientProvider'
 import { ThemeProvider } from '@/components/theme-provider'
+import { SidebarProvider } from '@/components/ui/sidebar'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -41,7 +42,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ClerkProvider>
-            <ConvexClientProvider>{children}</ConvexClientProvider>
+            <ConvexClientProvider>
+              <SidebarProvider>
+                {children}
+              </SidebarProvider>
+            </ConvexClientProvider>
           </ClerkProvider>
         </ThemeProvider>
       </body>

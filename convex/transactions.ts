@@ -399,6 +399,14 @@ export const updateTransaction = mutation({
             patchData.categoryId = undefined;
         } else if (updates.categoryId !== undefined) {
             patchData.categoryId = updates.categoryId;
+
+            // If a category is being assigned, inherit its transaction type (unless explicitly clearing transaction type)
+            if (updates.categoryId && !updates.clearTransactionType && updates.transactionType === undefined) {
+                const category = await ctx.db.get(updates.categoryId);
+                if (category && category.transactionType) {
+                    patchData.transactionType = category.transactionType;
+                }
+            }
         }
 
         // Handle other fields normally
@@ -467,10 +475,20 @@ export const updateTransactionByGroup = mutation({
             }
         }
 
+        // Get the transaction type from the category (if a category is being assigned)
+        let inheritedTransactionType = transaction.transactionType;
+        if (finalCategoryId) {
+            const category = await ctx.db.get(finalCategoryId);
+            if (category && category.transactionType) {
+                inheritedTransactionType = category.transactionType;
+            }
+        }
+
         // Update the transaction
         const updatedTransaction = {
             ...transaction,
             categoryId: finalCategoryId,
+            transactionType: inheritedTransactionType,
             updatedAt: Date.now(),
         };
 

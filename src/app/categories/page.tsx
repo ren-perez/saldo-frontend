@@ -57,6 +57,7 @@ export default function CategoriesPage() {
   const [categoryForm, setCategoryForm] = useState({
     name: "",
     groupId: "" as string,
+    transactionType: "" as string,
   });
 
   const [groupForm, setGroupForm] = useState({
@@ -97,9 +98,10 @@ export default function CategoriesPage() {
       groupId: categoryForm.groupId
         ? (categoryForm.groupId as Id<"category_groups">)
         : undefined,
+      transactionType: categoryForm.transactionType || undefined,
     });
 
-    setCategoryForm({ name: "", groupId: "" });
+    setCategoryForm({ name: "", groupId: "", transactionType: "" });
   };
 
   const handleCreateGroup = async (e: React.FormEvent) => {
@@ -123,6 +125,7 @@ export default function CategoriesPage() {
       updates: {
         name: editingCategory.name,
         groupId: editingCategory.groupId || undefined,
+        transactionType: editingCategory.transactionType || undefined,
       },
     });
 
@@ -168,6 +171,15 @@ export default function CategoriesPage() {
     return group?.name || "Unknown Group";
   };
 
+  const getTransactionTypeDisplay = (transactionType?: string) => {
+    switch (transactionType) {
+      case "income": return "💰 Income";
+      case "expense": return "💸 Expense";
+      case "transfer": return "🔄 Transfer";
+      default: return "No Type";
+    }
+  };
+
   return (
     <AppLayout>
       <InitUser />
@@ -193,7 +205,7 @@ export default function CategoriesPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleCreateCategory} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Input
                       value={categoryForm.name}
                       onChange={(e) =>
@@ -202,6 +214,25 @@ export default function CategoriesPage() {
                       placeholder="e.g., Groceries, Gas"
                       required
                     />
+                    <Select
+                      value={categoryForm.transactionType}
+                      onValueChange={(val) =>
+                        setCategoryForm((p) => ({
+                          ...p,
+                          transactionType: val === "none" ? "" : val,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Transaction Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Type</SelectItem>
+                        <SelectItem value="income">💰 Income</SelectItem>
+                        <SelectItem value="expense">💸 Expense</SelectItem>
+                        <SelectItem value="transfer">🔄 Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Select
                       value={categoryForm.groupId}
                       onValueChange={(val) =>
@@ -259,6 +290,25 @@ export default function CategoriesPage() {
                               required
                             />
                             <Select
+                              value={editingCategory.transactionType || "none"}
+                              onValueChange={(val) =>
+                                setEditingCategory((p) => p ? ({
+                                  ...p,
+                                  transactionType: val === "none" ? undefined : val,
+                                }) : null)
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Transaction Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No Type</SelectItem>
+                                <SelectItem value="income">💰 Income</SelectItem>
+                                <SelectItem value="expense">💸 Expense</SelectItem>
+                                <SelectItem value="transfer">🔄 Transfer</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select
                               value={editingCategory.groupId || "none"}
                               onValueChange={(val) =>
                                 setEditingCategory((p) => p ? ({
@@ -298,7 +348,7 @@ export default function CategoriesPage() {
                             <div>
                               <div className="font-medium">{cat.name}</div>
                               <div className="text-sm text-muted-foreground">
-                                Group: {getGroupName(cat.groupId)}
+                                Type: {getTransactionTypeDisplay(cat.transactionType)} • Group: {getGroupName(cat.groupId)}
                               </div>
                             </div>
                             <div className="space-x-2">

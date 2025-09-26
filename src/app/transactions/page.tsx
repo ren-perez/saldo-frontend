@@ -6,7 +6,8 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { Search, X, Filter, Download, RefreshCw, Trash2 } from "lucide-react";
+import { Search, X, Filter, Download, RefreshCw, Trash2, ArrowRightLeft } from "lucide-react";
+import Link from "next/link";
 import { Id } from "../../../convex/_generated/dataModel";
 
 import {
@@ -320,6 +321,12 @@ export default function TransactionsPage() {
                             </p>
                         </div>
                         <div className="flex gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/transfers-inbox">
+                                    <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                    Transfers Inbox
+                                </Link>
+                            </Button>
                             <Button variant="outline" size="sm">
                                 <Download className="h-4 w-4 mr-2" />
                                 Export
@@ -675,27 +682,34 @@ export default function TransactionsPage() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Select
-                                                        value={transaction.transactionType || "NONE"}
-                                                        onValueChange={(value) =>
-                                                            updateTransaction({
-                                                                transactionId: transaction._id,
-                                                                updates: value === "NONE"
-                                                                    ? { clearTransactionType: true }
-                                                                    : { transactionType: value },
-                                                            })
-                                                        }
-                                                    >
-                                                        <SelectTrigger className="w-24 h-8 text-xs">
-                                                            <SelectValue placeholder="—" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="NONE">—</SelectItem>
-                                                            <SelectItem value="income">Income</SelectItem>
-                                                            <SelectItem value="expense">Expense</SelectItem>
-                                                            <SelectItem value="transfer">Transfer</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
+                                                    {transaction.transfer_pair_id ? (
+                                                        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                            <ArrowRightLeft className="h-3 w-3 mr-1" />
+                                                            Transfer
+                                                        </Badge>
+                                                    ) : (
+                                                        <Select
+                                                            value={transaction.transactionType || "NONE"}
+                                                            onValueChange={(value) =>
+                                                                updateTransaction({
+                                                                    transactionId: transaction._id,
+                                                                    updates: value === "NONE"
+                                                                        ? { clearTransactionType: true }
+                                                                        : { transactionType: value },
+                                                                })
+                                                            }
+                                                        >
+                                                            <SelectTrigger className="w-24 h-8 text-xs">
+                                                                <SelectValue placeholder="—" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="NONE">—</SelectItem>
+                                                                <SelectItem value="income">Income</SelectItem>
+                                                                <SelectItem value="expense">Expense</SelectItem>
+                                                                <SelectItem value="transfer">Transfer</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <CategoryCombobox
