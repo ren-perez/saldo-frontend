@@ -31,12 +31,12 @@ import {
 
 interface FilterOptions {
     accounts: Array<{
-        id: string; // Changed from number to string to match Convex Id types
+        _id: string; // Changed from number to string to match Convex Id types
         name: string;
         account_type: string;
     }>;
     monthly_plans?: Array<{
-        id: string; // Changed from number to string to match Convex Id types
+        _id: string; // Changed from number to string to match Convex Id types
         name: string;
         month: number;
         year: number;
@@ -158,7 +158,7 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
                                                 <SelectItem value="__all__">All accounts</SelectItem>
                                                 {filterOptions?.accounts && filterOptions.accounts.length > 0 ? (
                                                     filterOptions.accounts.map((account) => (
-                                                        <SelectItem key={account.id} value={account.id.toString()}>
+                                                        <SelectItem key={account._id} value={account._id.toString()}>
                                                             <div className="flex items-center gap-2">
                                                                 <span>{getAccountTypeIcon(account.account_type)}</span>
                                                                 <span>{account.name}</span>
@@ -288,7 +288,7 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
                     {filters.account_id && (
                         <Badge variant="secondary" className="flex items-center gap-1">
                             <CreditCard className="h-3 w-3" />
-                            Account: {filterOptions?.accounts?.find(a => a.id.toString() === filters.account_id)?.name}
+                            Account: {filterOptions?.accounts?.find(a => a._id.toString() === filters.account_id)?.name}
                             <X
                                 className="h-3 w-3 cursor-pointer hover:bg-destructive/10 rounded"
                                 onClick={() => handleFilterChange('account_id', '')}

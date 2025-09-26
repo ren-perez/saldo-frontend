@@ -2,13 +2,13 @@
 import { Id } from "../../convex/_generated/dataModel"
 
 export interface Goal {
-  id: Id<"goals">; // Changed from _id to id to match your API response
+  _id: Id<"goals">; // Keep as _id to match Convex document format
   name: string;
   note?: string;
   total_amount: number;
   current_amount: number;
   monthly_contribution: number;
-  due_date?: string; // Required based on error message
+  due_date?: string;
   color: string;
   emoji: string;
   priority: number;
@@ -17,13 +17,13 @@ export interface Goal {
   calculation_type?: string;
   linked_account_id?: Id<"accounts">;
   image_url?: string;
-  image?: string; // Add image property for backward compatibility
+  image?: string;
   is_completed?: boolean;
   createdAt?: number;
   updatedAt?: number;
   // Populated via join for UI
   linked_account?: {
-    id: Id<"accounts">; // Changed from _id to id
+    _id: Id<"accounts">; // Keep as _id
     name: string;
     account_type: string;
     balance?: number;
@@ -32,7 +32,7 @@ export interface Goal {
 }
 
 export interface MonthlyPlanData {
-  id: Id<"goal_monthly_plans">; // Changed from _id to id
+  _id: Id<"goal_monthly_plans">; // Changed from _id to id
   name: string;
   month: number;
   year: number;
@@ -41,7 +41,7 @@ export interface MonthlyPlanData {
 
 export interface FilterOptions {
   accounts: Array<{
-    id: Id<"accounts">; // Changed from _id to id
+    _id: Id<"accounts">; // Changed from _id to id
     name: string;
     type: string;
   }>;

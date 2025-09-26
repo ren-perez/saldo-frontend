@@ -29,7 +29,7 @@ export default function GoalsPage() {
     convexUser ? api.goals.getGoals : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
   ) || []
-  
+
   const filterOptions = useQuery(
     convexUser ? api.goals.getFilterOptions : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
@@ -187,7 +187,7 @@ export default function GoalsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredGoals.map((goal: Goal) => (
               <GoalCardItem
-                key={goal.id}
+                key={goal._id} // Change from goal.id to goal._id
                 goal={goal}
                 onEditGoal={handleEditGoal}
                 formatCurrency={formatCurrency}

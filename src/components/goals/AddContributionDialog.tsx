@@ -88,7 +88,7 @@ export function AddContributionDialog({
         try {
             await addContributionMutation({
                 userId: convexUser._id,
-                goalId: goal.id.toString(),
+                goalId: goal._id.toString(),
                 amount: parseFloat(formData.amount),
                 note: formData.note,
                 contribution_date: formData.contribution_date

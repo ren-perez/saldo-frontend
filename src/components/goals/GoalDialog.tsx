@@ -120,7 +120,7 @@ export function GoalDialog({
     // Get selected account details
     // const selectedAccount = accounts.find((account) => account.id === formData.linked_account_id)
     const selectedAccount = accounts.find(
-        (account) => account.id.toString() === formData.linked_account_id
+        (account) => account._id.toString() === formData.linked_account_id
     )
 
     // Quick date options (in months from now)
@@ -135,24 +135,24 @@ export function GoalDialog({
 
 
     // Add this debugging code at the start of your GoalDialog component
-    useEffect(() => {
-        console.log('=== GoalDialog Debug ===');
-        console.log('priorityOptions:', priorityOptions);
-        console.log('accounts:', accounts);
+    // useEffect(() => {
+    //     console.log('=== GoalDialog Debug ===');
+    //     console.log('priorityOptions:', priorityOptions);
+    //     console.log('accounts:', accounts);
 
-        // Check for NaN values
-        priorityOptions?.forEach((option, index) => {
-            if (Number.isNaN(option.value)) {
-                console.error(`Priority option at index ${index} has NaN value:`, option);
-            }
-        });
+    //     // Check for NaN values
+    //     priorityOptions?.forEach((option, index) => {
+    //         if (Number.isNaN(option.value)) {
+    //             console.error(`Priority option at index ${index} has NaN value:`, option);
+    //         }
+    //     });
 
-        accounts?.forEach((account, index) => {
-            if (Number.isNaN(account.id)) {
-                console.error(`Account at index ${index} has NaN id:`, account);
-            }
-        });
-    }, [priorityOptions, accounts]);
+    //     accounts?.forEach((account, index) => {
+    //         if (Number.isNaN(account.id)) {
+    //             console.error(`Account at index ${index} has NaN id:`, account);
+    //         }
+    //     });
+    // }, [priorityOptions, accounts]);
 
 
 
@@ -175,7 +175,7 @@ export function GoalDialog({
                 monthly_contribution: editingGoal.monthly_contribution.toString(),
                 calculation_type: editingGoal.calculation_type || "DUE_DATE",
                 tracking_type: editingGoal.tracking_type || "MANUAL",
-                linked_account_id: editingGoal.linked_account?.id || null,
+                linked_account_id: editingGoal.linked_account?._id || null,
                 color: editingGoal.color || "#3b82f6",
                 emoji: editingGoal.emoji || "🎯",
                 priority: editingGoal.priority || 3,
@@ -306,7 +306,7 @@ export function GoalDialog({
             if (mode === "edit" && editingGoal) {
                 const result = await updateGoalMutation({
                     ...submitData,
-                    goalId: editingGoal.id,
+                    goalId: editingGoal._id,
                 })
                 onUpdateGoal(result as Goal)
                 toast.success("Goal updated successfully")
@@ -655,8 +655,8 @@ export function GoalDialog({
                                 <SelectItem value="MANUAL">Manual Tracking</SelectItem>
                                 {accounts.map((account, index) => (
                                     <SelectItem
-                                        key={`account-${account.id || index}`}
-                                        value={account.id?.toString() || index.toString()}
+                                        key={`account-${account._id}-${index}`}
+                                        value={account._id}
                                     >
                                         {account.name} ({account.account_type})
                                     </SelectItem>

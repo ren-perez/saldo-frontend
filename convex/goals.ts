@@ -30,10 +30,76 @@ function shouldAutoTrack(goal: any): boolean {
 }
 
 // Query to get all goals for the current user
+// export const getGoals = query({
+//   args: { userId: v.id("users") },
+//   handler: async (ctx, { userId }) => {
+
+//     const goals = await ctx.db
+//       .query("goals")
+//       .withIndex("by_user", (q) => q.eq("userId", userId))
+//       .collect();
+
+//     // Get related data for each goal
+//     const goalsWithData = await Promise.all(
+//       goals.map(async (goal) => {
+//         // Get linked account info if exists
+//         let linked_account = null;
+//         if (goal.linked_account_id) {
+//           const account = await ctx.db.get(goal.linked_account_id);
+//           if (account) {
+//             linked_account = {
+//               id: account._id,
+//               name: account.name,
+//               account_type: account.type,
+//             };
+//           }
+//         }
+
+//         // Get monthly plans for this goal
+//         const monthly_plans = await ctx.db
+//           .query("goal_monthly_plans")
+//           .withIndex("by_goal", (q) => q.eq("goalId", goal._id))
+//           .collect();
+
+//         // Calculate current amount based on tracking type
+//         const current_amount = await calculateCurrentAmount(ctx, goal);
+
+//         return {
+//           id: goal._id,
+//           name: goal.name,
+//           total_amount: goal.total_amount,
+//           current_amount,
+//           monthly_contribution: goal.monthly_contribution,
+//           due_date: goal.due_date || "",
+//           color: goal.color,
+//           emoji: goal.emoji,
+//           note: goal.note,
+//           priority: goal.priority || 3,
+//           priority_label: goal.priority_label || "Medium",
+//           tracking_type: goal.tracking_type,
+//           calculation_type: goal.calculation_type,
+//           linked_account,
+//           monthly_plans: monthly_plans.map((plan) => ({
+//             id: plan._id,
+//             name: plan.name,
+//             month: plan.month,
+//             year: plan.year,
+//             allocated_amount: plan.allocated_amount,
+//           })),
+//           image_url: goal.image_url,
+//           is_completed: goal.is_completed || false,
+//           createdAt: goal.createdAt,
+//           updatedAt: goal.updatedAt,
+//         };
+//       })
+//     );
+
+//     return goalsWithData;
+//   },
+// });
 export const getGoals = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-
     const goals = await ctx.db
       .query("goals")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -48,7 +114,7 @@ export const getGoals = query({
           const account = await ctx.db.get(goal.linked_account_id);
           if (account) {
             linked_account = {
-              id: account._id,
+              _id: account._id,  // Changed from 'id' to '_id'
               name: account.name,
               account_type: account.type,
             };
@@ -65,7 +131,7 @@ export const getGoals = query({
         const current_amount = await calculateCurrentAmount(ctx, goal);
 
         return {
-          id: goal._id,
+          _id: goal._id,  // Changed from 'id' to '_id'
           name: goal.name,
           total_amount: goal.total_amount,
           current_amount,
@@ -80,7 +146,7 @@ export const getGoals = query({
           calculation_type: goal.calculation_type,
           linked_account,
           monthly_plans: monthly_plans.map((plan) => ({
-            id: plan._id,
+            _id: plan._id,  // Changed from 'id' to '_id'
             name: plan.name,
             month: plan.month,
             year: plan.year,
@@ -102,7 +168,6 @@ export const getGoals = query({
 export const getFilterOptions = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-
     const accounts = await ctx.db
       .query("accounts")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -115,12 +180,12 @@ export const getFilterOptions = query({
 
     return {
       accounts: accounts.map((account) => ({
-        id: account._id,
+        _id: account._id,  // Changed from 'id' to '_id'
         name: account.name,
         account_type: account.type,
       })),
       monthly_plans: monthly_plans.map((plan) => ({
-        id: plan._id,
+        _id: plan._id,  // Changed from 'id' to '_id'
         name: plan.name,
         month: plan.month,
         year: plan.year,
@@ -158,10 +223,10 @@ export const getGoalAccounts = query({
       .collect();
 
     return accounts.map((account) => ({
-      id: account._id, // Keep as Convex ID string - don't convert to number
+      _id: account._id, // Keep as _id to match Convex format
       name: account.name,
       account_type: account.type,
-      balance: 0, // You might want to calculate this from transactions
+      balance: 0,
     }));
   },
 });
@@ -258,7 +323,7 @@ export const createGoal = mutation({
     const goalId = await ctx.db.insert("goals", goalData);
 
     // return { _id: goalId, id: parseInt(goalId), ...args };
-    return { id: goalId, ...args };
+    return { _id: goalId, ...args };
   },
 });
 

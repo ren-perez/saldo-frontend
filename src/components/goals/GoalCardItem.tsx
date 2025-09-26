@@ -50,7 +50,7 @@ export function GoalCardItem({
         try {
             await deleteGoalMutation({
                 userId: convexUser._id,
-                goalId: goal.id
+                goalId: goal._id
             })
             toast.success("Goal deleted successfully")
         } catch (error) {
@@ -195,7 +195,7 @@ export function GoalCardItem({
                         )}
 
                         {/* Monthly Plans Pills */}
-                        {goal.monthly_plans && goal.monthly_plans.length > 0 && (
+                        {/* {goal.monthly_plans && goal.monthly_plans.length > 0 && (
                             <div className="w-full mb-4">
                                 <div className="flex items-center gap-2 mb-2 text-muted-foreground">
                                     <NotebookText className="h-4 w-4" />
@@ -217,7 +217,7 @@ export function GoalCardItem({
                                     ))}
                                 </div>
                             </div>
-                        )}
+                        )} */}
 
                         {/* Account Tracking */}
                         {goal.linked_account && (
