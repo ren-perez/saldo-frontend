@@ -96,10 +96,11 @@ export function AccountsSidebarGroup() {
                                         {group.map((account) => (
                                             <SidebarMenuItem key={account._id}>
                                                 <SidebarMenuButton asChild>
-                                                    <Link
+                                                    {/* <Link
                                                         href={`/accounts/${account._id}`}
                                                         className="flex items-center justify-between w-full"
-                                                    >
+                                                    > */}
+                                                    <div>
                                                         <div className="flex items-center flex-1 min-w-0">
                                                             <span className="text-sm font-medium truncate">
                                                                 {account.name}
@@ -108,7 +109,8 @@ export function AccountsSidebarGroup() {
                                                         <span className="text-xs font-medium ml-2">
                                                             {formatCurrency(account.balance ?? 0, "USD")}
                                                         </span>
-                                                    </Link>
+                                                    </div>
+                                                    {/* </Link> */}
                                                 </SidebarMenuButton>
                                             </SidebarMenuItem>
                                         ))}
