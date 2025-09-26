@@ -22,9 +22,10 @@ import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
-import { 
+import {
     // DollarSign, 
-    Calendar, AlertCircle } from "lucide-react"
+    Calendar, AlertCircle
+} from "lucide-react"
 import type { Goal } from "@/types/goals"
 import type { Id } from "../../../convex/_generated/dataModel"
 import Image from "next/image"
@@ -131,6 +132,29 @@ export function GoalDialog({
 
     // Quick contribution amounts
     const quickContributionAmounts = [100, 500, 1000]
+
+
+    // Add this debugging code at the start of your GoalDialog component
+    useEffect(() => {
+        console.log('=== GoalDialog Debug ===');
+        console.log('priorityOptions:', priorityOptions);
+        console.log('accounts:', accounts);
+
+        // Check for NaN values
+        priorityOptions?.forEach((option, index) => {
+            if (Number.isNaN(option.value)) {
+                console.error(`Priority option at index ${index} has NaN value:`, option);
+            }
+        });
+
+        accounts?.forEach((account, index) => {
+            if (Number.isNaN(account.id)) {
+                console.error(`Account at index ${index} has NaN id:`, account);
+            }
+        });
+    }, [priorityOptions, accounts]);
+
+
 
     useEffect(() => {
         if (open && mode === "edit" && editingGoal && !editingGoal.note) {
@@ -394,8 +418,8 @@ export function GoalDialog({
                                 <SelectContent>
                                     {priorityOptions.map((option, index) => (
                                         <SelectItem
-                                            key={`priority-${index}`}
-                                            value={option.value?.toString() || '0'}
+                                            key={`priority-${option.value || index}`}
+                                            value={option.value?.toString() || index.toString()}
                                         >
                                             {option.label}
                                         </SelectItem>
@@ -631,8 +655,8 @@ export function GoalDialog({
                                 <SelectItem value="MANUAL">Manual Tracking</SelectItem>
                                 {accounts.map((account, index) => (
                                     <SelectItem
-                                        key={`account-${index}`}
-                                        value={account.id?.toString() || '0'}
+                                        key={`account-${account.id || index}`}
+                                        value={account.id?.toString() || index.toString()}
                                     >
                                         {account.name} ({account.account_type})
                                     </SelectItem>

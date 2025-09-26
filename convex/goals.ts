@@ -129,18 +129,36 @@ export const getFilterOptions = query({
   },
 });
 
+// // Query to get accounts for goal creation/editing
+// export const getGoalAccounts = query({
+//   args: { userId: v.id("users") },
+//   handler: async (ctx, { userId }) => {
+
+//     const accounts = await ctx.db
+//       .query("accounts")
+//       .withIndex("by_user", (q) => q.eq("userId", userId))
+//       .collect();
+
+//     return accounts.map((account) => ({
+//       id: parseInt(account._id), // Convert to number for existing component compatibility
+//       name: account.name,
+//       account_type: account.type,
+//       balance: 0, // You might want to calculate this from transactions
+//     }));
+//   },
+// });
+
 // Query to get accounts for goal creation/editing
 export const getGoalAccounts = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-
     const accounts = await ctx.db
       .query("accounts")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
     return accounts.map((account) => ({
-      id: parseInt(account._id), // Convert to number for existing component compatibility
+      id: account._id, // Keep as Convex ID string - don't convert to number
       name: account.name,
       account_type: account.type,
       balance: 0, // You might want to calculate this from transactions
