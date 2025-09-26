@@ -147,6 +147,106 @@ export const listTransferPairs = query({
     },
 });
 
+// export const getPotentialTransfers = query({
+//     args: {
+//         userId: v.id("users"),
+//         maxDaysDifference: v.optional(v.number()),
+//         maxAmountDifferenceRatio: v.optional(v.number()),
+//     },
+//     handler: async (ctx, args) => {
+//         const { userId, maxDaysDifference = 2, maxAmountDifferenceRatio = 0.05 } = args;
+
+//         // Get all unpaired transactions
+//         const allTransactions = await ctx.db
+//             .query("transactions")
+//             .withIndex("by_user", (q) => q.eq("userId", userId))
+//             .filter((q) => q.eq(q.field("transfer_pair_id"), undefined))
+//             .collect();
+
+//         // Get accounts for reference
+//         const accounts = await ctx.db
+//             .query("accounts")
+//             .withIndex("by_user", (q) => q.eq("userId", userId))
+//             .collect();
+
+//         // Get ignored pairs
+//         const ignoredPairs = await ctx.db
+//             .query("ignored_transfer_pairs")
+//             .withIndex("by_user", (q) => q.eq("userId", userId))
+//             .collect();
+
+//         const ignoredPairsSet = new Set(
+//             ignoredPairs.map(pair => `${pair.outgoingTransactionId}-${pair.incomingTransactionId}`)
+//         );
+
+//         console.log("accounts:", accounts);
+//         const accountMap = new Map(accounts.map(acc => [acc._id, acc]));
+
+//         const outgoingTxns = allTransactions.filter(t => t.amount < 0);
+//         const incomingTxns = allTransactions.filter(t => t.amount > 0);
+
+//         const potentialTransfers = [];
+
+//         for (const outgoing of outgoingTxns) {
+//             const outgoingAccount = accountMap.get(outgoing.accountId);
+//             if (!outgoingAccount) continue;
+
+//             for (const incoming of incomingTxns) {
+//                 const incomingAccount = accountMap.get(incoming.accountId);
+//                 if (!incomingAccount || outgoing.accountId === incoming.accountId) continue;
+
+//                 const amountDifference = Math.abs(Math.abs(outgoing.amount) - incoming.amount);
+//                 const amountRatio = amountDifference / Math.abs(outgoing.amount);
+//                 const daysDifference = Math.abs((incoming.date - outgoing.date) / (1000 * 60 * 60 * 24));
+
+//                 if (daysDifference <= maxDaysDifference && amountRatio <= maxAmountDifferenceRatio) {
+//                     // Skip if this pair has been ignored
+//                     const pairKey = `${outgoing._id}-${incoming._id}`;
+//                     if (ignoredPairsSet.has(pairKey)) {
+//                         continue;
+//                     }
+
+//                     let matchType: 'exact' | 'close' | 'loose' = 'loose';
+//                     let confidence: 'high' | 'medium' | 'low' = 'low';
+//                     let matchScore = 0;
+
+//                     if (amountDifference < 0.01) {
+//                         matchType = 'exact';
+//                         confidence = 'high';
+//                         matchScore = 100 - (daysDifference * 5);
+//                     } else if (amountRatio <= 0.02) {
+//                         matchType = 'close';
+//                         confidence = daysDifference <= 1 ? 'high' : 'medium';
+//                         matchScore = 80 - (daysDifference * 5) - (amountRatio * 100);
+//                     } else {
+//                         matchType = 'loose';
+//                         confidence = 'medium';
+//                         matchScore = 60 - (daysDifference * 10) - (amountRatio * 200);
+//                     }
+
+//                     potentialTransfers.push({
+//                         id: `${outgoing._id}-${incoming._id}`,
+//                         outgoingTransaction: outgoing,
+//                         incomingTransaction: incoming,
+//                         outgoingAccount,
+//                         incomingAccount,
+//                         matchScore,
+//                         matchType,
+//                         daysDifference,
+//                         amountDifference,
+//                         confidence
+//                     });
+//                 }
+//             }
+//         }
+
+//         // Sort by match score (highest first)
+//         potentialTransfers.sort((a, b) => b.matchScore - a.matchScore);
+
+//         return potentialTransfers;
+//     },
+// });
+
 export const getPotentialTransfers = query({
     args: {
         userId: v.id("users"),
@@ -154,95 +254,128 @@ export const getPotentialTransfers = query({
         maxAmountDifferenceRatio: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const { userId, maxDaysDifference = 2, maxAmountDifferenceRatio = 0.05 } = args;
+        try {
+            const { userId, maxDaysDifference = 2, maxAmountDifferenceRatio = 0.05 } = args;
 
-        // Get all unpaired transactions
-        const allTransactions = await ctx.db
-            .query("transactions")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .filter((q) => q.eq(q.field("transfer_pair_id"), undefined))
-            .collect();
+            // Get all unpaired transactions
+            const allTransactions = await ctx.db
+                .query("transactions")
+                .withIndex("by_user", (q) => q.eq("userId", userId))
+                .filter((q) => q.eq(q.field("transfer_pair_id"), undefined))
+                .collect();
 
-        // Get accounts for reference
-        const accounts = await ctx.db
-            .query("accounts")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
+            // Get accounts for reference
+            const accounts = await ctx.db
+                .query("accounts")
+                .withIndex("by_user", (q) => q.eq("userId", userId))
+                .collect();
 
-        // Get ignored pairs
-        const ignoredPairs = await ctx.db
-            .query("ignored_transfer_pairs")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
+            // Get ignored pairs
+            const ignoredPairs = await ctx.db
+                .query("ignored_transfer_pairs")
+                .withIndex("by_user", (q) => q.eq("userId", userId))
+                .collect();
 
-        const ignoredPairsSet = new Set(
-            ignoredPairs.map(pair => `${pair.outgoingTransactionId}-${pair.incomingTransactionId}`)
-        );
+            const ignoredPairsSet = new Set(
+                ignoredPairs.map(pair => `${pair.outgoingTransactionId}-${pair.incomingTransactionId}`)
+            );
 
-        const accountMap = new Map(accounts.map(acc => [acc._id, acc]));
+            const accountMap = new Map(accounts.map(acc => [acc._id, acc]));
 
-        const outgoingTxns = allTransactions.filter(t => t.amount < 0);
-        const incomingTxns = allTransactions.filter(t => t.amount > 0);
+            // Filter transactions and ensure they have valid dates and amounts
+            const validTransactions = allTransactions.filter(t => {
+                // Ensure date is a number and amount exists
+                const hasValidDate = typeof t.date === 'number' && !isNaN(t.date);
+                const hasValidAmount = typeof t.amount === 'number' && !isNaN(t.amount);
+                const hasValidAccount = accountMap.has(t.accountId);
 
-        const potentialTransfers = [];
+                return hasValidDate && hasValidAmount && hasValidAccount;
+            });
 
-        for (const outgoing of outgoingTxns) {
-            const outgoingAccount = accountMap.get(outgoing.accountId);
-            if (!outgoingAccount) continue;
+            const outgoingTxns = validTransactions.filter(t => t.amount < 0);
+            const incomingTxns = validTransactions.filter(t => t.amount > 0);
 
-            for (const incoming of incomingTxns) {
-                const incomingAccount = accountMap.get(incoming.accountId);
-                if (!incomingAccount || outgoing.accountId === incoming.accountId) continue;
+            const potentialTransfers = [];
 
-                const amountDifference = Math.abs(Math.abs(outgoing.amount) - incoming.amount);
-                const amountRatio = amountDifference / Math.abs(outgoing.amount);
-                const daysDifference = Math.abs((incoming.date - outgoing.date) / (1000 * 60 * 60 * 24));
+            for (const outgoing of outgoingTxns) {
+                const outgoingAccount = accountMap.get(outgoing.accountId);
+                if (!outgoingAccount) continue;
 
-                if (daysDifference <= maxDaysDifference && amountRatio <= maxAmountDifferenceRatio) {
-                    // Skip if this pair has been ignored
-                    const pairKey = `${outgoing._id}-${incoming._id}`;
-                    if (ignoredPairsSet.has(pairKey)) {
+                for (const incoming of incomingTxns) {
+                    const incomingAccount = accountMap.get(incoming.accountId);
+                    if (!incomingAccount || outgoing.accountId === incoming.accountId) continue;
+
+                    // Ensure both dates are numbers before calculation
+                    if (typeof outgoing.date !== 'number' || typeof incoming.date !== 'number') {
+                        console.warn('Invalid date types:', {
+                            outgoingDate: outgoing.date,
+                            incomingDate: incoming.date
+                        });
                         continue;
                     }
 
-                    let matchType: 'exact' | 'close' | 'loose' = 'loose';
-                    let confidence: 'high' | 'medium' | 'low' = 'low';
-                    let matchScore = 0;
+                    const amountDifference = Math.abs(Math.abs(outgoing.amount) - incoming.amount);
+                    const outgoingAmountAbs = Math.abs(outgoing.amount);
 
-                    if (amountDifference < 0.01) {
-                        matchType = 'exact';
-                        confidence = 'high';
-                        matchScore = 100 - (daysDifference * 5);
-                    } else if (amountRatio <= 0.02) {
-                        matchType = 'close';
-                        confidence = daysDifference <= 1 ? 'high' : 'medium';
-                        matchScore = 80 - (daysDifference * 5) - (amountRatio * 100);
-                    } else {
-                        matchType = 'loose';
-                        confidence = 'medium';
-                        matchScore = 60 - (daysDifference * 10) - (amountRatio * 200);
+                    // Avoid division by zero
+                    if (outgoingAmountAbs === 0) continue;
+
+                    const amountRatio = amountDifference / outgoingAmountAbs;
+                    const daysDifference = Math.abs((incoming.date - outgoing.date) / (1000 * 60 * 60 * 24));
+
+                    if (daysDifference <= maxDaysDifference && amountRatio <= maxAmountDifferenceRatio) {
+                        // Skip if this pair has been ignored
+                        const pairKey = `${outgoing._id}-${incoming._id}`;
+                        if (ignoredPairsSet.has(pairKey)) {
+                            continue;
+                        }
+
+                        let matchType: 'exact' | 'close' | 'loose' = 'loose';
+                        let confidence: 'high' | 'medium' | 'low' = 'low';
+                        let matchScore = 0;
+
+                        if (amountDifference < 0.01) {
+                            matchType = 'exact';
+                            confidence = 'high';
+                            matchScore = Math.max(0, 100 - (daysDifference * 5));
+                        } else if (amountRatio <= 0.02) {
+                            matchType = 'close';
+                            confidence = daysDifference <= 1 ? 'high' : 'medium';
+                            matchScore = Math.max(0, 80 - (daysDifference * 5) - (amountRatio * 100));
+                        } else {
+                            matchType = 'loose';
+                            confidence = 'medium';
+                            matchScore = Math.max(0, 60 - (daysDifference * 10) - (amountRatio * 200));
+                        }
+
+                        potentialTransfers.push({
+                            id: `${outgoing._id}-${incoming._id}`,
+                            outgoingTransaction: outgoing,
+                            incomingTransaction: incoming,
+                            outgoingAccount,
+                            incomingAccount,
+                            matchScore,
+                            matchType,
+                            daysDifference: Number(daysDifference.toFixed(2)),
+                            amountDifference: Number(amountDifference.toFixed(2)),
+                            confidence
+                        });
                     }
-
-                    potentialTransfers.push({
-                        id: `${outgoing._id}-${incoming._id}`,
-                        outgoingTransaction: outgoing,
-                        incomingTransaction: incoming,
-                        outgoingAccount,
-                        incomingAccount,
-                        matchScore,
-                        matchType,
-                        daysDifference,
-                        amountDifference,
-                        confidence
-                    });
                 }
             }
+
+            // Sort by match score (highest first)
+            potentialTransfers.sort((a, b) => b.matchScore - a.matchScore);
+
+            return potentialTransfers;
+        } catch (error) {
+            console.error("Error in getPotentialTransfers:", error);
+            if (error instanceof Error) {
+                throw new Error(`Failed to get potential transfers: ${error.message}`);
+            }
+            throw new Error("Failed to get potential transfers: Unknown error");
         }
 
-        // Sort by match score (highest first)
-        potentialTransfers.sort((a, b) => b.matchScore - a.matchScore);
-
-        return potentialTransfers;
     },
 });
 
