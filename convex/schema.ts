@@ -16,6 +16,7 @@ export default defineSchema({
         type: v.string(), // "checking" | "savings" | "credit"
         bank: v.string(),
         createdAt: v.string(),
+        balance: v.optional(v.number()),
     }).index("by_user", ["userId"]),
 
     presets: defineTable({
