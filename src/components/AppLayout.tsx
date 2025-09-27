@@ -19,7 +19,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
                         <SidebarTrigger className="-ml-1" />
                         <Separator orientation="vertical" className="h-4" />
-                        <h1 className="text-lg font-semibold">Finance Dashboard</h1>
+                        <h1 className="text-lg font-semibold pl-4">Saldo</h1>
                     </header>
                     <main className="flex flex-1 flex-col gap-4 p-4">
                         {children}

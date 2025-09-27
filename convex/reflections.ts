@@ -23,14 +23,20 @@ export const getMonthlySummary = query({
             )
             .collect();
 
-        // Calculate totals by type
+        // Calculate totals by transaction type, excluding transfers
         let totalIncome = 0;
         let totalExpenses = 0;
 
         for (const transaction of transactions) {
-            if (transaction.amount > 0) {
-                totalIncome += transaction.amount;
-            } else {
+            // Skip transfers
+            if (transaction.transactionType === "transfer") {
+                continue;
+            }
+
+            // Use transactionType field for proper classification
+            if (transaction.transactionType === "income") {
+                totalIncome += Math.abs(transaction.amount);
+            } else if (transaction.transactionType === "expense") {
                 totalExpenses += Math.abs(transaction.amount);
             }
         }
@@ -85,15 +91,22 @@ export const getCategoryBreakdown = query({
         const categoryBreakdown = new Map<string, { name: string; amount: number; count: number }>();
 
         for (const transaction of transactions) {
-            // Filter by expenses only if requested
-            if (expensesOnly && transaction.amount >= 0) continue;
+            // Skip transfers
+            if (transaction.transactionType === "transfer") {
+                continue;
+            }
+
+            // Filter by transaction type if requested
+            if (expensesOnly && transaction.transactionType !== "expense") {
+                continue;
+            }
 
             const categoryId = transaction.categoryId || "uncategorized";
             const categoryName = categoryId === "uncategorized"
                 ? "Uncategorized"
                 : categoryLookup.get(categoryId)?.name || "Unknown";
 
-            const amount = expensesOnly ? Math.abs(transaction.amount) : transaction.amount;
+            const amount = Math.abs(transaction.amount);
 
             if (categoryBreakdown.has(categoryId)) {
                 const existing = categoryBreakdown.get(categoryId)!;
@@ -164,8 +177,15 @@ export const getGroupBreakdown = query({
         const groupBreakdown = new Map<string, { name: string; amount: number; count: number }>();
 
         for (const transaction of transactions) {
-            // Filter by expenses only if requested
-            if (expensesOnly && transaction.amount >= 0) continue;
+            // Skip transfers
+            if (transaction.transactionType === "transfer") {
+                continue;
+            }
+
+            // Filter by transaction type if requested
+            if (expensesOnly && transaction.transactionType !== "expense") {
+                continue;
+            }
 
             let groupId = "ungrouped";
             let groupName = "Ungrouped";
@@ -181,7 +201,7 @@ export const getGroupBreakdown = query({
                 }
             }
 
-            const amount = expensesOnly ? Math.abs(transaction.amount) : transaction.amount;
+            const amount = Math.abs(transaction.amount);
 
             if (groupBreakdown.has(groupId)) {
                 const existing = groupBreakdown.get(groupId)!;
@@ -294,10 +314,13 @@ export const getCategoryTrend = query({
             const dayData = dailyData.get(dayKey)!;
             dayData.transactions.push(transactionDetail);
 
-            if (transaction.amount > 0) {
-                dayData.income += transaction.amount;
-            } else {
-                dayData.expense += Math.abs(transaction.amount);
+            // Skip transfers for income/expense calculation
+            if (transaction.transactionType !== 'transfer') {
+                if (transaction.transactionType === 'income') {
+                    dayData.income += Math.abs(transaction.amount);
+                } else if (transaction.transactionType === 'expense') {
+                    dayData.expense += Math.abs(transaction.amount);
+                }
             }
 
             if (transaction.transactionType === 'transfer') {
@@ -457,10 +480,13 @@ export const getTimeBasedBreakdown = query({
 
             const dayData = dailyData.get(dayKey)!;
 
-            if (transaction.amount > 0) {
-                dayData.income += transaction.amount;
-            } else {
-                dayData.expense += Math.abs(transaction.amount);
+            // Skip transfers for income/expense calculation
+            if (transaction.transactionType !== 'transfer') {
+                if (transaction.transactionType === 'income') {
+                    dayData.income += Math.abs(transaction.amount);
+                } else if (transaction.transactionType === 'expense') {
+                    dayData.expense += Math.abs(transaction.amount);
+                }
             }
         }
 
@@ -470,4 +496,114 @@ export const getTimeBasedBreakdown = query({
 
         return result;
     },
+});
+
+export const getTransferInsights = query({
+  args: {
+    userId: v.id("users"),
+    startDate: v.number(),
+    endDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const { userId, startDate, endDate } = args;
+
+    // Get all paired transfer transactions within the date range
+    const transferTransactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => 
+        q.and(
+          q.neq(q.field("transfer_pair_id"), undefined),
+          q.eq(q.field("transactionType"), "transfer"),
+          q.gte(q.field("date"), startDate),
+          q.lte(q.field("date"), endDate)
+        )
+      )
+      .collect();
+
+    // Get all accounts for this user
+    const accounts = await ctx.db
+      .query("accounts")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const accountMap = new Map(accounts.map(acc => [acc._id, acc]));
+
+    // Group transfers by pair ID
+    const transferPairs = new Map<string, typeof transferTransactions>();
+    for (const tx of transferTransactions) {
+      const pairId = tx.transfer_pair_id!;
+      if (!transferPairs.has(pairId)) {
+        transferPairs.set(pairId, []);
+      }
+      transferPairs.get(pairId)!.push(tx);
+    }
+
+    // Analyze each transfer pair for insights
+    const insights = new Map<string, {
+      type: 'savings' | 'debt_payment';
+      amount: number;
+      accountName: string;
+      count: number;
+    }>();
+
+    for (const [pairId, transactions] of transferPairs) {
+      if (transactions.length !== 2) continue; // Skip incomplete pairs
+
+      const outgoing = transactions.find(tx => tx.amount < 0);
+      const incoming = transactions.find(tx => tx.amount > 0);
+
+      if (!outgoing || !incoming) continue;
+
+      const outgoingAccount = accountMap.get(outgoing.accountId);
+      const incomingAccount = accountMap.get(incoming.accountId);
+
+      if (!outgoingAccount || !incomingAccount) continue;
+
+      // Determine insight type based on account types
+      let insightType: 'savings' | 'debt_payment' | null = null;
+      let targetAccountName = '';
+      let transferAmount = incoming.amount; // Use positive amount
+
+      // Savings: Money going TO savings account
+      if (incomingAccount.type === 'savings') {
+        insightType = 'savings';
+        targetAccountName = incomingAccount.name;
+      }
+      // Debt payment: Money going TO credit card (reducing debt)
+      else if (incomingAccount.type === 'credit') {
+        insightType = 'debt_payment';
+        targetAccountName = incomingAccount.name;
+      }
+      // Alternative: Money coming FROM credit card could be debt increase (skip this for insights)
+      // Alternative: Check for specific account names that might indicate savings/investment
+      else if (incomingAccount.name.toLowerCase().includes('saving') || 
+               incomingAccount.name.toLowerCase().includes('investment') ||
+               incomingAccount.name.toLowerCase().includes('emergency')) {
+        insightType = 'savings';
+        targetAccountName = incomingAccount.name;
+      }
+
+      if (insightType) {
+        const key = `${insightType}-${targetAccountName}`;
+        if (insights.has(key)) {
+          const existing = insights.get(key)!;
+          existing.amount += transferAmount;
+          existing.count += 1;
+        } else {
+          insights.set(key, {
+            type: insightType,
+            amount: transferAmount,
+            accountName: targetAccountName,
+            count: 1,
+          });
+        }
+      }
+    }
+
+    // Convert to array and sort by amount (descending)
+    const insightArray = Array.from(insights.values()).sort((a, b) => b.amount - a.amount);
+
+    return insightArray;
+  },
 });

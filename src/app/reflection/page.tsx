@@ -29,7 +29,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format, addMonths, subMonths } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, PiggyBank, CreditCard } from "lucide-react";
 import Link from "next/link";
 
 type TrendTransaction = {
@@ -54,6 +54,12 @@ type LegendEntry = {
     dataKey?: string
   }
 
+type TransferInsight = {
+  type: 'savings' | 'debt_payment';
+  amount: number;
+  accountName: string;
+  count: number;
+};
 
 export default function ReflectionPage() {
   const { convexUser } = useConvexUser();
@@ -102,16 +108,6 @@ export default function ReflectionPage() {
       : "skip"
   );
 
-  // const categoryTrend = useQuery(
-  //   api.reflections.getCategoryTrend,
-  //   convexUser
-  //     ? {
-  //         userId: convexUser._id,
-  //         ...dateRange,
-  //         categoryId: dailyChartCategoryId,
-  //       }
-  //     : "skip"
-  // );
   const categoryTrend = useQuery(
     api.reflections.getCategoryTrend,
     convexUser
@@ -145,6 +141,12 @@ export default function ReflectionPage() {
         filterId: topExpensesFilterId,
       }
       : "skip"
+  );
+
+  // Fetch transfer insights
+  const transferInsights = useQuery(
+    api.reflections.getTransferInsights,
+    convexUser ? { userId: convexUser._id, ...dateRange } : "skip"
   );
 
   const formatCurrency = (amount: number) => {
@@ -181,6 +183,28 @@ export default function ReflectionPage() {
     });
   };
 
+  // Generate reflection insights
+  const generateReflectionInsights = () => {
+    const insights: string[] = [];
+    
+    if (transferInsights && transferInsights.length > 0) {
+      transferInsights.forEach((insight: TransferInsight) => {
+        if (insight.type === 'savings' && insight.amount > 0) {
+          insights.push(`You saved ${formatCurrency(insight.amount)} this month through transfers to ${insight.accountName}`);
+        } else if (insight.type === 'debt_payment' && insight.amount > 0) {
+          insights.push(`You paid down ${formatCurrency(insight.amount)} in debt with payments to ${insight.accountName}`);
+        }
+      });
+    }
+
+    // Add net savings insight if positive
+    if (monthlySummary && monthlySummary.netDifference > 0) {
+      insights.push(`Your net savings this month is ${formatCurrency(monthlySummary.netDifference)} - great job staying within budget!`);
+    }
+
+    return insights;
+  };
+
   // Colors for charts
   const CHART_COLORS = [
     "#8884d8",
@@ -202,22 +226,22 @@ export default function ReflectionPage() {
     if (active && payload && payload.length) {
       const data = payload[0]?.payload;
       return (
-        <div className="bg-background border rounded-lg p-4 shadow-lg max-w-sm">
+        <div className="bg-background border rounded-lg p-3 sm:p-4 shadow-lg max-w-xs sm:max-w-sm">
           {label && (
-            <p className="font-medium mb-2">{formatDateWithDay(label)}</p>
+            <p className="font-medium mb-2 text-sm sm:text-base">{formatDateWithDay(label)}</p>
           )}
 
           {/* Income/Expense Summary */}
           <div className="space-y-1 mb-3">
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-xs sm:text-sm">
               <span className="text-green-600">Income:</span>
               <span className="font-semibold text-green-600">{formatCurrency(data?.income || 0)}</span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-xs sm:text-sm">
               <span className="text-red-600">Expenses:</span>
               <span className="font-semibold text-red-600">{formatCurrency(data?.expense || 0)}</span>
             </div>
-            <div className="flex justify-between text-sm border-t pt-1">
+            <div className="flex justify-between text-xs sm:text-sm border-t pt-1">
               <span>Net:</span>
               <span className={`font-semibold ${(data?.income || 0) - (data?.expense || 0) >= 0
                 ? "text-green-600"
@@ -226,7 +250,7 @@ export default function ReflectionPage() {
                 {formatCurrency((data?.income || 0) - (data?.expense || 0))}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-xs sm:text-sm">
               <span>Transactions:</span>
               <span>{data?.transactionCount || 0}</span>
             </div>
@@ -236,7 +260,7 @@ export default function ReflectionPage() {
           {data?.transactions && data.transactions.length > 0 && (
             <div className="border-t pt-2">
               <p className="text-xs font-medium text-muted-foreground mb-1">Top Transactions:</p>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
+              <div className="space-y-1 max-h-24 sm:max-h-32 overflow-y-auto">
                 {data.transactions.slice(0, 3).map((tx: TrendTransaction, idx: number) => (
                   <div key={idx} className="text-xs">
                     <div className="flex justify-between items-start">
@@ -244,11 +268,11 @@ export default function ReflectionPage() {
                         <div className="truncate font-medium" title={tx.description}>
                           {tx.description}
                         </div>
-                        <div className="text-muted-foreground">
+                        <div className="text-muted-foreground truncate">
                           {tx.accountName} • {tx.categoryName}
                         </div>
                       </div>
-                      <div className={`font-semibold flex-shrink-0 ${tx.amount >= 0
+                      <div className={`font-semibold flex-shrink-0 text-xs ${tx.amount >= 0
                         ? "text-green-600"
                         : tx.transactionType === "transfer"
                           ? "text-gray-600"
@@ -313,17 +337,19 @@ export default function ReflectionPage() {
     { month: "long", year: "numeric" }
   );
 
+  const reflectionInsights = generateReflectionInsights();
+
   return (
     <AppLayout>
       <InitUser />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
         {/* Header with Month Navigation */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold">📊 Financial Reflection</h1>
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4">
+            <h1 className="text-2xl sm:text-3xl font-bold">📊 Financial Reflection</h1>
 
             {/* Month Navigation */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-center sm:justify-end space-x-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -332,7 +358,7 @@ export default function ReflectionPage() {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
 
-              <div className="text-lg font-semibold min-w-[200px] text-center">
+              <div className="text-base sm:text-lg font-semibold min-w-[180px] sm:min-w-[200px] text-center">
                 {monthName}
               </div>
 
@@ -346,20 +372,56 @@ export default function ReflectionPage() {
             </div>
           </div>
 
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground text-center sm:text-left">
             Your spending and income insights for the selected period
           </p>
         </div>
 
+        {/* Reflection Insights */}
+        {reflectionInsights.length > 0 && (
+          <Card className="p-4 sm:p-6 mb-6 sm:mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+            <div className="flex flex-col sm:flex-row sm:items-start space-y-3 sm:space-y-0 sm:space-x-3">
+              <div className="flex-shrink-0 mx-auto sm:mx-0 sm:mt-1">
+                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3 text-center sm:text-left">
+                  ✨ Financial Reflections
+                </h3>
+                <div className="space-y-2">
+                  {reflectionInsights.map((insight, index) => (
+                    <div key={index} className="flex flex-col sm:flex-row sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
+                      <div className="flex-shrink-0 mx-auto sm:mx-0 sm:mt-2">
+                        {insight.includes('saved') ? (
+                          <PiggyBank className="h-4 w-4 text-green-600" />
+                        ) : insight.includes('debt') ? (
+                          <CreditCard className="h-4 w-4 text-orange-600" />
+                        ) : (
+                          <TrendingUp className="h-4 w-4 text-blue-600" />
+                        )}
+                      </div>
+                      <p className="text-blue-800 dark:text-blue-200 leading-relaxed text-center sm:text-left text-sm sm:text-base">
+                        {insight}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Summary Cards */}
         {monthlySummary && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            <Card className="p-4 sm:p-6">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">
                   Total Income
                 </p>
-                <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
                   {formatCurrency(monthlySummary.totalIncome)}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -368,12 +430,12 @@ export default function ReflectionPage() {
               </div>
             </Card>
 
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">
                   Total Expenses
                 </p>
-                <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                <p className="text-2xl sm:text-3xl font-bold text-red-600 dark:text-red-400">
                   {formatCurrency(monthlySummary.totalExpenses)}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -382,13 +444,13 @@ export default function ReflectionPage() {
               </div>
             </Card>
 
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6 sm:col-span-2 md:col-span-1">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">
                   Net Difference
                 </p>
                 <p
-                  className={`text-3xl font-bold ${monthlySummary.netDifference >= 0
+                  className={`text-2xl sm:text-3xl font-bold ${monthlySummary.netDifference >= 0
                     ? "text-green-600 dark:text-green-400"
                     : "text-red-600 dark:text-red-400"
                     }`}
@@ -403,15 +465,15 @@ export default function ReflectionPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
           {/* Daily Income vs Expenses */}
           {categoryTrend && categoryTrend.length > 0 && (
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
+            <Card className="p-4 sm:p-6 lg:col-span-2">
+              <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4">
                 <h3 className="text-lg font-semibold">Daily Income vs Expenses</h3>
                 {categories && (
                   <Select value={dailyChartCategoryId || "all"} onValueChange={(value) => setDailyChartCategoryId(value === "all" ? undefined : value)}>
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="w-full sm:w-48">
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
@@ -425,19 +487,19 @@ export default function ReflectionPage() {
                   </Select>
                 )}
               </div>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={categoryTrend}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                   <XAxis
                     dataKey="date"
                     tickFormatter={formatDate}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis
                     tickFormatter={(value) => value >= 1000 ? `$${(value / 1000).toFixed(1)}k` : `$${value}`}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -451,12 +513,12 @@ export default function ReflectionPage() {
           )}
 
           {/* Time-based Top Expenses Chart */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+          <Card className="p-4 sm:p-6">
+            <div className="flex flex-col space-y-4 mb-4">
               <h3 className="text-lg font-semibold">Top Expenses Over Time</h3>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
                 <Select value={topExpensesType} onValueChange={(value) => setTopExpensesType(value as "category" | "group")}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-full sm:w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -466,7 +528,7 @@ export default function ReflectionPage() {
                 </Select>
 
                 <Select value={topExpensesFilterId} onValueChange={setTopExpensesFilterId}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="Select filter" />
                   </SelectTrigger>
                   <SelectContent>
@@ -493,19 +555,19 @@ export default function ReflectionPage() {
             </div>
 
             {timeBasedData && timeBasedData.length > 0 && (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={timeBasedData}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                   <XAxis
                     dataKey="date"
                     tickFormatter={formatDate}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis
                     tickFormatter={(value) => value >= 1000 ? `$${(value / 1000).toFixed(1)}k` : `$${value}`}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -518,10 +580,10 @@ export default function ReflectionPage() {
 
           {/* Group Breakdown Donut Chart */}
           {groupBreakdown && groupBreakdown.length > 0 && (
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold mb-4">Expense Groups</h3>
               <div className="relative">
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Pie
                       data={groupBreakdown.slice(0, 8)}
@@ -530,8 +592,8 @@ export default function ReflectionPage() {
                       cx="50%"
                       cy="50%"
                       startAngle={90}
-                      innerRadius={60}
-                      outerRadius={100}
+                      innerRadius={50}
+                      outerRadius={90}
                       fill="#8884d8"
                       stroke="none"
                     >
@@ -559,10 +621,10 @@ export default function ReflectionPage() {
                 {/* Total amount in center */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center">
-                    <div className="text-2xl font-bold">
+                    <div className="text-lg sm:text-2xl font-bold">
                       {formatCurrency(groupBreakdown.reduce((sum, item) => sum + item.amount, 0))}
                     </div>
-                    <div className="text-sm text-muted-foreground">Total</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Total</div>
                   </div>
                 </div>
               </div>
@@ -571,11 +633,11 @@ export default function ReflectionPage() {
 
           {/* Category Details Table */}
           {categoryBreakdown && categoryBreakdown.length > 0 && (
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
+            <Card className="p-4 sm:p-6">
+              <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4">
                 <h3 className="text-lg font-semibold">Category Details</h3>
                 <Link href="/categories">
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">
                     Manage Categories →
                   </Button>
                 </Link>
@@ -586,15 +648,15 @@ export default function ReflectionPage() {
                     (category.name === "Uncategorized" ? "uncategorized" : null);
 
                   const content = (
-                    <div className="flex justify-between items-center p-2 rounded hover:bg-muted/50 transition-colors">
-                      <div>
-                        <p className="font-medium">{category.name}</p>
-                        <p className="text-sm text-muted-foreground">
+                    <div className="flex justify-between items-center p-3 sm:p-2 rounded hover:bg-muted/50 transition-colors">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <p className="font-medium text-sm sm:text-base truncate">{category.name}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           {category.count} transaction{category.count !== 1 ? "s" : ""}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-semibold text-sm sm:text-base">
                           {formatCurrency(category.amount)}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -621,10 +683,10 @@ export default function ReflectionPage() {
 
         {/* Empty State */}
         {monthlySummary?.transactionCount === 0 && (
-          <div className="text-center py-12">
+          <div className="text-center py-8 sm:py-12">
             <div className="text-muted-foreground">
-              <p className="text-lg">No transactions found for {monthName}</p>
-              <p>Import some transactions to see your financial reflection!</p>
+              <p className="text-base sm:text-lg">No transactions found for {monthName}</p>
+              <p className="text-sm sm:text-base">Import some transactions to see your financial reflection!</p>
             </div>
           </div>
         )}
