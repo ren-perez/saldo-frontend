@@ -601,6 +601,43 @@ export const mergeTransaction = mutation({
     },
 });
 
+export const addAsNewTransaction = mutation({
+    args: {
+        newTransactionData: v.object({
+            date: v.number(),
+            amount: v.number(),
+            description: v.string(),
+            transactionType: v.optional(v.string()),
+            rawData: v.any(),
+        }),
+        userId: v.id("users"),
+        accountId: v.id("accounts"),
+    },
+    handler: async (ctx, args) => {
+        const { newTransactionData, userId, accountId } = args;
+
+        // Verify account belongs to user
+        const account = await ctx.db.get(accountId);
+        if (!account || account.userId !== userId) {
+            throw new Error("Account not found or not owned by user");
+        }
+
+        // Insert the new transaction
+        const insertedId = await ctx.db.insert("transactions", {
+            userId,
+            accountId,
+            date: newTransactionData.date,
+            amount: newTransactionData.amount,
+            description: newTransactionData.description,
+            transactionType: newTransactionData.transactionType,
+            categoryId: undefined,
+            createdAt: Date.now(),
+        });
+
+        return { success: true, transactionId: insertedId };
+    },
+});
+
 export const loadImportSession = query({
     args: {
         sessionId: v.string(),

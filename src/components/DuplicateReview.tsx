@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ interface ExistingTransaction {
   amount: number;
   description: string;
   date: number;
-  categoryId?: Id<"categories"> | null; // added
+  categoryId?: Id<"categories"> | null;
+  accountId: Id<"accounts">;
 }
 
 interface DuplicateTransaction {
@@ -59,7 +60,12 @@ export default function DuplicateReview({
   );
 
   const mergeTransaction = useMutation(api.transactions.mergeTransaction);
+  const addAsNewTransaction = useMutation(api.transactions.addAsNewTransaction);
   const resolveImportSession = useMutation(api.transactions.resolveImportSession);
+
+  // Get categories and accounts to show names instead of IDs
+  const categories = useQuery(api.categories.listCategories, { userId: session.userId });
+  const accounts = useQuery(api.accounts.listAccounts, { userId: session.userId });
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString();
@@ -71,6 +77,18 @@ export default function DuplicateReview({
 
   const getExistingTransaction = (existingId: string) => {
     return existingTransactions.find((t) => t._id === existingId);
+  };
+
+  const getCategoryName = (categoryId?: Id<"categories"> | null) => {
+    if (!categoryId || !categories) return null;
+    const category = categories.find(c => c._id === categoryId);
+    return category?.name || null;
+  };
+
+  const getAccountName = (accountId: Id<"accounts">) => {
+    if (!accounts) return "Loading...";
+    const account = accounts.find(a => a._id === accountId);
+    return account ? `${account.name} (${account.bank})` : "Unknown Account";
   };
 
   const handleMerge = async (duplicateIndex: number) => {
@@ -99,6 +117,30 @@ export default function DuplicateReview({
 
   const handleIgnore = (duplicateIndex: number) => {
     setResolvedDuplicates((prev) => new Set(prev).add(duplicateIndex));
+  };
+
+  const handleAddAsNew = async (duplicateIndex: number) => {
+    setResolvingDuplicates((prev) => new Set(prev).add(duplicateIndex));
+
+    try {
+      const duplicate = session.duplicates[duplicateIndex];
+      await addAsNewTransaction({
+        newTransactionData: duplicate.newTransaction,
+        userId: session.userId,
+        accountId: session.accountId,
+      });
+
+      setResolvedDuplicates((prev) => new Set(prev).add(duplicateIndex));
+    } catch (error) {
+      console.error("Error adding as new transaction:", error);
+      alert(`Error adding transaction: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setResolvingDuplicates((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(duplicateIndex);
+        return newSet;
+      });
+    }
   };
 
   const handleFinishReview = async () => {
@@ -198,12 +240,16 @@ export default function DuplicateReview({
                         <div>
                           <span className="font-medium">Category:</span>{" "}
                           {existing?.categoryId ? (
-                            <Badge variant="secondary">Categorized</Badge>
+                            <Badge variant="secondary">{getCategoryName(existing.categoryId) || "Unknown"}</Badge>
                           ) : (
                             <span className="text-muted-foreground">
                               (uncategorized)
                             </span>
                           )}
+                        </div>
+                        <div>
+                          <span className="font-medium">Account:</span>{" "}
+                          {existing ? getAccountName(existing.accountId) : "N/A"}
                         </div>
                       </div>
                     </div>
@@ -240,6 +286,10 @@ export default function DuplicateReview({
                             <span className="text-muted-foreground">(none)</span>
                           )}
                         </div>
+                        <div>
+                          <span className="font-medium">Account:</span>{" "}
+                          {getAccountName(session.accountId)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -262,11 +312,19 @@ export default function DuplicateReview({
                     >
                       Ignore ❌
                     </Button>
+                    <Button
+                      onClick={() => handleAddAsNew(i)}
+                      disabled={isResolving}
+                      variant="outline"
+                      size="sm"
+                    >
+                      {isResolving ? "Adding..." : "Add as New ➕"}
+                    </Button>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    <strong>Merge:</strong> Update existing with new file data,
-                    keep user edits (category).{" "}
-                    <strong>Ignore:</strong> Keep existing, skip new transaction.
+                    <strong>Merge:</strong> Update existing with new file data, keep user edits.{" "}
+                    <strong>Ignore:</strong> Keep existing, skip new transaction.{" "}
+                    <strong>Add as New:</strong> They are different transactions - add both.
                   </div>
                 </div>
               );
