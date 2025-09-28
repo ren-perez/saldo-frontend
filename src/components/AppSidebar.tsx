@@ -54,8 +54,10 @@ export function AppSidebar() {
   }, [pathname, isMobile, setOpenMobile])
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
-      <SidebarHeader>
+    <Sidebar collapsible="icon" 
+      className="border-none bg-transparent" 
+      variant="floating">
+      <SidebarHeader className="border-none">
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3 min-w-0">
             {/* Financial-themed SVG icon - clickable and properly sized */}

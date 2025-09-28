@@ -47,7 +47,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         <Separator orientation="vertical" className="h-4" />
                         <div className="flex flex-1 items-center justify-between">
                             <h1 className="text-lg font-semibold pl-4">Saldo</h1>
-                            <div className="text-sm text-gray-500 font-medium">
+                            <div className="text-sm text-gray-500 font-medium pr-2">
                                 {today}
                             </div>
                         </div>

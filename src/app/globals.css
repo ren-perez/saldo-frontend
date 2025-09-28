@@ -149,3 +149,94 @@ body {
     overflow: hidden;
   }
 }
+
+
+/* Add these styles to your existing global.css file */
+
+/* Enhanced backdrop blur support */
+@supports (backdrop-filter: blur(12px)) {
+  .backdrop-blur-xl {
+    backdrop-filter: blur(12px);
+  }
+  
+  .backdrop-blur-sm {
+    backdrop-filter: blur(4px);
+  }
+}
+
+/* Fallback for browsers that don't support backdrop-filter */
+@supports not (backdrop-filter: blur(12px)) {
+  .backdrop-blur-xl {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  
+  .dark .backdrop-blur-xl {
+    background: rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* Ensure the sidebar container has proper positioning */
+[data-variant="floating"] {
+  position: relative;
+}
+
+/* Custom scrollbar for the glassy sidebar */
+[data-slot="sidebar-content"]::-webkit-scrollbar {
+  width: 6px;
+}
+
+[data-slot="sidebar-content"]::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+[data-slot="sidebar-content"]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+[data-slot="sidebar-content"]::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.dark [data-slot="sidebar-content"]::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark [data-slot="sidebar-content"]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark [data-slot="sidebar-content"]::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Enhanced glass morphism effect */
+.glass-sidebar {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.05)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 
+    0 8px 32px 0 rgba(31, 38, 135, 0.37),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+.dark .glass-sidebar {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.1),
+    rgba(0, 0, 0, 0.05)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-sidebar="mobile"] {
+  background-color: rgba(0, 0, 0, 0.4); /* dimmed background */
+  backdrop-filter: blur(8px);            /* frosted blur effect */
+}
