@@ -183,7 +183,7 @@ export function EditPresetDialog({ open, onClose, onSave, preset }: EditPresetDi
                                             className="mt-2"
                                         />
                                     </div>
-                                    
+
                                     <div className="flex items-center space-x-3">
                                         <Checkbox
                                             id="hasHeader"
@@ -192,7 +192,7 @@ export function EditPresetDialog({ open, onClose, onSave, preset }: EditPresetDi
                                         />
                                         <Label htmlFor="hasHeader">File has header row</Label>
                                     </div>
-                                    
+
                                     <div className="space-y-2">
                                         <Label htmlFor="skipRows">Skip rows from top</Label>
                                         <Input
@@ -238,7 +238,7 @@ export function EditPresetDialog({ open, onClose, onSave, preset }: EditPresetDi
                                             />
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-2">
                                         <Label htmlFor="amountColumns">Amount Columns *</Label>
                                         <Input
@@ -415,15 +415,17 @@ export function EditPresetDialog({ open, onClose, onSave, preset }: EditPresetDi
                                 </CardContent>
                             </Card>
                         </TabsContent>
+
                     </div>
                 </Tabs>
+
+                <div className="text-sm text-muted-foreground">
+                    * Required fields
+                </div>
 
                 <Separator className="my-4" />
 
                 <DialogFooter className="flex justify-between">
-                    <div className="text-sm text-muted-foreground">
-                        * Required fields
-                    </div>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={onClose}>
                             Cancel

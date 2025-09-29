@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(pnpm lint:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(pnpm add:*)",
+      "Bash(npx convex:*)"
     ],
     "deny": [],
     "ask": []

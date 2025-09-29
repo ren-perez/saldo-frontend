@@ -18,6 +18,8 @@ import type * as categories from "../categories.js";
 import type * as categoryGroups from "../categoryGroups.js";
 import type * as demo from "../demo.js";
 import type * as goals from "../goals.js";
+import type * as importActions from "../importActions.js";
+import type * as imports from "../imports.js";
 import type * as presets from "../presets.js";
 import type * as reflections from "../reflections.js";
 import type * as transactions from "../transactions.js";
@@ -38,6 +40,8 @@ declare const fullApi: ApiFromModules<{
   categoryGroups: typeof categoryGroups;
   demo: typeof demo;
   goals: typeof goals;
+  importActions: typeof importActions;
+  imports: typeof imports;
   presets: typeof presets;
   reflections: typeof reflections;
   transactions: typeof transactions;

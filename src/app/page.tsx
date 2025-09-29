@@ -136,6 +136,7 @@ function UnauthenticatedHome() {
           <p className="text-gray-600 mb-8">
             Import and manage your bank transactions with ease.
             Track spending, categorize transactions, and gain insights into your financial habits.
+            THIS IS COMING FROM UnauthenticatedHome
           </p>
 
           <div className="space-y-4 mb-8">

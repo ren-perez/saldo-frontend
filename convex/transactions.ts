@@ -21,12 +21,13 @@ export const importTransactions = mutation({
             description: v.string(),
             category: v.optional(v.string()),
             transactionType: v.optional(v.string()),
-            rawData: v.any(), // Raw CSV data - keeping v.any() for Convex compatibility
+            rawData: v.any(),
         })),
         sessionId: v.string(),
+        importId: v.id("imports"), // ✅ Required, not optional
     },
     handler: async (ctx, args) => {
-        const { userId, accountId, transactions, sessionId } = args;
+        const { userId, accountId, transactions, sessionId, importId } = args;
 
         // Verify account belongs to user
         const account = await ctx.db.get(accountId);
@@ -81,6 +82,8 @@ export const importTransactions = mutation({
                 const deduplicationKey = createDeduplicationKey(accountId, transaction.amount, transaction.description);
                 const existingTransaction = existingTransactionKeys.get(deduplicationKey);
 
+                console.log("Import id:", importId);
+
                 if (existingTransaction) {
                     // Possible duplicate found
                     possibleDuplicates.push({
@@ -91,6 +94,7 @@ export const importTransactions = mutation({
                             description: transaction.description,
                             transactionType: transaction.transactionType,
                             rawData: transaction.rawData,
+                            importId: importId,
                         },
                     });
                 } else {
@@ -101,6 +105,7 @@ export const importTransactions = mutation({
                         date: transaction.date,
                         amount: transaction.amount,
                         description: transaction.description,
+                        importId: importId,
                         transactionType: transaction.transactionType,
                         categoryId: undefined,
                         createdAt: Date.now(),
@@ -115,28 +120,129 @@ export const importTransactions = mutation({
             }
         }
 
-        // Store import session for duplicate resolution if needed
-        if (possibleDuplicates.length > 0 || errors.length > 0) {
-            await ctx.db.insert("import_sessions", {
-                sessionId,
-                userId,
-                accountId,
-                duplicates: possibleDuplicates,
-                errors,
-                summary: {
-                    inserted: inserted.length,
-                    totalErrors: errors.length,
-                },
-                createdAt: Date.now(),
-                isResolved: possibleDuplicates.length === 0, // If no duplicates, mark as resolved
-            });
-        }
+        // ✅ ALWAYS create import session (no conditional)
+        await ctx.db.insert("import_sessions", {
+            sessionId,
+            userId,
+            accountId,
+            importId,
+            pendingTransactions: transactions,
+            duplicates: possibleDuplicates,
+            errors,
+            summary: {
+                inserted: inserted.length,
+                skipped: possibleDuplicates.length,
+                totalErrors: errors.length,
+            },
+            createdAt: Date.now(),
+            status: possibleDuplicates.length > 0 ? "awaiting_review" : "completed",
+        });
 
         return {
             inserted: inserted.length,
-            possibleDuplicates,
+            skipped: possibleDuplicates.length,
             errors,
-            sessionId: possibleDuplicates.length > 0 ? sessionId : undefined,
+            sessionId, // ✅ Always return sessionId
+            hasDuplicates: possibleDuplicates.length > 0,
+        };
+    },
+});
+
+
+export const resolveDuplicates = mutation({
+    args: {
+        sessionId: v.string(),
+        userId: v.id("users"),
+        decisions: v.array(v.object({
+            existingId: v.id("transactions"),
+            action: v.union(v.literal("skip"), v.literal("import")),
+            newTransaction: v.optional(v.object({
+                date: v.number(),
+                amount: v.number(),
+                description: v.string(),
+                transactionType: v.optional(v.string()),
+                rawData: v.any(),
+            })),
+        })),
+    },
+    handler: async (ctx, args) => {
+        const { sessionId, userId, decisions } = args;
+
+        // Get session
+        const session = await ctx.db
+            .query("import_sessions")
+            .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+            .unique();
+
+        if (!session || session.userId !== userId) {
+            throw new Error("Session not found or unauthorized");
+        }
+
+        const { importId, accountId } = session;
+        let importedCount = session.summary.inserted;
+
+        // Process decisions
+        for (const decision of decisions) {
+            if (decision.action === "import" && decision.newTransaction) {
+                // Import the transaction
+                const insertedId = await ctx.db.insert("transactions", {
+                    userId,
+                    accountId,
+                    date: decision.newTransaction.date,
+                    amount: decision.newTransaction.amount,
+                    description: decision.newTransaction.description,
+                    transactionType: decision.newTransaction.transactionType,
+                    importId,
+                    createdAt: Date.now(),
+                });
+
+                importedCount++;
+
+                // Record resolution
+                await ctx.db.insert("import_duplicate_resolutions", {
+                    sessionId,
+                    importId,
+                    userId,
+                    existingTransactionId: decision.existingId,
+                    action: "import",
+                    newTransactionId: insertedId,
+                    resolvedAt: Date.now(),
+                });
+            } else {
+                // Skip - record decision
+                await ctx.db.insert("import_duplicate_resolutions", {
+                    sessionId,
+                    importId,
+                    userId,
+                    existingTransactionId: decision.existingId,
+                    action: "skip",
+                    resolvedAt: Date.now(),
+                });
+            }
+        }
+
+        // Update session status
+        await ctx.db.patch(session._id, {
+            status: "completed",
+            resolvedAt: Date.now(),
+            summary: {
+                ...session.summary,
+                inserted: importedCount,
+            },
+        });
+
+        // Update import record
+        await ctx.db.patch(importId, {
+            status: "completed",
+            processedAt: Date.now(),
+            importedCount,
+            skippedCount: session.summary.skipped - (importedCount - session.summary.inserted),
+            updatedAt: Date.now(),
+        });
+
+        return {
+            success: true,
+            totalImported: importedCount,
         };
     },
 });
@@ -155,17 +261,17 @@ export const listTransactionsPaginated = query({
         pageSize: v.number(),
     },
     handler: async (ctx, args) => {
-        const { 
-            userId, 
-            accountId, 
-            transactionType, 
-            categoryId, 
+        const {
+            userId,
+            accountId,
+            transactionType,
+            categoryId,
             groupId,
-            searchTerm, 
-            startDate, 
-            endDate, 
-            page, 
-            pageSize 
+            searchTerm,
+            startDate,
+            endDate,
+            page,
+            pageSize
         } = args;
 
         // Build base query
@@ -354,7 +460,7 @@ export const deleteTransaction = mutation({
         if (!transaction) {
             throw new Error("Transaction not found");
         }
-        
+
         await ctx.db.delete(transactionId);
         return { success: true };
     },
@@ -413,7 +519,7 @@ export const updateTransaction = mutation({
         if (updates.description !== undefined) {
             patchData.description = updates.description;
         }
-        
+
         if (updates.amount !== undefined) {
             patchData.amount = updates.amount;
         }
@@ -512,7 +618,7 @@ export const getTransactionsInDateRange = query({
         const transactions = await ctx.db
             .query("transactions")
             .withIndex("by_account", (q) => q.eq("accountId", accountId))
-            .filter((q) => 
+            .filter((q) =>
                 q.and(
                     q.eq(q.field("userId"), userId),
                     q.gte(q.field("date"), startDate),
@@ -609,6 +715,7 @@ export const addAsNewTransaction = mutation({
             description: v.string(),
             transactionType: v.optional(v.string()),
             rawData: v.any(),
+            importId: v.id("imports"),
         }),
         userId: v.id("users"),
         accountId: v.id("accounts"),
@@ -632,11 +739,13 @@ export const addAsNewTransaction = mutation({
             transactionType: newTransactionData.transactionType,
             categoryId: undefined,
             createdAt: Date.now(),
+            importId: newTransactionData.importId,
         });
 
         return { success: true, transactionId: insertedId };
     },
 });
+
 
 export const loadImportSession = query({
     args: {
@@ -676,10 +785,10 @@ export const resolveImportSession = mutation({
             throw new Error("Session not found or not owned by user");
         }
 
-        // Mark session as resolved
-        await ctx.db.replace(session._id, {
-            ...session,
-            isResolved: true,
+        // Mark session as completed
+        await ctx.db.patch(session._id, {
+            status: "completed",
+            resolvedAt: Date.now(),
         });
 
         return { success: true };

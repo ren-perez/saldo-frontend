@@ -55,7 +55,7 @@ export function PresetDisplay({
             </div>
             <p className="text-sm text-muted-foreground mb-3">{preset.description}</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                <div><strong>Delimiter:</strong> "{preset.delimiter}"</div>
+                <div><strong>Delimiter:</strong> `&quot;`{preset.delimiter}`&quot;`</div>
                 <div><strong>Header:</strong> {preset.hasHeader ? "Yes" : "No"}</div>
                 <div><strong>Skip:</strong> {preset.skipRows} rows</div>
                 <div><strong>Multiplier:</strong> {preset.amountMultiplier}</div>
@@ -68,7 +68,7 @@ export function PresetDisplay({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center p-3 bg-muted rounded-lg">
                     <div className="text-sm text-muted-foreground mb-1">Delimiter</div>
-                    <div className="font-mono text-lg">"{preset.delimiter}"</div>
+                    <div className="font-mono text-lg">`&quot;`{preset.delimiter}`&quot;`</div>
                 </div>
                 <div className="text-center p-3 bg-muted rounded-lg">
                     <div className="text-sm text-muted-foreground mb-1">Header Row</div>
@@ -170,11 +170,11 @@ export function PresetDisplay({
             <CardContent className="space-y-4">
                 {renderSummaryView()}
 
-                <Separator />
+                <Separator className="my-6" />
 
                 {renderColumnMapping()}
 
-                <Separator />
+                <Separator className="my-6" />
 
                 {renderDateFormat()}
 

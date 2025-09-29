@@ -10,12 +10,12 @@ export default function Navigation() {
 
     const navItems = [
         { href: "/dashboard", label: "Dashboard", icon: "📊" },
+        { href: "/reflection", label: "Reflection", icon: "🔍" },
         { href: "/accounts", label: "Accounts", icon: "🏦" },
         { href: "/presets", label: "Presets", icon: "⚙️" },
         { href: "/import-csv", label: "Import CSV", icon: "📤" },
         { href: "/transactions", label: "Transactions", icon: "💰" },
         { href: "/categories", label: "Categories", icon: "🏷️" },
-        { href: "/reflection", label: "Reflection", icon: "🔍" },
     ];
 
     return (

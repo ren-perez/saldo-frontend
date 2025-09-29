@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { useConvexUser } from "../../hooks/useConvexUser";
@@ -13,7 +13,6 @@ import DuplicateReview from "@/components/DuplicateReview";
 import { Button } from "@/components/ui/button";
 import {
     processTransactions,
-    validatePreset,
     validateCsvHeaders,
     type PresetConfig,
     type ValidationError,
@@ -23,15 +22,10 @@ import { PresetDisplay, PresetNotFound } from "@/components/PresetDisplay";
 
 export default function CsvImporterPage() {
     const { convexUser } = useConvexUser();
-    // const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
     const [selectedAccount, setSelectedAccount] = useState<Id<"accounts"> | null>(null);
     const [file, setFile] = useState<File | null>(null);
-    const [previewTransactions, setPreviewTransactions] = useState<
-        NormalizedTransaction[]
-    >([]);
-    const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
-        []
-    );
+    const [previewTransactions, setPreviewTransactions] = useState<NormalizedTransaction[]>([]);
+    const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
     const [processingStats, setProcessingStats] = useState<{
         totalRows: number;
         validRows: number;
@@ -40,27 +34,28 @@ export default function CsvImporterPage() {
     } | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-    const [importPhase, setImportPhase] = useState<
-        "upload" | "preview" | "reviewing" | "completed"
-    >("upload");
+    const [importPhase, setImportPhase] = useState<"upload" | "preview" | "reviewing" | "completed">("upload");
 
+    // Queries & Mutations
     const accounts = useQuery(
         api.accounts.listAccounts,
         convexUser ? { userId: convexUser._id } : "skip"
     );
 
-    // const preset = useQuery(
-    //   api.accounts.getAccountPreset,
-    //   selectedAccount ? { accountId: selectedAccount as string } : "skip"
-    // );
     const preset = useQuery(
         api.accounts.getAccountPreset,
         selectedAccount ? { accountId: selectedAccount } : "skip"
     );
 
     const importTransactions = useMutation(api.transactions.importTransactions);
+    const resolveDuplicates = useMutation(api.transactions.resolveDuplicates);
+    const resolveImportSession = useMutation(api.transactions.resolveImportSession); // ✅ Added
+    // const uploadFileToR2 = useMutation(api.imports.uploadFileToR2);
+    const getUploadUrl = useAction(api.importActions.getUploadUrl);
+    const registerImportMutation = useMutation(api.imports.registerImport);
+    const updateImportStatusMutation = useMutation(api.imports.updateImportStatus);
 
-    // Load import session if we have a sessionId
+    // ✅ Fixed: Use transactions API instead of imports API
     const importSession = useQuery(
         api.transactions.loadImportSession,
         currentSessionId && convexUser
@@ -68,23 +63,12 @@ export default function CsvImporterPage() {
             : "skip"
     );
 
-    // Get existing transactions for duplicate review (only load when needed)
-    // const existingTransactions = useQuery(
-    //   api.transactions.listTransactions,
-    //   importSession && selectedAccount && convexUser
-    //     ? {
-    //       userId: convexUser._id,
-    //       accountId: selectedAccount as string,
-    //       limit: 1000 // Get more for duplicate matching
-    //     }
-    //     : "skip"
-    // );
     const existingTransactions = useQuery(
         api.transactions.listTransactions,
         importSession && selectedAccount && convexUser
             ? {
                 userId: convexUser._id,
-                accountId: selectedAccount as Id<"accounts">, // ✅ Correct cast
+                accountId: selectedAccount,
                 limit: 1000
             }
             : "skip"
@@ -119,362 +103,327 @@ export default function CsvImporterPage() {
         }
     };
 
-    // const handlePreview = () => {
-    //   if (!file || !preset) return;
-    //   setIsProcessing(true);
-
-    //   const presetErrors = validatePreset(preset as PresetConfig);
-    //   if (presetErrors.length > 0) {
-    //     setValidationErrors(presetErrors);
-    //     setIsProcessing(false);
-    //     return;
-    //   }
-
-    //   Papa.parse(file, {
-    //     header: preset.hasHeader,
-    //     delimiter: preset.delimiter,
-    //     skipEmptyLines: true,
-    //     complete: (results) => {
-    //       const rows = results.data as Record<string, unknown>[];
-
-    //       if (rows.length === 0) {
-    //         setValidationErrors([
-    //           {
-    //             row: -1,
-    //             column: "file",
-    //             error: "No data rows found in CSV",
-    //             value: null,
-    //           },
-    //         ]);
-    //         setIsProcessing(false);
-    //         return;
-    //       }
-
-    //       const headers = preset.hasHeader ? Object.keys(rows[0]) : [];
-    //       const headerErrors = validateCsvHeaders(headers, preset as PresetConfig);
-    //       if (headerErrors.length > 0) {
-    //         setValidationErrors(headerErrors);
-    //         setIsProcessing(false);
-    //         return;
-    //       }
-
-    //       const result = processTransactions(rows, preset as PresetConfig);
-    //       setValidationErrors(result.errors);
-    //       setPreviewTransactions(result.transactions.slice(0, 10));
-    //       setProcessingStats(result.stats);
-    //       setImportPhase("preview");
-    //       setIsProcessing(false);
-    //     },
-    //     error: (error) => {
-    //       setValidationErrors([
-    //         {
-    //           row: -1,
-    //           column: "file",
-    //           error: `CSV parsing error: ${error.message}`,
-    //           value: null,
-    //         },
-    //       ]);
-    //       setIsProcessing(false);
-    //     },
-    //   });
-    // };
-
-    const handlePreview = () => {
-        if (!file || !preset) return;
-        setIsProcessing(true);
-
-        const presetErrors = validatePreset(preset as PresetConfig);
-        if (presetErrors.length > 0) {
-            setValidationErrors(presetErrors);
-            setIsProcessing(false);
-            return;
-        }
-
+    const parseFile = async (
+        file: File,
+        preset: PresetConfig
+    ): Promise<Record<string, unknown>[]> => {
         const extension = file.name.split(".").pop()?.toLowerCase();
 
-        // --- CSV ---
-        if (extension === "csv") {
-            Papa.parse(file, {
-                header: preset.hasHeader,
-                delimiter: preset.delimiter,
-                skipEmptyLines: true,
-                complete: (results) => {
-                    const rows = results.data as Record<string, unknown>[];
-                    processParsedRows(rows);
-                },
-                error: (error) => {
-                    setValidationErrors([
-                        {
-                            row: -1,
-                            column: "file",
-                            error: `CSV parsing error: ${error.message}`,
-                            value: null,
-                        },
-                    ]);
-                    setIsProcessing(false);
-                },
-            });
-        }
-
-        // --- Excel (.xlsx / .xls) ---
-        else if (extension === "xlsx" || extension === "xls") {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                    const workbook = XLSX.read(data, { type: "array" });
-                    const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-                    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-                        defval: "",
-                    });
-                    processParsedRows(rows);
-                } catch (err) {
-                    setValidationErrors([
-                        {
-                            row: -1,
-                            column: "file",
-                            error: `XLSX parsing error: ${(err as Error).message}`,
-                            value: null,
-                        },
-                    ]);
-                    setIsProcessing(false);
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        // --- Unsupported ---
-        else {
-            setValidationErrors([
-                { row: -1, column: "file", error: "Unsupported file type", value: null },
-            ]);
-            setIsProcessing(false);
-        }
-    };
-
-    const processParsedRows = (rows: Record<string, unknown>[]) => {
-        if (rows.length === 0) {
-            setValidationErrors([
-                {
-                    row: -1,
-                    column: "file",
-                    error: "No data rows found in file",
-                    value: null,
-                },
-            ]);
-            setIsProcessing(false);
-            return;
-        }
-
-        const headers = preset.hasHeader ? Object.keys(rows[0]) : [];
-        const headerErrors = validateCsvHeaders(headers, preset as PresetConfig);
-        if (headerErrors.length > 0) {
-            setValidationErrors(headerErrors);
-            setIsProcessing(false);
-            return;
-        }
-
-        const result = processTransactions(rows, preset as PresetConfig);
-        setValidationErrors(result.errors);
-        setPreviewTransactions(result.transactions.slice(0, 10));
-        setProcessingStats(result.stats);
-        setImportPhase("preview");
-        setIsProcessing(false);
-    };
-
-
-
-    // const handleImport = async () => {
-    //     if (!convexUser || !selectedAccount || !preset || !file) return;
-    //     try {
-    //         setIsProcessing(true);
-
-    //         Papa.parse(file, {
-    //             header: preset.hasHeader,
-    //             delimiter: preset.delimiter,
-    //             skipEmptyLines: true,
-    //             complete: async (results) => {
-    //                 const rows = results.data as Record<string, unknown>[];
-    //                 const result = processTransactions(rows, preset as PresetConfig);
-
-    //                 if (result.errors.length > 0) {
-    //                     setValidationErrors(result.errors);
-    //                     setIsProcessing(false);
-    //                     return;
-    //                 }
-
-    //                 // Generate a session ID for this import
-    //                 const sessionId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    //                 const transactionsForConvex = result.transactions.map((t, index) => ({
-    //                     date: new Date(t.date).getTime(),
-    //                     amount: t.amount,
-    //                     description: t.description,
-    //                     category: t.category,
-    //                     transactionType: t.transactionType,
-    //                     rawData: { ...t, originalRowIndex: index }, // Store original row data
-    //                 }));
-
-    //                 const importResult = await importTransactions({
-    //                     userId: convexUser._id,
-    //                     accountId: selectedAccount as Id<"accounts">,
-    //                     transactions: transactionsForConvex,
-    //                     sessionId,
-    //                 });
-
-    //                 if (importResult.possibleDuplicates && importResult.possibleDuplicates.length > 0) {
-    //                     // Store session ID for persistence
-    //                     localStorage.setItem('import_session_id', sessionId);
-    //                     setCurrentSessionId(sessionId);
-    //                     setImportPhase("reviewing");
-    //                 } else {
-    //                     // No duplicates, show success
-    //                     alert(
-    //                         `Successfully imported ${importResult.inserted} transactions!${importResult.errors.length > 0
-    //                             ? ` ${importResult.errors.length} rows had errors.`
-    //                             : ""
-    //                         }`
-    //                     );
-    //                     setImportPhase("completed");
-    //                 }
-
-    //                 setIsProcessing(false);
-    //             },
-    //         });
-    //     } catch (error) {
-    //         console.error("Import error:", error);
-    //         alert(
-    //             `Error importing transactions: ${error instanceof Error ? error.message : "Unknown error"
-    //             }`
-    //         );
-    //         setIsProcessing(false);
-    //     }
-    // };
-
-    const handleImport = async () => {
-        if (!convexUser || !selectedAccount || !preset || !file) return;
-        try {
-            setIsProcessing(true);
-            const extension = file.name.split(".").pop()?.toLowerCase();
-
-            const processImportData = async (rows: Record<string, unknown>[]) => {
-                const result = processTransactions(rows, preset as PresetConfig);
-
-                if (result.errors.length > 0) {
-                    setValidationErrors(result.errors);
-                    setIsProcessing(false);
-                    return;
-                }
-
-                // Generate a session ID for this import
-                const sessionId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-                const transactionsForConvex = result.transactions.map((t, index) => ({
-                    date: new Date(t.date).getTime(), // Convert ISO string to timestamp
-                    amount: t.amount,
-                    description: t.description,
-                    category: t.category,
-                    transactionType: t.transactionType,
-                    rawData: { ...t, originalRowIndex: index }, // Store original row data
-                }));
-
-                const importResult = await importTransactions({
-                    userId: convexUser._id,
-                    accountId: selectedAccount as Id<"accounts">,
-                    transactions: transactionsForConvex,
-                    sessionId,
-                });
-
-                if (importResult.possibleDuplicates && importResult.possibleDuplicates.length > 0) {
-                    // Store session ID for persistence
-                    localStorage.setItem('import_session_id', sessionId);
-                    setCurrentSessionId(sessionId);
-                    setImportPhase("reviewing");
-                } else {
-                    // No duplicates, show success
-                    alert(
-                        `Successfully imported ${importResult.inserted} transactions!${importResult.errors.length > 0
-                            ? ` ${importResult.errors.length} rows had errors.`
-                            : ""
-                        }`
-                    );
-                    setImportPhase("completed");
-                }
-
-                setIsProcessing(false);
-            };
-
-            // Handle CSV files
+        return new Promise((resolve, reject) => {
             if (extension === "csv") {
                 Papa.parse(file, {
                     header: preset.hasHeader,
                     delimiter: preset.delimiter,
                     skipEmptyLines: true,
-                    complete: async (results) => {
-                        const rows = results.data as Record<string, unknown>[];
-                        await processImportData(rows);
-                    },
-                    error: (error) => {
-                        setValidationErrors([
-                            {
-                                row: -1,
-                                column: "file",
-                                error: `CSV parsing error: ${error.message}`,
-                                value: null,
-                            },
-                        ]);
-                        setIsProcessing(false);
-                    },
+                    complete: (results) => resolve(results.data as Record<string, unknown>[]),
+                    error: (error) => reject(new Error(`CSV parsing error: ${error.message}`)),
                 });
-            }
-            // Handle Excel files
-            else if (extension === "xlsx" || extension === "xls") {
+            } else if (extension === "xlsx" || extension === "xls") {
                 const reader = new FileReader();
-                reader.onload = async (e) => {
+                reader.onload = (e) => {
                     try {
                         const data = new Uint8Array(e.target?.result as ArrayBuffer);
                         const workbook = XLSX.read(data, { type: "array" });
                         const sheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[sheetName];
-                        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-                            defval: "",
-                        });
-                        await processImportData(rows);
+                        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "" });
+                        resolve(rows);
                     } catch (err) {
-                        setValidationErrors([
-                            {
-                                row: -1,
-                                column: "file",
-                                error: `XLSX parsing error: ${(err as Error).message}`,
-                                value: null,
-                            },
-                        ]);
-                        setIsProcessing(false);
+                        reject(new Error(`XLSX parsing error: ${(err as Error).message}`));
                     }
                 };
                 reader.readAsArrayBuffer(file);
+            } else {
+                reject(new Error("Unsupported file type. Please use CSV, XLSX, or XLS files."));
             }
-            else {
-                setValidationErrors([
-                    { row: -1, column: "file", error: "Unsupported file type. Please use CSV, XLSX, or XLS files.", value: null },
-                ]);
+        });
+    };
+
+    const handlePreview = async () => {
+        if (!file || !preset) return;
+
+        try {
+            setIsProcessing(true);
+
+            const rows = await parseFile(file, preset as PresetConfig);
+            if (rows.length === 0) {
+                setValidationErrors([{ row: -1, column: "file", error: "No data rows found in file", value: null }]);
                 setIsProcessing(false);
+                return;
             }
+
+            const headers = preset.hasHeader ? Object.keys(rows[0]) : [];
+            const headerErrors = validateCsvHeaders(headers, preset as PresetConfig);
+            if (headerErrors.length > 0) {
+                setValidationErrors(headerErrors);
+                setIsProcessing(false);
+                return;
+            }
+
+            const result = processTransactions(rows, preset as PresetConfig);
+            setValidationErrors(result.errors);
+            setPreviewTransactions(result.transactions.slice(0, 10));
+            setProcessingStats(result.stats);
+            setImportPhase("preview");
+            setIsProcessing(false);
         } catch (error) {
-            console.error("Import error:", error);
-            alert(
-                `Error importing transactions: ${error instanceof Error ? error.message : "Unknown error"
-                }`
-            );
+            setValidationErrors([{ row: -1, column: "file", error: (error as Error).message, value: null }]);
             setIsProcessing(false);
         }
     };
 
-    const handleSessionResolved = () => {
-        localStorage.removeItem('import_session_id');
-        setImportPhase("completed");
-        alert("Import completed successfully!");
+    // const handleImport = async () => {
+    //     if (!convexUser || !selectedAccount || !preset || !file) return;
+
+    //     let importId: Id<"imports"> | null = null;
+
+    //     try {
+    //         setIsProcessing(true);
+
+    //         // Parse and validate
+    //         const rows = await parseFile(file, preset as PresetConfig);
+    //         if (rows.length === 0) {
+    //             setValidationErrors([{ row: -1, column: "file", error: "No data rows found in file", value: null }]);
+    //             setIsProcessing(false);
+    //             return;
+    //         }
+
+    //         const headers = preset.hasHeader ? Object.keys(rows[0]) : [];
+    //         const headerErrors = validateCsvHeaders(headers, preset as PresetConfig);
+    //         if (headerErrors.length > 0) {
+    //             setValidationErrors(headerErrors);
+    //             setIsProcessing(false);
+    //             return;
+    //         }
+
+    //         const result = processTransactions(rows, preset as PresetConfig);
+    //         if (result.errors.length > 0) {
+    //             setValidationErrors(result.errors);
+    //             setIsProcessing(false);
+    //             return;
+    //         }
+
+    //         // Upload file to R2
+    //         const fileData = await file.arrayBuffer();
+    //         const uploadResult = await uploadFileToR2({
+    //             userId: convexUser._id,
+    //             fileName: file.name,
+    //             contentType: file.type || "application/octet-stream",
+    //             fileData: fileData,
+    //         });
+
+    //         // Register import
+    //         const registerResult = await registerImportMutation({
+    //             userId: convexUser._id,
+    //             accountId: selectedAccount,
+    //             fileKey: uploadResult.fileKey,
+    //             fileName: file.name,
+    //             contentType: file.type || "application/octet-stream",
+    //             size: file.size,
+    //         });
+
+    //         importId = registerResult.importId;
+
+    //         // Update status to processing
+    //         await updateImportStatusMutation({
+    //             importId: importId,
+    //             status: "processing",
+    //         });
+
+    //         // Generate session ID
+    //         const sessionId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    //         // Map transactions for Convex
+    //         const transactionsForConvex = result.transactions.map((t, index) => ({
+    //             date: new Date(t.date).getTime(),
+    //             amount: t.amount,
+    //             description: t.description,
+    //             category: t.category,
+    //             transactionType: t.transactionType,
+    //             rawData: { ...t, originalRowIndex: index },
+    //         }));
+
+    //         // Import transactions
+    //         const importResult = await importTransactions({
+    //             userId: convexUser._id,
+    //             accountId: selectedAccount,
+    //             transactions: transactionsForConvex,
+    //             sessionId,
+    //             importId: importId,
+    //         });
+
+    //         // Handle result
+    //         if (importResult.hasDuplicates) {
+    //             localStorage.setItem("import_session_id", sessionId);
+    //             setCurrentSessionId(sessionId);
+    //             setImportPhase("reviewing");
+    //         } else {
+    //             await updateImportStatusMutation({
+    //                 importId: importId,
+    //                 status: "completed",
+    //             });
+    //             setImportPhase("completed");
+    //             alert(`Successfully imported ${importResult.inserted} transactions!`);
+    //         }
+
+    //         setIsProcessing(false);
+    //     } catch (error) {
+    //         console.error("Import error:", error);
+
+    //         if (importId) {
+    //             try {
+    //                 await updateImportStatusMutation({
+    //                     importId: importId,
+    //                     status: "failed",
+    //                     error: (error as Error).message,
+    //                 });
+    //             } catch (updateError) {
+    //                 console.error("Failed to update import status:", updateError);
+    //             }
+    //         }
+
+    //         setValidationErrors([{
+    //             row: -1,
+    //             column: "file",
+    //             error: `Import failed: ${(error as Error).message}`,
+    //             value: null
+    //         }]);
+    //         setIsProcessing(false);
+    //     }
+    // };
+
+    // ✅ Fixed: Simplified handler with no parameters
+
+    const handleImport = async () => {
+        if (!convexUser || !selectedAccount || !preset || !file) return;
+
+        let importId: Id<"imports"> | null = null;
+
+        try {
+            setIsProcessing(true);
+
+            // ✅ Step 1: Parse and validate
+            const rows = await parseFile(file, preset as PresetConfig);
+            if (rows.length === 0) {
+                setValidationErrors([{ row: -1, column: "file", error: "No data rows found in file", value: null }]);
+                setIsProcessing(false);
+                return;
+            }
+
+            const headers = preset.hasHeader ? Object.keys(rows[0]) : [];
+            const headerErrors = validateCsvHeaders(headers, preset as PresetConfig);
+            if (headerErrors.length > 0) {
+                setValidationErrors(headerErrors);
+                setIsProcessing(false);
+                return;
+            }
+
+            const result = processTransactions(rows, preset as PresetConfig);
+            if (result.errors.length > 0) {
+                setValidationErrors(result.errors);
+                setIsProcessing(false);
+                return;
+            }
+
+            // ✅ Step 2: Ask Convex for a presigned URL
+            const { uploadUrl, fileKey } = await getUploadUrl({
+                userId: convexUser._id,
+                fileName: file.name,
+                contentType: file.type || "application/octet-stream",
+            });
+
+            // ✅ Step 3: Upload directly to R2 from client
+            await fetch(uploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": file.type || "application/octet-stream" },
+                body: file,
+            });
+
+            // ✅ Step 4: Register import metadata in Convex
+            const registerResult = await registerImportMutation({
+                userId: convexUser._id,
+                accountId: selectedAccount,
+                fileKey,
+                fileName: file.name,
+                contentType: file.type || "application/octet-stream",
+                size: file.size,
+            });
+
+            importId = registerResult.importId;
+
+            // ✅ Step 5: Update status
+            await updateImportStatusMutation({
+                importId,
+                status: "processing",
+            });
+
+            // ✅ Step 6: Create session + import transactions
+            const sessionId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const transactionsForConvex = result.transactions.map((t, index) => ({
+                date: new Date(t.date).getTime(),
+                amount: t.amount,
+                description: t.description,
+                category: t.category,
+                transactionType: t.transactionType,
+                rawData: { ...t, originalRowIndex: index },
+            }));
+
+            const importResult = await importTransactions({
+                userId: convexUser._id,
+                accountId: selectedAccount,
+                transactions: transactionsForConvex,
+                sessionId,
+                importId,
+            });
+
+            if (importResult.hasDuplicates) {
+                localStorage.setItem("import_session_id", sessionId);
+                setCurrentSessionId(sessionId);
+                setImportPhase("reviewing");
+            } else {
+                await updateImportStatusMutation({ importId, status: "completed" });
+                setImportPhase("completed");
+                alert(`Successfully imported ${importResult.inserted} transactions!`);
+            }
+
+            setIsProcessing(false);
+        } catch (error) {
+            console.error("Import error:", error);
+
+            if (importId) {
+                await updateImportStatusMutation({
+                    importId,
+                    status: "failed",
+                    error: (error as Error).message,
+                });
+            }
+
+            setValidationErrors([{
+                row: -1,
+                column: "file",
+                error: `Import failed: ${(error as Error).message}`,
+                value: null
+            }]);
+            setIsProcessing(false);
+        }
+    };
+
+    const handleSessionResolved = async () => {
+        if (!currentSessionId || !convexUser) return;
+
+        try {
+            await resolveImportSession({
+                sessionId: currentSessionId,
+                userId: convexUser._id,
+            });
+
+            localStorage.removeItem('import_session_id');
+            setImportPhase("completed");
+            alert("Import completed successfully!");
+        } catch (error) {
+            console.error("Failed to resolve session:", error);
+            alert("Failed to complete import");
+        }
     };
 
     if (!convexUser) {
@@ -500,7 +449,7 @@ export default function CsvImporterPage() {
                     )}
                 </div>
 
-                {/* Show duplicate review phase */}
+                {/* Duplicate Review Phase */}
                 {importPhase === "reviewing" && importSession && existingTransactions && (
                     <DuplicateReview
                         session={importSession}
@@ -509,7 +458,7 @@ export default function CsvImporterPage() {
                     />
                 )}
 
-                {/* Show completion message */}
+                {/* Completion Message */}
                 {importPhase === "completed" && (
                     <div className="mb-6 p-4 rounded-md border bg-green-50 dark:bg-green-950/20">
                         <h2 className="text-xl font-semibold text-green-700 dark:text-green-300 mb-2">
@@ -521,16 +470,14 @@ export default function CsvImporterPage() {
                     </div>
                 )}
 
-                {/* Show upload/preview phase only when not in reviewing/completed state */}
+                {/* Upload/Preview Phase */}
                 {importPhase !== "reviewing" && importPhase !== "completed" && (
                     <>
-
                         {/* Account Selection */}
                         <div className="mb-6">
                             <label className="block text-sm font-medium mb-2">Select Account</label>
                             <select
                                 value={selectedAccount || ""}
-                                // onChange={(e) => setSelectedAccount(e.target.value || null)}
                                 onChange={(e) => setSelectedAccount(e.target.value ? e.target.value as Id<"accounts"> : null)}
                                 className="w-full p-2 border rounded-md bg-background text-foreground border-border"
                             >
@@ -543,31 +490,7 @@ export default function CsvImporterPage() {
                             </select>
                         </div>
 
-                        {/* Preset Info */}
-                        {/* {selectedAccount && preset && (
-                            <div className="mb-6 p-4 rounded-md border bg-muted">
-                                <h3 className="text-lg font-medium">Using Preset: {preset.name}</h3>
-                                <p className="text-muted-foreground">{preset.description}</p>
-                                <div className="text-sm text-muted-foreground mt-2 space-y-1">
-                                    <div>
-                                        Delimiter: &quot;{preset.delimiter}&quot; | Headers:{" "}
-                                        {preset.hasHeader ? "Yes" : "No"} | Skip rows:{" "}
-                                        {preset.skipRows || 0}
-                                    </div>
-                                    <div>Date format: {preset.dateFormat}</div>
-                                </div>
-                            </div>
-                        )}
-
-                        {selectedAccount && !preset && (
-                            <div className="mb-6 p-4 rounded-md border bg-yellow-100/10 text-yellow-700 dark:text-yellow-400">
-                                <h3 className="text-lg font-medium">
-                                    No preset linked to this account. Please create and link a preset
-                                    first.
-                                </h3>
-                            </div>
-                        )} */}
-
+                        {/* Preset Display */}
                         {selectedAccount && preset && (
                             <div className="mb-6">
                                 <PresetDisplay
@@ -659,50 +582,25 @@ export default function CsvImporterPage() {
                                     <table className="min-w-full divide-y divide-border">
                                         <thead className="bg-muted">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                                                    Date
-                                                </th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                                                    Amount
-                                                </th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                                                    Description
-                                                </th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                                                    Category
-                                                </th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                                                    Type
-                                                </th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Date</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Amount</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Description</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Category</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Type</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {previewTransactions.map((transaction, i) => (
-                                                <tr
-                                                    key={i}
-                                                    className={i % 2 === 0 ? "bg-background" : "bg-muted"}
-                                                >
+                                                <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted"}>
                                                     <td className="px-4 py-3 text-sm">{transaction.date}</td>
                                                     <td className="px-4 py-3 text-sm">
-                                                        <span
-                                                            className={
-                                                                transaction.amount >= 0
-                                                                    ? "text-green-600 dark:text-green-400"
-                                                                    : "text-red-600 dark:text-red-400"
-                                                            }
-                                                        >
+                                                        <span className={transaction.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
                                                             ${transaction.amount.toFixed(2)}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3 text-sm max-w-xs truncate">
-                                                        {transaction.description}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                                                        {transaction.category || "-"}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                                                        {transaction.transactionType || "-"}
-                                                    </td>
+                                                    <td className="px-4 py-3 text-sm max-w-xs truncate">{transaction.description}</td>
+                                                    <td className="px-4 py-3 text-sm text-muted-foreground">{transaction.category || "-"}</td>
+                                                    <td className="px-4 py-3 text-sm text-muted-foreground">{transaction.transactionType || "-"}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -716,12 +614,9 @@ export default function CsvImporterPage() {
                             <Button
                                 onClick={handleImport}
                                 disabled={isProcessing}
-                                // variant="success"
                                 className="mb-6"
                             >
-                                {isProcessing
-                                    ? "Importing..."
-                                    : `Import All ${processingStats?.validRows || 0} Transactions`}
+                                {isProcessing ? "Importing..." : `Import All ${processingStats?.validRows || 0} Transactions`}
                             </Button>
                         )}
 
@@ -736,9 +631,6 @@ export default function CsvImporterPage() {
                                 <div>5. Review the normalized transactions preview</div>
                                 <div>6. If validation passes, click &quot;Import All Transactions&quot;</div>
                                 <div>7. Review any duplicate transactions if found</div>
-                                <div className="text-yellow-600 dark:text-yellow-400 mt-2">
-                                    ⚠️ Import process now includes duplicate detection based on account, amount, and description.
-                                </div>
                             </div>
                         </div>
                     </>

@@ -23,6 +23,7 @@ interface DuplicateTransaction {
     description: string;
     transactionType?: string;
     rawData: Record<string, unknown>;
+    importId: Id<"imports">;
   };
 }
 
@@ -38,13 +39,14 @@ interface ImportSession {
     totalErrors: number;
   };
   createdAt: number;
-  isResolved: boolean;
+  status: string; // Allow any string to match your database schema
+  resolvedAt?: number;
 }
 
 interface DuplicateReviewProps {
   session: ImportSession;
   existingTransactions: ExistingTransaction[];
-  onSessionResolved: () => void;
+  onSessionResolved: () => void; // No parameters needed
 }
 
 export default function DuplicateReview({
@@ -61,7 +63,6 @@ export default function DuplicateReview({
 
   const mergeTransaction = useMutation(api.transactions.mergeTransaction);
   const addAsNewTransaction = useMutation(api.transactions.addAsNewTransaction);
-  const resolveImportSession = useMutation(api.transactions.resolveImportSession);
 
   // Get categories and accounts to show names instead of IDs
   const categories = useQuery(api.categories.listCategories, { userId: session.userId });
@@ -143,17 +144,9 @@ export default function DuplicateReview({
     }
   };
 
-  const handleFinishReview = async () => {
-    try {
-      await resolveImportSession({
-        sessionId: session.sessionId,
-        userId: session.userId,
-      });
-      onSessionResolved();
-    } catch (error) {
-      console.error("Error resolving session:", error);
-      alert(`Error finishing review: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
+  const handleFinishReview = () => {
+    // Simply call the parent callback - no complex logic needed
+    onSessionResolved();
   };
 
   const unresolved = session.duplicates.filter((_, i) => !resolvedDuplicates.has(i));
