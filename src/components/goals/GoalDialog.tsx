@@ -30,45 +30,10 @@ import type { Goal } from "@/types/goals"
 import type { Id } from "../../../convex/_generated/dataModel"
 import Image from "next/image"
 
-
-// interface Goal {
-//     id: number
-//     name: string
-//     note?: string
-//     total_amount: number
-//     monthly_contribution: number
-//     due_date: string
-//     color: string
-//     emoji: string
-//     priority: number
-//     priority_label: string
-//     tracking_type: string
-//     calculation_type: string
-//     linked_account: {
-//         id: number
-//         name: string
-//         account_type: string
-//         balance?: number
-//     } | null
-//     image?: string
-// }
-
-// interface GoalFormData {
-//     name: string
-//     note: string
-//     total_amount: string
-//     due_date: string
-//     monthly_contribution: string
-//     calculation_type: string
-//     tracking_type: string
-//     linked_account_id: Id<"accounts"> | null
-//     color: string
-//     emoji: string
-//     priority: number
-//     image: File | null
-//     imageChanged: boolean
-// }
-
+type ImageState =
+    | { type: "original"; url: string }
+    | { type: "new"; file: File; url: string }
+    | { type: "removed" }
 
 interface GoalDialogProps {
     open: boolean
@@ -104,6 +69,11 @@ export function GoalDialog({
         imageChanged: false,
     })
 
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(editingGoal?.image_url || null)
+    const [imageState, setImageState] = useState<ImageState | null>(
+        editingGoal?.image_url ? { type: "original", url: editingGoal.image_url } : null
+    )
     const noteRef = useRef<HTMLTextAreaElement>(null)
 
     // Load accounts and priority options using Convex
@@ -135,28 +105,6 @@ export function GoalDialog({
     const quickContributionAmounts = [100, 500, 1000]
 
 
-    // Add this debugging code at the start of your GoalDialog component
-    // useEffect(() => {
-    //     console.log('=== GoalDialog Debug ===');
-    //     console.log('priorityOptions:', priorityOptions);
-    //     console.log('accounts:', accounts);
-
-    //     // Check for NaN values
-    //     priorityOptions?.forEach((option, index) => {
-    //         if (Number.isNaN(option.value)) {
-    //             console.error(`Priority option at index ${index} has NaN value:`, option);
-    //         }
-    //     });
-
-    //     accounts?.forEach((account, index) => {
-    //         if (Number.isNaN(account.id)) {
-    //             console.error(`Account at index ${index} has NaN id:`, account);
-    //         }
-    //     });
-    // }, [priorityOptions, accounts]);
-
-
-
     useEffect(() => {
         if (open && mode === "edit" && editingGoal && !editingGoal.note) {
             setTimeout(() => {
@@ -183,6 +131,8 @@ export function GoalDialog({
                 image: null,
                 imageChanged: false,
             })
+            setPreviousImageUrl(editingGoal.image_url || null)
+            setPreviewUrl(editingGoal.image_url || null)
         } else if (open && mode === "create") {
             setFormData({
                 name: "",
@@ -199,6 +149,7 @@ export function GoalDialog({
                 image: null,
                 imageChanged: false,
             })
+            setPreviewUrl(null)
         }
     }, [open, mode, editingGoal])
 
@@ -259,70 +210,6 @@ export function GoalDialog({
         return true
     }
 
-    // const handleSubmit = async (e: React.FormEvent) => {
-    //     e.preventDefault()
-
-    //     if (!convexUser) {
-    //         toast.error("User not authenticated")
-    //         return
-    //     }
-
-    //     if (!formData.name || !formData.total_amount) {
-    //         toast.error("Please fill in all required fields")
-    //         return
-    //     }
-
-    //     if (formData.calculation_type === 'DUE_DATE' && !formData.due_date) {
-    //         toast.error("Due date is required when calculating from due date")
-    //         return
-    //     }
-
-    //     if (formData.calculation_type === 'MONTHLY_CONTRIBUTION' && !formData.monthly_contribution) {
-    //         toast.error("Monthly contribution is required when calculating from monthly contribution")
-    //         return
-    //     }
-
-    //     if (formData.monthly_contribution && !validateMonthlyContribution(formData.monthly_contribution)) {
-    //         return
-    //     }
-
-    //     try {
-    //         const submitData = {
-    //             userId: convexUser._id,
-    //             name: formData.name,
-    //             note: formData.note,
-    //             total_amount: formData.total_amount,
-    //             monthly_contribution: formData.monthly_contribution,
-    //             due_date: formData.due_date,
-    //             calculation_type: formData.calculation_type,
-    //             tracking_type: formData.tracking_type,
-    //             linked_account_id: formData.linked_account_id,
-    //             color: formData.color,
-    //             emoji: formData.emoji,
-    //             priority: formData.priority,
-    //             image: formData.image,
-    //             imageChanged: formData.imageChanged,
-    //         }
-
-    //         if (mode === "edit" && editingGoal) {
-    //             const result = await updateGoalMutation({
-    //                 ...submitData,
-    //                 goalId: editingGoal._id,
-    //             })
-    //             onUpdateGoal(result as Goal)
-    //             toast.success("Goal updated successfully")
-    //         } else {
-    //             const result = await createGoalMutation(submitData)
-    //             onCreateGoal(result as Goal)
-    //             toast.success("Goal created successfully")
-    //         }
-    //         onOpenChange(false)
-    //     } catch (error) {
-    //         console.error('Error saving goal:', error)
-    //         toast.error("Failed to save goal. Please try again.")
-    //     }
-    // }
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -337,29 +224,28 @@ export function GoalDialog({
         }
 
         try {
-            let imageUrl: string | null = editingGoal?.image || null;
+            let imageUrl: string | undefined
 
-            
-            // Upload image if a new file was selected
-            if (formData.imageChanged && formData.image) {
+            if (!imageState) {
+                imageUrl = undefined
+            } else if (imageState.type === "original") {
+                imageUrl = imageState.url
+            } else if (imageState.type === "new") {
                 const { uploadUrl, fileKey } = await getGoalImageUploadUrl({
                     userId: convexUser._id,
-                    fileName: formData.image.name,
-                    contentType: formData.image.type,
-                });
-                
+                    fileName: imageState.file.name,
+                    contentType: imageState.file.type,
+                })
+
                 await fetch(uploadUrl, {
                     method: "PUT",
-                    body: formData.image,
-                    headers: {
-                        "Content-Type": formData.image.type,
-                    },
-                });
-                
-                imageUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${fileKey}`;
-            } else if (formData.imageChanged && !formData.image) {
-                // User removed the image
-                imageUrl = null;
+                    body: imageState.file,
+                    headers: { "Content-Type": imageState.file.type },
+                })
+
+                imageUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${fileKey}`
+            } else if (imageState.type === "removed") {
+                imageUrl = "" // remove existing image
             }
 
             const submitData = {
@@ -410,21 +296,39 @@ export function GoalDialog({
         handleInputChange("monthly_contribution", value)
     }
 
+    // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    //     const file = e.target.files?.[0] || null
+    //     setFormData((prev) => ({
+    //         ...prev,
+    //         image: file,
+    //         imageChanged: true
+    //     }))
+    // }
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] || null
-        setFormData((prev) => ({
-            ...prev,
-            image: file,
-            imageChanged: true
-        }))
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const url = URL.createObjectURL(file)
+        setImageState({ type: "new", file, url })
+
+        e.target.value = "" // allow re-selecting the same file
     }
 
     const handleImageRemove = () => {
-        setFormData((prev) => ({
-            ...prev,
-            image: null,
-            imageChanged: true
-        }))
+        if (!imageState) return
+
+        if (imageState.type === "new") {
+            // Remove new image, revert to original if exists
+            setImageState(
+                editingGoal?.image_url
+                    ? { type: "original", url: editingGoal.image_url }
+                    : null
+            )
+        } else if (imageState.type === "original") {
+            // Mark original image for removal
+            setImageState({ type: "removed" })
+        }
     }
 
     const formatBalance = (balance?: number): string => {
@@ -506,25 +410,23 @@ export function GoalDialog({
                         </div>
                     </div>
 
+                    {/* Image */}
                     <div className="grid grid-cols-2 gap-4 items-center">
-
                         <div className="space-y-2">
-                            <Label htmlFor="image">
-                                {isEditing ? 'Update Image' : 'Image'}
-                            </Label>
-                            {isEditing && editingGoal?.image && !formData.imageChanged && (
+                            <Label htmlFor="image">{mode === "edit" ? 'Update Image' : 'Image'}</Label>
+
+                            {imageState && imageState.type !== "removed" && (
                                 <div className="flex items-center gap-2 p-2 border rounded">
                                     <Image
-                                        src={editingGoal.image}
-                                        alt="Current goal image"
+                                        src={imageState.url}
+                                        alt="Goal image preview"
                                         className="w-12 h-12 object-cover rounded"
+                                        width={48}
+                                        height={48}
                                     />
-                                    {/* <img
-                                        src={editingGoal.image}
-                                        alt="Current goal image"
-                                        className="w-12 h-12 object-cover rounded"
-                                    /> */}
-                                    <span className="text-sm text-muted-foreground">Current image</span>
+                                    <span className="text-sm text-muted-foreground">
+                                        {imageState.type === "new" ? "New image selected" : "Current image"}
+                                    </span>
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -535,19 +437,26 @@ export function GoalDialog({
                                     </Button>
                                 </div>
                             )}
+
+                            {imageState?.type === "removed" && (
+                                <p className="text-sm text-muted-foreground">
+                                    Image will be removed
+                                </p>
+                            )}
+
+                            {imageState?.type === "new" && (
+                                <p className="text-sm text-muted-foreground">
+                                    Selected file: {imageState.file.name}
+                                </p>
+                            )}
                         </div>
+
                         <Input
                             id="image"
                             type="file"
                             accept="image/*"
                             onChange={handleFileChange}
                         />
-                        {formData.imageChanged && formData.image === null && (
-                            <p className="text-sm text-muted-foreground">Image will be removed</p>
-                        )}
-                        {formData.image && (
-                            <p className="text-sm text-muted-foreground">New image selected: {formData.image.name}</p>
-                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -563,143 +472,147 @@ export function GoalDialog({
 
                     <Separator className="my-8" />
 
-                    <div className="space-y-2">
-                        <Label htmlFor="total_amount">Total Amount *</Label>
-                        <Input
-                            id="total_amount"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={formData.total_amount}
-                            onChange={(e) => handleInputChange("total_amount", e.target.value)}
-                            required
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Calculation Method</Label>
-                        <RadioGroup
-                            value={formData.calculation_type}
-                            onValueChange={(value) => handleInputChange("calculation_type", value)}
-                        >
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="DUE_DATE" id="due_date" />
-                                <Label htmlFor="due_date">Set due date (calculate monthly contribution)</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="MONTHLY_CONTRIBUTION" id="monthly_contribution" />
-                                <Label htmlFor="monthly_contribution">Set monthly contribution (calculate due date)</Label>
-                            </div>
-                        </RadioGroup>
-                    </div>
-
-                    {formData.calculation_type === 'DUE_DATE' && (
-                        <div className="space-y-3">
-                            <div className="space-y-2">
-                                <Label>Quick Date Selection</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {quickDateOptions.map((option) => (
-                                        <Button
-                                            key={option.months}
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleQuickDateSelect(option.months)}
-                                            className="flex items-center gap-1"
-                                        >
-                                            <Calendar className="h-3 w-3" />
-                                            {option.label}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="due_date">Due Date *</Label>
-                                <Input
-                                    id="due_date"
-                                    type="date"
-                                    value={formData.due_date}
-                                    onChange={(e) => handleInputChange("due_date", e.target.value)}
-                                    required
-                                />
-                            </div>
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="total_amount">Total Amount *</Label>
+                            <Input
+                                id="total_amount"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                value={formData.total_amount}
+                                onChange={(e) => handleInputChange("total_amount", e.target.value)}
+                                required
+                            />
                         </div>
-                    )}
 
-                    {formData.calculation_type === 'MONTHLY_CONTRIBUTION' && (
-                        <div className="space-y-3">
-                            <div className="space-y-2">
-                                <Label>Quick Amount Selection</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {quickContributionAmounts.map((amount) => {
-                                        const totalAmount = parseFloat(formData.total_amount)
-                                        const isDisabled = !formData.total_amount || isNaN(totalAmount) || amount > totalAmount
+                        <div className="space-y-2">
+                            <Label>Calculation Method</Label>
+                            <RadioGroup
+                                value={formData.calculation_type}
+                                onValueChange={(value) => handleInputChange("calculation_type", value)}
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="DUE_DATE" id="due_date" />
+                                    <Label htmlFor="due_date">Set due date (calculate monthly contribution)</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="MONTHLY_CONTRIBUTION" id="monthly_contribution" />
+                                    <Label htmlFor="monthly_contribution">Set monthly contribution (calculate due date)</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
 
-                                        return (
+                        {formData.calculation_type === 'DUE_DATE' && (
+                            <div className="space-y-3">
+                                <div className="space-y-2">
+                                    <Label>Quick Date Selection</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {quickDateOptions.map((option) => (
                                             <Button
-                                                key={amount}
+                                                key={option.months}
                                                 type="button"
-                                                variant={isDisabled ? "secondary" : "outline"}
+                                                variant="outline"
                                                 size="sm"
-                                                onClick={() => handleQuickContributionSelect(amount)}
-                                                disabled={isDisabled}
+                                                onClick={() => handleQuickDateSelect(option.months)}
                                                 className="flex items-center gap-1"
                                             >
-                                                $ {amount}
-                                                {isDisabled && <AlertCircle className="h-3 w-3 ml-1" />}
+                                                <Calendar className="h-3 w-3" />
+                                                {option.label}
                                             </Button>
-                                        )
-                                    })}
+                                        ))}
+                                    </div>
                                 </div>
-                                {formData.total_amount && !isNaN(parseFloat(formData.total_amount)) && (
-                                    <p className="text-xs text-muted-foreground">
-                                        Maximum contribution: ${parseFloat(formData.total_amount).toFixed(2)}
-                                    </p>
-                                )}
+                                <div className="space-y-2">
+                                    <Label htmlFor="due_date">Due Date *</Label>
+                                    <Input
+                                        id="due_date"
+                                        type="date"
+                                        value={formData.due_date}
+                                        onChange={(e) => handleInputChange("due_date", e.target.value)}
+                                        required
+                                    />
+                                </div>
                             </div>
+                        )}
+
+                        {formData.calculation_type === 'MONTHLY_CONTRIBUTION' && (
+                            <div className="space-y-3">
+                                <div className="space-y-2">
+                                    <Label>Quick Amount Selection</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {quickContributionAmounts.map((amount) => {
+                                            const totalAmount = parseFloat(formData.total_amount)
+                                            const isDisabled = !formData.total_amount || isNaN(totalAmount) || amount > totalAmount
+
+                                            return (
+                                                <Button
+                                                    key={amount}
+                                                    type="button"
+                                                    variant={isDisabled ? "secondary" : "outline"}
+                                                    size="sm"
+                                                    onClick={() => handleQuickContributionSelect(amount)}
+                                                    disabled={isDisabled}
+                                                    className="flex items-center gap-1"
+                                                >
+                                                    $ {amount}
+                                                    {isDisabled && <AlertCircle className="h-3 w-3 ml-1" />}
+                                                </Button>
+                                            )
+                                        })}
+                                    </div>
+                                    {formData.total_amount && !isNaN(parseFloat(formData.total_amount)) && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Maximum contribution: ${parseFloat(formData.total_amount).toFixed(2)}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="monthly_contribution">Monthly Contribution *</Label>
+                                    <Input
+                                        id="monthly_contribution"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max={formData.total_amount || undefined}
+                                        placeholder="0.00"
+                                        value={formData.monthly_contribution}
+                                        onChange={(e) => handleMonthlyContributionChange(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {formData.calculation_type === 'DUE_DATE' && formData.monthly_contribution && (
                             <div className="space-y-2">
-                                <Label htmlFor="monthly_contribution">Monthly Contribution *</Label>
+                                <Label htmlFor="calculated_contribution">Calculated Monthly Contribution</Label>
                                 <Input
-                                    id="monthly_contribution"
+                                    id="calculated_contribution"
                                     type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max={formData.total_amount || undefined}
-                                    placeholder="0.00"
                                     value={formData.monthly_contribution}
-                                    onChange={(e) => handleMonthlyContributionChange(e.target.value)}
-                                    required
+                                    readOnly
+                                    className="bg-muted"
                                 />
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {formData.calculation_type === 'DUE_DATE' && formData.monthly_contribution && (
-                        <div className="space-y-2">
-                            <Label htmlFor="calculated_contribution">Calculated Monthly Contribution</Label>
-                            <Input
-                                id="calculated_contribution"
-                                type="number"
-                                value={formData.monthly_contribution}
-                                readOnly
-                                className="bg-muted"
-                            />
-                        </div>
-                    )}
+                        {formData.calculation_type === 'MONTHLY_CONTRIBUTION' && formData.due_date && (
+                            <div className="space-y-2">
+                                <Label htmlFor="calculated_date">Calculated Due Date</Label>
+                                <Input
+                                    id="calculated_date"
+                                    type="date"
+                                    value={formData.due_date}
+                                    readOnly
+                                    className="bg-muted"
+                                />
+                            </div>
+                        )}
+                    </div>
 
-                    {formData.calculation_type === 'MONTHLY_CONTRIBUTION' && formData.due_date && (
-                        <div className="space-y-2">
-                            <Label htmlFor="calculated_date">Calculated Due Date</Label>
-                            <Input
-                                id="calculated_date"
-                                type="date"
-                                value={formData.due_date}
-                                readOnly
-                                className="bg-muted"
-                            />
-                        </div>
-                    )}
+                    <Separator className="my-8" />
 
                     <div className="space-y-2">
                         <Label htmlFor="tracking_type">Tracking Type</Label>
