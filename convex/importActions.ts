@@ -42,6 +42,7 @@ export const getUploadUrl = action({
 export const getGoalImageUploadUrl = action({
     args: {
         userId: v.id("users"),
+        goalId: v.id("goals"),
         fileName: v.string(),
         contentType: v.string(),
     },
@@ -57,7 +58,8 @@ export const getGoalImageUploadUrl = action({
             requestHandler: new NodeHttpHandler(),
         });
 
-        const key = `goals/${args.userId}/${Date.now()}-${args.fileName}`;
+        // const key = `goals/${args.userId}/${Date.now()}-${args.fileName}`;
+        const key = `goals/${args.userId}/${args.goalId}.webp`;
 
         const command = new PutObjectCommand({
             Bucket: process.env.R2_BUCKET!,

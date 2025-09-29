@@ -24,11 +24,14 @@ import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
 import {
     // DollarSign, 
-    Calendar, AlertCircle
+    Calendar, AlertCircle,
+    Loader2
 } from "lucide-react"
 import type { Goal } from "@/types/goals"
 import type { Id } from "../../../convex/_generated/dataModel"
 import Image from "next/image"
+import imageCompression from "browser-image-compression"
+
 
 type ImageState =
     | { type: "original"; url: string }
@@ -74,6 +77,8 @@ export function GoalDialog({
     const [imageState, setImageState] = useState<ImageState | null>(
         editingGoal?.image_url ? { type: "original", url: editingGoal.image_url } : null
     )
+    const [isCompressing, setIsCompressing] = useState(false)
+    const [isUploading, setIsUploading] = useState(false)
     const noteRef = useRef<HTMLTextAreaElement>(null)
 
     // Load accounts and priority options using Convex
@@ -133,6 +138,11 @@ export function GoalDialog({
             })
             setPreviousImageUrl(editingGoal.image_url || null)
             setPreviewUrl(editingGoal.image_url || null)
+            setImageState(
+                editingGoal.image_url
+                    ? { type: "original", url: editingGoal.image_url } // ⭐ Removed ?t=${Date.now()}
+                    : null
+            )
         } else if (open && mode === "create") {
             setFormData({
                 name: "",
@@ -150,6 +160,7 @@ export function GoalDialog({
                 imageChanged: false,
             })
             setPreviewUrl(null)
+            setImageState(null)
         }
     }, [open, mode, editingGoal])
 
@@ -210,6 +221,31 @@ export function GoalDialog({
         return true
     }
 
+    const compressImage = async (file: File): Promise<File> => {
+        // If file is already small, skip compression
+        if (file.size < 0.3 * 1024 * 1024) {
+            return file
+        }
+
+        const options = {
+            maxSizeMB: 0.5, // Maximum file size in MB
+            maxWidthOrHeight: 1920, // Maximum width or height
+            useWebWorker: true,
+            fileType: 'image/webp', // Convert to WebP for better compression
+        }
+
+        try {
+            const compressedFile = await imageCompression(file, options)
+
+            // Create a new File object with .webp extension
+            const fileName = file.name.replace(/\.[^/.]+$/, '.webp')
+            return new File([compressedFile], fileName, { type: 'image/webp' })
+        } catch (error) {
+            console.error('Error compressing image:', error)
+            throw error
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -223,67 +259,152 @@ export function GoalDialog({
             return;
         }
 
+        setIsUploading(true);
+
         try {
             let imageUrl: string | undefined
+            let goalId: Id<"goals">
 
-            if (!imageState) {
-                imageUrl = undefined
-            } else if (imageState.type === "original") {
-                imageUrl = imageState.url
-            } else if (imageState.type === "new") {
+            if (mode === "edit" && editingGoal) {
+                goalId = editingGoal._id
+            } else {
+                toast.loading("Creating goal...", { id: "goal-save" });
+                const newGoal = await createGoalMutation({
+                    userId: convexUser._id,
+                    name: formData.name,
+                    note: formData.note,
+                    total_amount: formData.total_amount,
+                    monthly_contribution: formData.monthly_contribution,
+                    due_date: formData.due_date,
+                    calculation_type: formData.calculation_type,
+                    tracking_type: formData.tracking_type,
+                    linked_account_id: formData.linked_account_id,
+                    color: formData.color,
+                    emoji: formData.emoji,
+                    priority: formData.priority,
+                    image_url: undefined,
+                });
+                goalId = newGoal._id as Id<"goals">
+            }
+
+            // Handle image upload
+            if (imageState?.type === "new") {
+                toast.loading("Uploading image...", { id: "goal-save" });
+
+                const compressedFile = await compressImage(imageState.file)
+
                 const { uploadUrl, fileKey } = await getGoalImageUploadUrl({
                     userId: convexUser._id,
-                    fileName: imageState.file.name,
-                    contentType: imageState.file.type,
+                    goalId: goalId,
+                    fileName: compressedFile.name,
+                    contentType: compressedFile.type,
                 })
 
                 await fetch(uploadUrl, {
                     method: "PUT",
-                    body: imageState.file,
-                    headers: { "Content-Type": imageState.file.type },
+                    body: compressedFile,
+                    headers: { "Content-Type": compressedFile.type },
                 })
 
-                imageUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${fileKey}`
-            } else if (imageState.type === "removed") {
-                imageUrl = "" // remove existing image
-            }
+                // ⭐ KEY CHANGE: Add version timestamp to prevent caching
+                imageUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${fileKey}?v=${Date.now()}`
 
-            const submitData = {
-                userId: convexUser._id,
-                name: formData.name,
-                note: formData.note,
-                total_amount: formData.total_amount,
-                monthly_contribution: formData.monthly_contribution,
-                due_date: formData.due_date,
-                calculation_type: formData.calculation_type,
-                tracking_type: formData.tracking_type,
-                linked_account_id: formData.linked_account_id,
-                color: formData.color,
-                emoji: formData.emoji,
-                priority: formData.priority,
-                image_url: imageUrl, // Save the R2 URL
-            };
+                toast.loading("Finalizing...", { id: "goal-save" });
 
-            if (mode === "edit" && editingGoal) {
-                const result = await updateGoalMutation({
-                    ...submitData,
-                    goalId: editingGoal._id,
+                const updatedGoal = await updateGoalMutation({
+                    goalId: goalId,
+                    userId: convexUser._id,
+                    name: formData.name,
+                    note: formData.note,
+                    total_amount: formData.total_amount,
+                    monthly_contribution: formData.monthly_contribution,
+                    due_date: formData.due_date,
+                    calculation_type: formData.calculation_type,
+                    tracking_type: formData.tracking_type,
+                    linked_account_id: formData.linked_account_id,
+                    color: formData.color,
+                    emoji: formData.emoji,
+                    priority: formData.priority,
+                    image_url: imageUrl,
                 });
-                onUpdateGoal(result as Goal);
-                toast.success("Goal updated successfully");
+
+                if (mode === "create") {
+                    onCreateGoal(updatedGoal as Goal);
+                } else {
+                    onUpdateGoal(updatedGoal as Goal);
+                }
+            } else if (imageState?.type === "removed") {
+                toast.loading("Updating goal...", { id: "goal-save" });
+
+                const updatedGoal = await updateGoalMutation({
+                    goalId: goalId,
+                    userId: convexUser._id,
+                    name: formData.name,
+                    note: formData.note,
+                    total_amount: formData.total_amount,
+                    monthly_contribution: formData.monthly_contribution,
+                    due_date: formData.due_date,
+                    calculation_type: formData.calculation_type,
+                    tracking_type: formData.tracking_type,
+                    linked_account_id: formData.linked_account_id,
+                    color: formData.color,
+                    emoji: formData.emoji,
+                    priority: formData.priority,
+                    image_url: "",
+                });
+
+                onUpdateGoal(updatedGoal as Goal);
+            } else if (mode === "edit") {
+                toast.loading("Updating goal...", { id: "goal-save" });
+
+                const updatedGoal = await updateGoalMutation({
+                    goalId: goalId,
+                    userId: convexUser._id,
+                    name: formData.name,
+                    note: formData.note,
+                    total_amount: formData.total_amount,
+                    monthly_contribution: formData.monthly_contribution,
+                    due_date: formData.due_date,
+                    calculation_type: formData.calculation_type,
+                    tracking_type: formData.tracking_type,
+                    linked_account_id: formData.linked_account_id,
+                    color: formData.color,
+                    emoji: formData.emoji,
+                    priority: formData.priority,
+                    image_url: imageState?.type === "original" ? imageState.url : undefined,
+                });
+
+                onUpdateGoal(updatedGoal as Goal);
             } else {
-                const result = await createGoalMutation(submitData);
-                onCreateGoal(result as Goal);
-                toast.success("Goal created successfully");
+                // Create mode without image
+                const newGoal = await createGoalMutation({
+                    userId: convexUser._id,
+                    name: formData.name,
+                    note: formData.note,
+                    total_amount: formData.total_amount,
+                    monthly_contribution: formData.monthly_contribution,
+                    due_date: formData.due_date,
+                    calculation_type: formData.calculation_type,
+                    tracking_type: formData.tracking_type,
+                    linked_account_id: formData.linked_account_id,
+                    color: formData.color,
+                    emoji: formData.emoji,
+                    priority: formData.priority,
+                    image_url: undefined,
+                });
+
+                onCreateGoal(newGoal as Goal);
             }
 
+            toast.success(mode === "edit" ? "Goal updated successfully" : "Goal created successfully", { id: "goal-save" });
             onOpenChange(false);
         } catch (error) {
             console.error("Error saving goal:", error);
-            toast.error("Failed to save goal. Please try again.");
+            toast.error("Failed to save goal. Please try again.", { id: "goal-save" });
+        } finally {
+            setIsUploading(false);
         }
     };
-
 
     const handleInputChange = (field: string, value: string | number | null) => {
         setFormData((prev) => ({ ...prev, [field]: value }))
@@ -296,24 +417,39 @@ export function GoalDialog({
         handleInputChange("monthly_contribution", value)
     }
 
-    // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    //     const file = e.target.files?.[0] || null
-    //     setFormData((prev) => ({
-    //         ...prev,
-    //         image: file,
-    //         imageChanged: true
-    //     }))
-    // }
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
-        const url = URL.createObjectURL(file)
-        setImageState({ type: "new", file, url })
+        // Check if file is an image
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file')
+            return
+        }
 
-        e.target.value = "" // allow re-selecting the same file
+        setIsCompressing(true)
+
+        try {
+            // Compress the image
+            const compressedFile = await compressImage(file)
+
+            // Show size reduction info
+            const originalSizeMB = (file.size / (1024 * 1024)).toFixed(2)
+            const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(2)
+            toast.success(`Image compressed: ${originalSizeMB}MB → ${compressedSizeMB}MB`)
+
+            const url = URL.createObjectURL(compressedFile)
+            setImageState({ type: "new", file: compressedFile, url })
+        } catch (error) {
+            console.error('Error processing image:', error)
+            toast.error('Failed to process image. Please try again.')
+        } finally {
+            setIsCompressing(false)
+        }
+
+        e.target.value = ""
     }
+
 
     const handleImageRemove = () => {
         if (!imageState) return
@@ -411,52 +547,57 @@ export function GoalDialog({
                     </div>
 
                     {/* Image */}
-                    <div className="grid grid-cols-2 gap-4 items-center">
-                        <div className="space-y-2">
-                            <Label htmlFor="image">{mode === "edit" ? 'Update Image' : 'Image'}</Label>
+                    <div className="space-y-2">
+                        <Label htmlFor="image">{mode === "edit" ? 'Update Image' : 'Image'}</Label>
 
-                            {imageState && imageState.type !== "removed" && (
-                                <div className="flex items-center gap-2 p-2 border rounded">
-                                    <Image
-                                        src={imageState.url}
-                                        alt="Goal image preview"
-                                        className="w-12 h-12 object-cover rounded"
-                                        width={48}
-                                        height={48}
-                                    />
-                                    <span className="text-sm text-muted-foreground">
-                                        {imageState.type === "new" ? "New image selected" : "Current image"}
-                                    </span>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleImageRemove}
-                                    >
-                                        Remove
-                                    </Button>
-                                </div>
-                            )}
+                        {imageState && imageState.type !== "removed" && (
+                            <div className="flex items-center gap-2 p-2 border rounded">
+                                <Image
+                                    src={imageState.url}
+                                    alt="Goal image preview"
+                                    className="w-12 h-12 object-cover rounded"
+                                    width={48}
+                                    height={48}
+                                />
+                                <span className="text-sm text-muted-foreground flex-1">
+                                    {imageState.type === "new" ? "New image selected" : "Current image"}
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleImageRemove}
+                                    disabled={isUploading}
+                                >
+                                    Remove
+                                </Button>
+                            </div>
+                        )}
 
-                            {imageState?.type === "removed" && (
-                                <p className="text-sm text-muted-foreground">
-                                    Image will be removed
-                                </p>
-                            )}
+                        {imageState?.type === "removed" && (
+                            <p className="text-sm text-muted-foreground">
+                                Image will be removed
+                            </p>
+                        )}
 
-                            {imageState?.type === "new" && (
-                                <p className="text-sm text-muted-foreground">
-                                    Selected file: {imageState.file.name}
-                                </p>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                id="image"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                disabled={isCompressing || isUploading}
+                            />
+                            {isCompressing && (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             )}
                         </div>
 
-                        <Input
-                            id="image"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileChange}
-                        />
+                        {isCompressing && (
+                            <p className="text-xs text-muted-foreground">
+                                Compressing image...
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -671,11 +812,22 @@ export function GoalDialog({
                     )}
 
                     <DialogFooter className="mt-8">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => onOpenChange(false)}
+                            disabled={isUploading}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={isLoading}>
-                            {isLoading ? 'Saving...' : (isEditing ? 'Update Goal' : 'Create Goal')}
+                        <Button
+                            type="submit"
+                            disabled={isUploading || isCompressing}
+                        >
+                            {isUploading
+                                ? (imageState?.type === "new" ? "Uploading..." : "Saving...")
+                                : (isEditing ? 'Update Goal' : 'Create Goal')
+                            }
                         </Button>
                     </DialogFooter>
                 </form>
