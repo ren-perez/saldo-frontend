@@ -18,7 +18,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "../ui/textarea"
 import { Separator } from "../ui/separator"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery, useMutation, useAction } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
@@ -116,6 +116,7 @@ export function GoalDialog({
     // Mutations
     const createGoalMutation = useMutation(api.goals.createGoal)
     const updateGoalMutation = useMutation(api.goals.updateGoal)
+    const getGoalImageUploadUrl = useAction(api.importActions.getGoalImageUploadUrl);
 
     // Get selected account details
     // const selectedAccount = accounts.find((account) => account.id === formData.linked_account_id)
@@ -258,34 +259,109 @@ export function GoalDialog({
         return true
     }
 
+    // const handleSubmit = async (e: React.FormEvent) => {
+    //     e.preventDefault()
+
+    //     if (!convexUser) {
+    //         toast.error("User not authenticated")
+    //         return
+    //     }
+
+    //     if (!formData.name || !formData.total_amount) {
+    //         toast.error("Please fill in all required fields")
+    //         return
+    //     }
+
+    //     if (formData.calculation_type === 'DUE_DATE' && !formData.due_date) {
+    //         toast.error("Due date is required when calculating from due date")
+    //         return
+    //     }
+
+    //     if (formData.calculation_type === 'MONTHLY_CONTRIBUTION' && !formData.monthly_contribution) {
+    //         toast.error("Monthly contribution is required when calculating from monthly contribution")
+    //         return
+    //     }
+
+    //     if (formData.monthly_contribution && !validateMonthlyContribution(formData.monthly_contribution)) {
+    //         return
+    //     }
+
+    //     try {
+    //         const submitData = {
+    //             userId: convexUser._id,
+    //             name: formData.name,
+    //             note: formData.note,
+    //             total_amount: formData.total_amount,
+    //             monthly_contribution: formData.monthly_contribution,
+    //             due_date: formData.due_date,
+    //             calculation_type: formData.calculation_type,
+    //             tracking_type: formData.tracking_type,
+    //             linked_account_id: formData.linked_account_id,
+    //             color: formData.color,
+    //             emoji: formData.emoji,
+    //             priority: formData.priority,
+    //             image: formData.image,
+    //             imageChanged: formData.imageChanged,
+    //         }
+
+    //         if (mode === "edit" && editingGoal) {
+    //             const result = await updateGoalMutation({
+    //                 ...submitData,
+    //                 goalId: editingGoal._id,
+    //             })
+    //             onUpdateGoal(result as Goal)
+    //             toast.success("Goal updated successfully")
+    //         } else {
+    //             const result = await createGoalMutation(submitData)
+    //             onCreateGoal(result as Goal)
+    //             toast.success("Goal created successfully")
+    //         }
+    //         onOpenChange(false)
+    //     } catch (error) {
+    //         console.error('Error saving goal:', error)
+    //         toast.error("Failed to save goal. Please try again.")
+    //     }
+    // }
+
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+        e.preventDefault();
 
         if (!convexUser) {
-            toast.error("User not authenticated")
-            return
+            toast.error("User not authenticated");
+            return;
         }
 
         if (!formData.name || !formData.total_amount) {
-            toast.error("Please fill in all required fields")
-            return
-        }
-
-        if (formData.calculation_type === 'DUE_DATE' && !formData.due_date) {
-            toast.error("Due date is required when calculating from due date")
-            return
-        }
-
-        if (formData.calculation_type === 'MONTHLY_CONTRIBUTION' && !formData.monthly_contribution) {
-            toast.error("Monthly contribution is required when calculating from monthly contribution")
-            return
-        }
-
-        if (formData.monthly_contribution && !validateMonthlyContribution(formData.monthly_contribution)) {
-            return
+            toast.error("Please fill in all required fields");
+            return;
         }
 
         try {
+            let imageUrl: string | null = editingGoal?.image || null;
+
+            
+            // Upload image if a new file was selected
+            if (formData.imageChanged && formData.image) {
+                const { uploadUrl, fileKey } = await getGoalImageUploadUrl({
+                    userId: convexUser._id,
+                    fileName: formData.image.name,
+                    contentType: formData.image.type,
+                });
+                
+                await fetch(uploadUrl, {
+                    method: "PUT",
+                    body: formData.image,
+                    headers: {
+                        "Content-Type": formData.image.type,
+                    },
+                });
+                
+                imageUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${fileKey}`;
+            } else if (formData.imageChanged && !formData.image) {
+                // User removed the image
+                imageUrl = null;
+            }
+
             const submitData = {
                 userId: convexUser._id,
                 name: formData.name,
@@ -299,28 +375,29 @@ export function GoalDialog({
                 color: formData.color,
                 emoji: formData.emoji,
                 priority: formData.priority,
-                image: formData.image,
-                imageChanged: formData.imageChanged,
-            }
+                image_url: imageUrl, // Save the R2 URL
+            };
 
             if (mode === "edit" && editingGoal) {
                 const result = await updateGoalMutation({
                     ...submitData,
                     goalId: editingGoal._id,
-                })
-                onUpdateGoal(result as Goal)
-                toast.success("Goal updated successfully")
+                });
+                onUpdateGoal(result as Goal);
+                toast.success("Goal updated successfully");
             } else {
-                const result = await createGoalMutation(submitData)
-                onCreateGoal(result as Goal)
-                toast.success("Goal created successfully")
+                const result = await createGoalMutation(submitData);
+                onCreateGoal(result as Goal);
+                toast.success("Goal created successfully");
             }
-            onOpenChange(false)
+
+            onOpenChange(false);
         } catch (error) {
-            console.error('Error saving goal:', error)
-            toast.error("Failed to save goal. Please try again.")
+            console.error("Error saving goal:", error);
+            toast.error("Failed to save goal. Please try again.");
         }
-    }
+    };
+
 
     const handleInputChange = (field: string, value: string | number | null) => {
         setFormData((prev) => ({ ...prev, [field]: value }))

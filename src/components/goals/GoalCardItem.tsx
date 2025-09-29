@@ -97,7 +97,7 @@ export function GoalCardItem({
                         <div className="absolute top-3 right-3 z-20">
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 p-0 bg-background/20 hover:bg-background hover:cursor-pointer">
                                         <span className="sr-only">Open menu</span>
                                         <MoreVertical className="h-4 w-4" />
                                     </Button>

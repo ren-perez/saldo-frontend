@@ -82,8 +82,6 @@ export const importTransactions = mutation({
                 const deduplicationKey = createDeduplicationKey(accountId, transaction.amount, transaction.description);
                 const existingTransaction = existingTransactionKeys.get(deduplicationKey);
 
-                console.log("Import id:", importId);
-
                 if (existingTransaction) {
                     // Possible duplicate found
                     possibleDuplicates.push({
