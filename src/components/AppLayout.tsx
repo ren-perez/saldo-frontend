@@ -41,9 +41,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <SignedIn>
                 <AppSidebar />
                 <SidebarInset>
-                    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                    {/* <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4"> */}
+                    <header className="sticky top-0 z-50 w-full flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
                         {/* <SidebarTrigger className="-ml-1" /> */}
-                        <SidebarTrigger className="ml-1 mr-2" />
+                        <SidebarTrigger className="ml-3 mr-2" />
                         <Separator orientation="vertical" className="h-4" />
                         <div className="flex flex-1 items-center justify-between">
                             <h1 className="text-lg font-semibold pl-4">Saldo</h1>
