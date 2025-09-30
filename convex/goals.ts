@@ -21,6 +21,13 @@ async function calculateCurrentAmount(ctx: any, goal: any): Promise<number> {
             .withIndex("by_goal", (q: any) => q.eq("goalId", goal._id))
             .collect();
         return contributions.reduce((sum: number, contrib: any) => sum + contrib.amount, 0);
+    } else if (goal.tracking_type === "EXPENSE_CATEGORY" && goal.linked_category_id) {
+        // For expense-linked goals, sum up contributions from category transactions
+        const contributions = await ctx.db
+            .query("goal_contributions")
+            .withIndex("by_goal", (q: any) => q.eq("goalId", goal._id))
+            .collect();
+        return contributions.reduce((sum: number, contrib: any) => sum + contrib.amount, 0);
     }
     return 0;
 }
@@ -28,6 +35,45 @@ async function calculateCurrentAmount(ctx: any, goal: any): Promise<number> {
 // Helper function to determine if goal progress should be automatically tracked
 function shouldAutoTrack(goal: any): boolean {
     return goal.tracking_type === "LINKED_ACCOUNT" && goal.linked_account_id;
+}
+
+// Helper function to process retroactive contributions for expense-linked goals
+async function processRetroactiveContributions(
+    ctx: any,
+    userId: Id<"users">,
+    goalId: Id<"goals">,
+    categoryId: Id<"categories">
+): Promise<void> {
+    // Find all transactions with this category
+    const transactions = await ctx.db
+        .query("transactions")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .filter((q: any) => q.eq(q.field("categoryId"), categoryId))
+        .collect();
+
+    // Create contributions for all negative transactions (expenses)
+    for (const transaction of transactions) {
+        if (transaction.amount < 0) {
+            // Check if contribution already exists for this transaction
+            const existingContribution = await ctx.db
+                .query("goal_contributions")
+                .withIndex("by_transaction", (q: any) => q.eq("transactionId", transaction._id))
+                .filter((q: any) => q.eq(q.field("goalId"), goalId))
+                .first();
+
+            if (!existingContribution) {
+                await ctx.db.insert("goal_contributions", {
+                    userId,
+                    goalId,
+                    transactionId: transaction._id,
+                    amount: Math.abs(transaction.amount),
+                    contribution_date: new Date(transaction.date).toISOString().split('T')[0],
+                    source: "expense_linked",
+                    createdAt: Date.now(),
+                });
+            }
+        }
+    }
 }
 
 export const getGoals = query({
@@ -50,6 +96,26 @@ export const getGoals = query({
                             _id: account._id,  // Changed from 'id' to '_id'
                             name: account.name,
                             account_type: account.type,
+                        };
+                    }
+                }
+
+                // Get linked category info if exists
+                let linked_category = null;
+                if (goal.linked_category_id) {
+                    const category = await ctx.db.get(goal.linked_category_id);
+                    if (category) {
+                        let group_name = "";
+                        if (category.groupId) {
+                            const group = await ctx.db.get(category.groupId);
+                            if (group) {
+                                group_name = group.name;
+                            }
+                        }
+                        linked_category = {
+                            _id: category._id,
+                            name: category.name,
+                            group_name,
                         };
                     }
                 }
@@ -78,6 +144,8 @@ export const getGoals = query({
                     tracking_type: goal.tracking_type,
                     calculation_type: goal.calculation_type,
                     linked_account,
+                    linked_category,
+                    linked_category_id: goal.linked_category_id,
                     monthly_plans: monthly_plans.map((plan) => ({
                         _id: plan._id,  // Changed from 'id' to '_id'
                         name: plan.name,
@@ -171,6 +239,7 @@ export const createGoal = mutation({
         calculation_type: v.optional(v.string()),
         tracking_type: v.string(),
         linked_account_id: v.optional(v.union(v.string(), v.number(), v.null())),
+        linked_category_id: v.optional(v.union(v.string(), v.null())),
         color: v.string(),
         emoji: v.string(),
         priority: v.union(v.string(), v.number()),
@@ -208,6 +277,18 @@ export const createGoal = mutation({
             }
         }
 
+        // Handle linked category ID for expense-linked goals
+        let linked_category_id = undefined;
+        if (args.tracking_type === "EXPENSE_CATEGORY" && args.linked_category_id && args.linked_category_id !== null) {
+            const categoryIdStr = args.linked_category_id.toString();
+            const category = await ctx.db.get(categoryIdStr as any);
+            if (category && (category as any).userId === userId) {
+                linked_category_id = categoryIdStr as any;
+            } else {
+                throw new Error("Invalid category ID or category not found");
+            }
+        }
+
         // Prepare goal data - only include linked_account_id if it's defined
         const goalData: any = {
             userId,
@@ -239,7 +320,17 @@ export const createGoal = mutation({
             goalData.linked_account_id = linked_account_id;
         }
 
+        // Only add linked_category_id if it's defined (for EXPENSE_CATEGORY tracking)
+        if (linked_category_id !== undefined) {
+            goalData.linked_category_id = linked_category_id;
+        }
+
         const goalId = await ctx.db.insert("goals", goalData);
+
+        // If this is an expense-linked goal, process retroactive contributions
+        if (linked_category_id !== undefined) {
+            await processRetroactiveContributions(ctx, userId, goalId, linked_category_id);
+        }
 
         // return { _id: goalId, id: parseInt(goalId), ...args };
         return { _id: goalId, ...args };
@@ -259,6 +350,7 @@ export const updateGoal = mutation({
         calculation_type: v.optional(v.string()),
         tracking_type: v.optional(v.string()),
         linked_account_id: v.optional(v.union(v.string(), v.number(), v.null())),
+        linked_category_id: v.optional(v.union(v.string(), v.null())),
         color: v.optional(v.string()),
         emoji: v.optional(v.string()),
         priority: v.optional(v.union(v.string(), v.number())),
@@ -321,14 +413,68 @@ export const updateGoal = mutation({
                 } else {
                     throw new Error("Invalid account ID or account not found");
                 }
-            } else if (args.tracking_type === "MANUAL") {
-                // For manual tracking, remove the linked account
+            } else if (args.tracking_type === "MANUAL" || args.tracking_type === "EXPENSE_CATEGORY") {
+                // For manual or expense tracking, remove the linked account
                 updateData.linked_account_id = undefined;
             }
         }
-        
+
+        if (args.linked_category_id !== undefined) {
+            if (args.tracking_type === "EXPENSE_CATEGORY" && args.linked_category_id) {
+                // Validate the category ID
+                const categoryIdStr = args.linked_category_id.toString();
+                const category = await ctx.db.get(categoryIdStr as any);
+                if (category && (category as any).userId === userId) {
+                    updateData.linked_category_id = categoryIdStr as any;
+                } else {
+                    throw new Error("Invalid category ID or category not found");
+                }
+            } else if (args.tracking_type === "MANUAL" || args.tracking_type === "LINKED_ACCOUNT") {
+                // For manual or account tracking, remove the linked category
+                updateData.linked_category_id = undefined;
+            }
+        }
+
         if (args.image_url !== undefined) {
             updateData.image_url = args.image_url;
+        }
+
+        // Handle category linkage changes for expense-linked goals
+        const oldCategoryId = goal.linked_category_id;
+        const newCategoryId = updateData.linked_category_id;
+
+        // If category changed, clean up old contributions and process new ones
+        if (args.tracking_type === "EXPENSE_CATEGORY" && oldCategoryId !== newCategoryId) {
+            // Remove old expense-linked contributions if category changed
+            if (oldCategoryId) {
+                const oldContributions = await ctx.db
+                    .query("goal_contributions")
+                    .withIndex("by_goal", (q) => q.eq("goalId", goalId))
+                    .filter((q: any) => q.eq(q.field("source"), "expense_linked"))
+                    .collect();
+
+                for (const contrib of oldContributions) {
+                    await ctx.db.delete(contrib._id);
+                }
+            }
+
+            // Process retroactive contributions for new category
+            if (newCategoryId) {
+                await processRetroactiveContributions(ctx, userId, goalId, newCategoryId as any);
+            }
+        }
+
+        // If switching from expense-linked to another type, remove all expense-linked contributions
+        if (goal.tracking_type === "EXPENSE_CATEGORY" && args.tracking_type !== "EXPENSE_CATEGORY") {
+            const expenseContributions = await ctx.db
+                .query("goal_contributions")
+                .withIndex("by_goal", (q) => q.eq("goalId", goalId))
+                .filter((q: any) => q.eq(q.field("source"), "expense_linked"))
+                .collect();
+
+            for (const contrib of expenseContributions) {
+                await ctx.db.delete(contrib._id);
+            }
         }
 
         await ctx.db.patch(goalId, updateData);

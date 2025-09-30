@@ -19,6 +19,11 @@ export default function ImportsPage() {
         convexUser ? { userId: convexUser._id } : "skip"
     );
 
+    const activeSessions = useQuery(
+        api.imports.getActiveImportSessions,
+        convexUser ? { userId: convexUser._id } : "skip"
+    );
+
     if (!convexUser) {
         return (
             <AppLayout>
@@ -68,6 +73,12 @@ export default function ImportsPage() {
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
+    const handleResumeSession = (sessionId: string) => {
+        // Store the session ID in localStorage and navigate to import page
+        localStorage.setItem('import_session_id', sessionId);
+        window.location.href = '/import-csv';
+    };
+
     return (
         <AppLayout>
             <InitUser />
@@ -76,6 +87,58 @@ export default function ImportsPage() {
                     <h1 className="text-3xl font-bold text-foreground">Import History</h1>
                     <p className="text-muted-foreground mt-2">View all your CSV import sessions</p>
                 </div>
+
+                {/* Active/Pending Sessions */}
+                {activeSessions && activeSessions.length > 0 && (
+                    <div className="mb-6">
+                        <Card className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                                    <AlertCircle className="h-5 w-5" />
+                                    Pending Import Sessions
+                                </CardTitle>
+                                <p className="text-sm text-orange-600 dark:text-orange-400">
+                                    You have {activeSessions.length} import{activeSessions.length > 1 ? 's' : ''} awaiting duplicate review
+                                </p>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    {activeSessions.map((session) => (
+                                        <div
+                                            key={session._id}
+                                            className="flex items-center justify-between p-4 bg-background rounded-lg border"
+                                        >
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                                    <span className="font-medium">{session.fileName}</span>
+                                                </div>
+                                                <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                                                    <div className="flex items-center gap-1">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {session.uploadedAt && format(new Date(session.uploadedAt), 'MMM d, yyyy HH:mm')}
+                                                    </div>
+                                                    <span>Account: {session.accountName}</span>
+                                                    <Badge variant="outline" className="text-xs">
+                                                        {session.duplicates.length} duplicates to review
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                variant="default"
+                                                size="sm"
+                                                onClick={() => handleResumeSession(session.sessionId)}
+                                                className="bg-orange-600 hover:bg-orange-700"
+                                            >
+                                                Resume Review
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
 
                 {!imports || imports.length === 0 ? (
                     <Card>

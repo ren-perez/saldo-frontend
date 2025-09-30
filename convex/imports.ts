@@ -200,11 +200,29 @@ export const getImportDetails = query({
             .withIndex("by_import", (q) => q.eq("importId", args.importId))
             .collect();
 
+        // Enrich resolutions with transaction details
+        const enrichedResolutions = await Promise.all(
+            resolutions.map(async (resolution) => {
+                const existingTransaction = resolution.existingTransactionId
+                    ? await ctx.db.get(resolution.existingTransactionId)
+                    : null;
+                const newTransaction = resolution.newTransactionId
+                    ? await ctx.db.get(resolution.newTransactionId)
+                    : null;
+
+                return {
+                    ...resolution,
+                    existingTransaction,
+                    newTransaction,
+                };
+            })
+        );
+
         return {
             import: importRecord,
             session: session || null,
             transactions,
-            resolutions,
+            resolutions: enrichedResolutions,
             stats: {
                 totalTransactions: transactions.length,
                 totalResolutions: resolutions.length,

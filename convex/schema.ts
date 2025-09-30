@@ -95,15 +95,17 @@ export default defineSchema({
         note: v.optional(v.string()),
         priority: v.optional(v.number()),
         priority_label: v.optional(v.string()),
-        tracking_type: v.string(),
+        tracking_type: v.string(), // "MANUAL" | "LINKED_ACCOUNT" | "EXPENSE_CATEGORY"
         calculation_type: v.optional(v.string()),
         linked_account_id: v.optional(v.id("accounts")),
+        linked_category_id: v.optional(v.id("categories")), // For expense-linked goals
         image_url: v.optional(v.string()),
         is_completed: v.optional(v.boolean()),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     }).index("by_user", ["userId"])
         .index("by_account", ["linked_account_id"])
+        .index("by_category", ["linked_category_id"])
         .index("by_completion", ["is_completed"]),
 
     goal_contributions: defineTable({
@@ -113,7 +115,7 @@ export default defineSchema({
         amount: v.number(),
         note: v.optional(v.string()),
         contribution_date: v.string(),
-        source: v.string(), // "manual_ui" | "manual_tx" | "import" | "auto"
+        source: v.string(), // "manual_ui" | "manual_tx" | "import" | "auto" | "expense_linked"
         transfer_pair_id: v.optional(v.string()), // For goal-to-goal transfers
         is_withdrawal: v.optional(v.boolean()), // Track negative contributions
         createdAt: v.number(),

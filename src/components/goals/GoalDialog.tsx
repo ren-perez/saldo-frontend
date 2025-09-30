@@ -23,9 +23,9 @@ import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
 import {
-    // DollarSign, 
+    // DollarSign,
     Calendar, AlertCircle,
-    Loader2
+    Loader2, HandCoins, CreditCard, Tag
 } from "lucide-react"
 import type { Goal } from "@/types/goals"
 import type { Id } from "../../../convex/_generated/dataModel"
@@ -65,6 +65,7 @@ export function GoalDialog({
         calculation_type: "DUE_DATE",
         tracking_type: "MANUAL",
         linked_account_id: null as Id<"accounts"> | null,
+        linked_category_id: null as Id<"categories"> | null,
         color: "#3b82f6",
         emoji: "",
         priority: 3,
@@ -81,9 +82,13 @@ export function GoalDialog({
     const [isUploading, setIsUploading] = useState(false)
     const noteRef = useRef<HTMLTextAreaElement>(null)
 
-    // Load accounts and priority options using Convex
+    // Load accounts, categories, and priority options using Convex
     const accounts = useQuery(
         convexUser ? api.goals.getGoalAccounts : ("skip" as never),
+        convexUser ? { userId: convexUser._id } : "skip"
+    ) || []
+    const categories = useQuery(
+        convexUser ? api.categories.getCategoriesWithGroups : ("skip" as never),
         convexUser ? { userId: convexUser._id } : "skip"
     ) || []
     const priorityOptions = useQuery(api.goals.getGoalPriorityOptions) || []
@@ -130,6 +135,7 @@ export function GoalDialog({
                 calculation_type: editingGoal.calculation_type || "DUE_DATE",
                 tracking_type: editingGoal.tracking_type || "MANUAL",
                 linked_account_id: editingGoal.linked_account?._id || null,
+                linked_category_id: editingGoal.linked_category?._id || null,
                 color: editingGoal.color || "#3b82f6",
                 emoji: editingGoal.emoji || "🎯",
                 priority: editingGoal.priority || 3,
@@ -153,6 +159,7 @@ export function GoalDialog({
                 calculation_type: "DUE_DATE",
                 tracking_type: "MANUAL",
                 linked_account_id: null,
+                linked_category_id: null,
                 color: "#3b82f6",
                 emoji: "🎯",
                 priority: 3,
@@ -279,6 +286,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
+                    linked_category_id: formData.linked_category_id,
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -322,6 +330,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
+                    linked_category_id: formData.linked_category_id,
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -347,6 +356,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
+                    linked_category_id: formData.linked_category_id,
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -368,6 +378,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
+                    linked_category_id: formData.linked_category_id,
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -387,6 +398,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
+                    linked_category_id: formData.linked_category_id,
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -478,8 +490,8 @@ export function GoalDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader className="mb-4">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+                <DialogHeader className="mb-4 flex-shrink-0">
                     <DialogTitle>
                         {isEditing ? 'Edit Goal' : 'Create New Goal'}
                     </DialogTitle>
@@ -491,7 +503,7 @@ export function GoalDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 px-1">
                     <div className="space-y-2">
                         <Label htmlFor="name">Goal Name *</Label>
                         <Input
@@ -610,6 +622,120 @@ export function GoalDialog({
                             onChange={(e) => handleInputChange("note", e.target.value)}
                         />
                     </div>
+
+                    <Separator className="my-8" />
+
+                    <div className="space-y-3">
+                        <Label>Tracking Type</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            <Button
+                                type="button"
+                                variant={formData.tracking_type === 'MANUAL' ? 'default' : 'outline'}
+                                className="h-auto p-3 flex flex-col items-center gap-2"
+                                onClick={() => setFormData((prev) => ({
+                                    ...prev,
+                                    tracking_type: "MANUAL",
+                                    linked_account_id: null,
+                                    linked_category_id: null,
+                                }))}
+                            >
+                                <HandCoins className="h-5 w-5" />
+                                <span className="text-xs">Manual</span>
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={formData.tracking_type === 'LINKED_ACCOUNT' ? 'default' : 'outline'}
+                                className="h-auto p-3 flex flex-col items-center gap-2"
+                                onClick={() => setFormData((prev) => ({
+                                    ...prev,
+                                    tracking_type: "LINKED_ACCOUNT",
+                                    linked_category_id: null,
+                                }))}
+                            >
+                                <CreditCard className="h-5 w-5" />
+                                <span className="text-xs">From Account</span>
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={formData.tracking_type === 'EXPENSE_CATEGORY' ? 'default' : 'outline'}
+                                className="h-auto p-3 flex flex-col items-center gap-2"
+                                onClick={() => setFormData((prev) => ({
+                                    ...prev,
+                                    tracking_type: "EXPENSE_CATEGORY",
+                                    linked_account_id: null,
+                                }))}
+                            >
+                                <Tag className="h-5 w-5" />
+                                <span className="text-xs">Expense-Linked</span>
+                            </Button>
+                        </div>
+                    </div>
+
+                    {formData.tracking_type === "LINKED_ACCOUNT" && (
+                        <div className="space-y-2">
+                            <Label htmlFor="linked_account">Select Account *</Label>
+                            <Select
+                                value={formData.linked_account_id || ""}
+                                onValueChange={(value) => handleInputChange("linked_account_id", value)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Choose an account" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {accounts.map((account, index) => (
+                                        <SelectItem
+                                            key={`account-${account._id}-${index}`}
+                                            value={account._id}
+                                        >
+                                            {account.name} ({account.account_type})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                Goal progress will track the balance of this account
+                            </p>
+                            {selectedAccount && (
+                                <div className="p-3 bg-muted rounded-lg">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium">{selectedAccount.name}</p>
+                                            <p className="text-sm text-muted-foreground">{selectedAccount.account_type}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm text-muted-foreground">Current Balance</p>
+                                            <p className="font-semibold text-lg">${formatBalance(selectedAccount.balance)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {formData.tracking_type === "EXPENSE_CATEGORY" && (
+                        <div className="space-y-2">
+                            <Label htmlFor="linked_category">Select Category *</Label>
+                            <Select
+                                value={formData.linked_category_id || ""}
+                                onValueChange={(value) => handleInputChange("linked_category_id", value)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Choose a category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {categories.map((cat) => (
+                                        <SelectItem key={cat._id} value={cat._id}>
+                                            {cat.groupName ? `${cat.groupName} → ${cat.name}` : cat.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                All past and future expenses in this category will count toward this goal automatically.
+                            </p>
+                        </div>
+                    )}
+
 
                     <Separator className="my-8" />
 
@@ -753,65 +879,7 @@ export function GoalDialog({
                         )}
                     </div>
 
-                    <Separator className="my-8" />
-
-                    <div className="space-y-2">
-                        <Label htmlFor="tracking_type">Tracking Type</Label>
-                        <Select
-                            value={
-                                formData.tracking_type === "MANUAL"
-                                    ? "MANUAL"
-                                    : formData.linked_account_id?.toString() || "MANUAL"
-                            }
-                            onValueChange={(value) => {
-                                if (value === "MANUAL") {
-                                    setFormData((prev) => ({
-                                        ...prev,
-                                        tracking_type: "MANUAL",
-                                        linked_account_id: null,
-                                    }))
-                                } else {
-                                    setFormData((prev) => ({
-                                        ...prev,
-                                        tracking_type: "LINKED_ACCOUNT",
-                                        linked_account_id: value as Id<"accounts">,
-                                    }))
-                                }
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select tracking type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="MANUAL">Manual Tracking</SelectItem>
-                                {accounts.map((account, index) => (
-                                    <SelectItem
-                                        key={`account-${account._id}-${index}`}
-                                        value={account._id}
-                                    >
-                                        {account.name} ({account.account_type})
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {selectedAccount && (
-                        <div className="p-3 bg-muted rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-medium">{selectedAccount.name}</p>
-                                    <p className="text-sm text-muted-foreground">{selectedAccount.account_type}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-sm text-muted-foreground">Current Balance</p>
-                                    <p className="font-semibold text-lg">${formatBalance(selectedAccount.balance)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <DialogFooter className="mt-8">
+                    <DialogFooter className="mt-8 flex-shrink-0">
                         <Button
                             type="button"
                             variant="outline"

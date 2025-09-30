@@ -37,6 +37,7 @@ export default function CsvImporterPage() {
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [completedImportId, setCompletedImportId] = useState<Id<"imports"> | null>(null);
     const [importPhase, setImportPhase] = useState<"upload" | "preview" | "reviewing" | "completed">("upload");
+    const [isCheckingSession, setIsCheckingSession] = useState(true);
 
     // Queries & Mutations
     const accounts = useQuery(
@@ -78,14 +79,40 @@ export default function CsvImporterPage() {
 
     // Check for existing session on load
     useEffect(() => {
+        if (!convexUser) {
+            setIsCheckingSession(false);
+            return;
+        }
+
         const sessionId = localStorage.getItem('import_session_id');
-        if (sessionId && convexUser) {
+        if (sessionId) {
             setCurrentSessionId(sessionId);
             setImportPhase("reviewing");
         }
+        setIsCheckingSession(false);
     }, [convexUser]);
 
+    // Set selectedAccount when session loads
+    useEffect(() => {
+        if (importSession && importSession.accountId && !selectedAccount) {
+            setSelectedAccount(importSession.accountId);
+        }
+    }, [importSession, selectedAccount]);
+
     const resetImportState = () => {
+        // Warn user if there's an active session
+        if (currentSessionId && importPhase === "reviewing") {
+            const confirmed = window.confirm(
+                "You have an unfinished import session with pending duplicate reviews. " +
+                "Starting a new import will abandon the current session and those transactions will not be imported. " +
+                "Are you sure you want to continue?"
+            );
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
         setFile(null);
         setPreviewTransactions([]);
         setValidationErrors([]);
@@ -300,6 +327,23 @@ export default function CsvImporterPage() {
     const handleImport = async () => {
         if (!convexUser || !selectedAccount || !preset || !file) return;
 
+        // Check if there's an active session before starting a new import
+        const existingSessionId = localStorage.getItem('import_session_id');
+        if (existingSessionId && existingSessionId !== currentSessionId) {
+            const confirmed = window.confirm(
+                "Another import session is already in progress. " +
+                "Starting a new import will abandon that session and those transactions may not be imported. " +
+                "Are you sure you want to continue?"
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            // Clear the old session
+            localStorage.removeItem('import_session_id');
+        }
+
         let importId: Id<"imports"> | null = null;
 
         try {
@@ -423,7 +467,14 @@ export default function CsvImporterPage() {
 
             // Get the importId from the session before completing
             if (importSession?.importId) {
-                setCompletedImportId(importSession.importId as Id<"imports">);
+                const importId = importSession.importId as Id<"imports">;
+                setCompletedImportId(importId);
+
+                // Update import status to completed
+                await updateImportStatusMutation({
+                    importId,
+                    status: "completed"
+                });
             }
 
             localStorage.removeItem('import_session_id');
@@ -445,32 +496,44 @@ export default function CsvImporterPage() {
         );
     }
 
+    if (isCheckingSession) {
+        return (
+            <AppLayout>
+                <InitUser />
+                <div className="flex items-center justify-center h-64">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted-foreground border-t-transparent" />
+                </div>
+            </AppLayout>
+        );
+    }
+
     return (
         <AppLayout>
             <InitUser />
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="mb-8 flex flex-col items-start justify-between">
-                    <h1 className="text-3xl font-bold">Import Transactions</h1>
-                    {importPhase !== "upload" && (
-                        <Button onClick={resetImportState} variant="outline" size="sm">
-                            Start New Import
-                        </Button>
+            <div className="w-full min-w-0 mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 max-w-4xl">
+                <div className="py-8 space-y-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <h1 className="text-3xl font-bold">Import Transactions</h1>
+                        {importPhase !== "upload" && (
+                            <Button onClick={resetImportState} variant="outline" size="sm">
+                                Start New Import
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Duplicate Review Phase */}
+                    {importPhase === "reviewing" && importSession && existingTransactions && (
+                        <DuplicateReview
+                            session={importSession}
+                            existingTransactions={existingTransactions}
+                            onSessionResolved={handleSessionResolved}
+                        />
                     )}
-                </div>
 
-                {/* Duplicate Review Phase */}
-                {importPhase === "reviewing" && importSession && existingTransactions && (
-                    <DuplicateReview
-                        session={importSession}
-                        existingTransactions={existingTransactions}
-                        onSessionResolved={handleSessionResolved}
-                    />
-                )}
-
-                {/* Completion Message */}
-                {importPhase === "completed" && (
-                    <>
-                        <div className="mb-6 p-4 rounded-md border bg-green-50 dark:bg-green-950/20">
+                    {/* Completion Message */}
+                    {importPhase === "completed" && (
+                        <div className="space-y-6">
+                            <div className="p-4 rounded-md border bg-green-50 dark:bg-green-950/20">
                             <h2 className="text-xl font-semibold text-green-700 dark:text-green-300 mb-2">
                                 ✅ Import Completed Successfully!
                             </h2>
@@ -479,9 +542,8 @@ export default function CsvImporterPage() {
                             </p>
                         </div>
 
-                        {/* Import Allocation Status */}
-                        {completedImportId && (
-                            <div className="mb-6">
+                            {/* Import Allocation Status */}
+                            {completedImportId && (
                                 <ImportAllocationStatus
                                     importId={completedImportId}
                                     formatCurrency={(amount: number) =>
@@ -491,22 +553,21 @@ export default function CsvImporterPage() {
                                         }).format(amount)
                                     }
                                 />
+                            )}
+
+                            <div className="flex gap-4">
+                                <Button onClick={resetImportState}>
+                                    Import Another File
+                                </Button>
                             </div>
-                        )}
-
-                        <div className="flex gap-4">
-                            <Button onClick={resetImportState}>
-                                Import Another File
-                            </Button>
                         </div>
-                    </>
-                )}
+                    )}
 
-                {/* Upload/Preview Phase */}
-                {importPhase !== "reviewing" && importPhase !== "completed" && (
-                    <>
-                        {/* Account Selection */}
-                        <div className="mb-6">
+                    {/* Upload/Preview Phase */}
+                    {importPhase !== "reviewing" && importPhase !== "completed" && (
+                        <div className="space-y-6">
+                            {/* Account Selection */}
+                            <div>
                             <label className="block text-sm font-medium mb-2">Select Account</label>
                             <select
                                 value={selectedAccount || ""}
@@ -522,28 +583,26 @@ export default function CsvImporterPage() {
                             </select>
                         </div>
 
-                        {/* Preset Display */}
-                        {selectedAccount && preset && (
-                            <div className="mb-6">
-                                <PresetDisplay
-                                    preset={preset}
-                                    mode="detailed"
-                                    showHeader={true}
-                                    showAdvanced={true}
-                                />
-                            </div>
-                        )}
+                            {/* Preset Display */}
+                            {selectedAccount && preset && (
+                                <div>
+                                    <PresetDisplay
+                                        preset={preset}
+                                        mode="detailed"
+                                        showHeader={true}
+                                        showAdvanced={true}
+                                    />
+                                </div>
+                            )}
 
-                        {selectedAccount && !preset && (
-                            <div className="mb-6">
+                            {selectedAccount && !preset && (
                                 <PresetNotFound
                                     accountName={accounts?.find(a => a._id === selectedAccount)?.name}
                                 />
-                            </div>
-                        )}
+                            )}
 
-                        {/* File Upload */}
-                        <div className="mb-6">
+                            {/* File Upload */}
+                            <div>
                             <label className="block text-sm font-medium mb-2">Select CSV or XLSX File</label>
                             <input
                                 type="file"
@@ -652,21 +711,22 @@ export default function CsvImporterPage() {
                             </Button>
                         )}
 
-                        {/* Instructions */}
-                        <div className="p-6 rounded-md border bg-muted">
-                            <h3 className="text-lg font-medium mb-4">Instructions:</h3>
-                            <div className="space-y-2 text-sm text-muted-foreground">
-                                <div>1. Select the account you want to import transactions for</div>
-                                <div>2. Make sure the account has a preset linked to it</div>
-                                <div>3. Choose your CSV file</div>
-                                <div>4. Click &quot;Preview CSV&quot; to validate and normalize the data</div>
-                                <div>5. Review the normalized transactions preview</div>
-                                <div>6. If validation passes, click &quot;Import All Transactions&quot;</div>
-                                <div>7. Review any duplicate transactions if found</div>
+                            {/* Instructions */}
+                            <div className="p-6 rounded-md border bg-muted">
+                                <h3 className="text-lg font-medium mb-4">Instructions:</h3>
+                                <div className="space-y-2 text-sm text-muted-foreground">
+                                    <div>1. Select the account you want to import transactions for</div>
+                                    <div>2. Make sure the account has a preset linked to it</div>
+                                    <div>3. Choose your CSV file</div>
+                                    <div>4. Click &quot;Preview CSV&quot; to validate and normalize the data</div>
+                                    <div>5. Review the normalized transactions preview</div>
+                                    <div>6. If validation passes, click &quot;Import All Transactions&quot;</div>
+                                    <div>7. Review any duplicate transactions if found</div>
+                                </div>
                             </div>
                         </div>
-                    </>
-                )}
+                    )}
+                </div>
             </div>
         </AppLayout>
     );

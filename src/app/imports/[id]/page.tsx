@@ -205,6 +205,101 @@ export default function ImportDetailPage() {
                     </Card>
                 )}
 
+                {/* Duplicate Resolutions */}
+                {importDetails.resolutions && importDetails.resolutions.length > 0 && (
+                    <Card className="mb-6">
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <CardTitle>Duplicate Resolutions</CardTitle>
+                                <Badge variant="secondary">
+                                    {importDetails.resolutions.length} duplicates resolved
+                                </Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {importDetails.resolutions.map((resolution, index) => (
+                                    <div
+                                        key={resolution._id}
+                                        className="p-4 border rounded-lg bg-muted/30"
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <Badge
+                                                    variant={resolution.action === "import" ? "default" : "secondary"}
+                                                    className={
+                                                        resolution.action === "import"
+                                                            ? "bg-green-600"
+                                                            : "bg-orange-600"
+                                                    }
+                                                >
+                                                    {resolution.action === "import" ? "Imported" : "Skipped"}
+                                                </Badge>
+                                                <span className="text-sm text-muted-foreground">
+                                                    Duplicate #{index + 1}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                {format(new Date(resolution.resolvedAt), 'MMM d, yyyy HH:mm')}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Existing Transaction */}
+                                            {resolution.existingTransactionId && (
+                                                <div className="p-3 bg-background rounded border">
+                                                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                                                        Existing Transaction
+                                                    </p>
+                                                    <p className="text-sm font-medium">
+                                                        {resolution.existingTransaction?.description || 'N/A'}
+                                                    </p>
+                                                    <div className="flex items-center justify-between mt-2">
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {resolution.existingTransaction?.date &&
+                                                                format(new Date(resolution.existingTransaction.date), 'MMM d, yyyy')}
+                                                        </span>
+                                                        <span className={`text-sm font-medium ${
+                                                            (resolution.existingTransaction?.amount ?? 0) >= 0
+                                                                ? 'text-green-600'
+                                                                : 'text-red-600'
+                                                        }`}>
+                                                            {resolution.existingTransaction?.amount !== undefined &&
+                                                                formatCurrency(resolution.existingTransaction.amount)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {/* New Transaction */}
+                                            <div className="p-3 bg-background rounded border">
+                                                <p className="text-xs font-medium text-muted-foreground mb-2">
+                                                    New Transaction (from CSV)
+                                                </p>
+                                                <p className="text-sm font-medium">
+                                                    {resolution.newTransaction?.description || 'N/A'}
+                                                </p>
+                                                <div className="flex items-center justify-between mt-2">
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {resolution.newTransaction?.date &&
+                                                            format(new Date(resolution.newTransaction.date), 'MMM d, yyyy')}
+                                                    </span>
+                                                    <span className={`text-sm font-medium ${
+                                                        (resolution.newTransaction?.amount ?? 0) >= 0
+                                                            ? 'text-green-600'
+                                                            : 'text-red-600'
+                                                    }`}>
+                                                        {resolution.newTransaction?.amount !== undefined &&
+                                                            formatCurrency(resolution.newTransaction.amount)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Transactions Preview */}
                 {importDetails.transactions && importDetails.transactions.length > 0 && (
                     <Card>

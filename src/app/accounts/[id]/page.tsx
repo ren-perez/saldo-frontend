@@ -1,5 +1,6 @@
 // src/app/accounts/[id]/page.tsx
 "use client";
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
@@ -18,6 +19,7 @@ export default function AccountDetailPage() {
     const params = useParams();
     const accountId = params.id as Id<"accounts">;
     const { convexUser } = useConvexUser();
+    const [transactionLimit, setTransactionLimit] = useState(20);
 
     const accountDetails = useQuery(
         api.accounts.getAccountDetails,
@@ -26,7 +28,7 @@ export default function AccountDetailPage() {
 
     const transactions = useQuery(
         api.accounts.getAccountTransactions,
-        convexUser && accountId ? { accountId, userId: convexUser._id, limit: 50 } : "skip"
+        convexUser && accountId ? { accountId, userId: convexUser._id, limit: transactionLimit } : "skip"
     );
 
     if (!convexUser) {
@@ -147,42 +149,53 @@ export default function AccountDetailPage() {
                                     </Badge>
                                 </div>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="space-y-4">
                                 {!transactions || transactions.length === 0 ? (
                                     <div className="text-center py-8">
                                         <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
                                         <p className="text-muted-foreground">No transactions yet</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2">
-                                        {transactions.map((transaction) => (
-                                            <div
-                                                key={transaction._id}
-                                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors"
-                                            >
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-medium text-sm truncate">
-                                                        {transaction.description}
-                                                    </p>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                    <>
+                                        <div className="space-y-2">
+                                            {transactions.map((transaction) => (
+                                                <div
+                                                    key={transaction._id}
+                                                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors"
+                                                >
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-medium text-sm truncate">
+                                                            {transaction.description}
                                                         </p>
-                                                        {transaction.transactionType && (
-                                                            <Badge variant="outline" className="text-xs">
-                                                                {transaction.transactionType}
-                                                            </Badge>
-                                                        )}
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                                            </p>
+                                                            {transaction.transactionType && (
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    {transaction.transactionType}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
                                                     </div>
+                                                    <p className={`font-semibold ml-4 ${
+                                                        transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                                                    }`}>
+                                                        {formatCurrency(transaction.amount)}
+                                                    </p>
                                                 </div>
-                                                <p className={`font-semibold ml-4 ${
-                                                    transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                                                }`}>
-                                                    {formatCurrency(transaction.amount)}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                        {transactions.length >= transactionLimit && (
+                                            <Button
+                                                variant="outline"
+                                                className="w-full"
+                                                onClick={() => setTransactionLimit(prev => prev + 20)}
+                                            >
+                                                Load More Transactions
+                                            </Button>
+                                        )}
+                                    </>
                                 )}
                             </CardContent>
                         </Card>
@@ -193,34 +206,47 @@ export default function AccountDetailPage() {
                         {/* Linked Goals */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Target className="h-5 w-5" />
-                                    Linked Goals
-                                    <Badge variant="secondary" className="ml-auto">
-                                        {accountDetails.linkedGoals.length}
-                                    </Badge>
-                                </CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Target className="h-5 w-5" />
+                                        Linked Goals
+                                        <Badge variant="secondary">
+                                            {accountDetails.linkedGoals.length}
+                                        </Badge>
+                                    </CardTitle>
+                                    <Button variant="ghost" size="sm" asChild>
+                                        <Link href="/goals">
+                                            View All
+                                        </Link>
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 {accountDetails.linkedGoals.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground text-center py-4">
-                                        No linked goals
-                                    </p>
+                                    <div className="text-center py-4">
+                                        <p className="text-sm text-muted-foreground mb-3">
+                                            No linked goals
+                                        </p>
+                                        <Button variant="outline" size="sm" asChild>
+                                            <Link href="/goals">
+                                                Create a Goal
+                                            </Link>
+                                        </Button>
+                                    </div>
                                 ) : (
                                     <div className="space-y-2">
                                         {accountDetails.linkedGoals.map((goal) => (
-                                            <div
-                                                key={goal._id}
-                                                className="flex items-center gap-2 p-2 border rounded-lg"
-                                            >
-                                                <span className="text-xl">{goal.emoji}</span>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium truncate">{goal.name}</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {formatCurrency(goal.total_amount)} goal
-                                                    </p>
+                                            <Link key={goal._id} href={`/goals/${goal._id}`}>
+                                                <div className="flex items-center gap-2 p-2 border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer">
+                                                    <span className="text-xl">{goal.emoji}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium truncate">{goal.name}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {formatCurrency(goal.total_amount)} goal
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            </Link>
                                         ))}
                                     </div>
                                 )}

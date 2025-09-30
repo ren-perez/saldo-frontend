@@ -71,3 +71,35 @@ export const listCategoryGroups = query({
             .collect();
     },
 });
+
+// 📌 Get categories with their group names for goal dialog
+export const getCategoriesWithGroups = query({
+    args: { userId: v.id("users") },
+    handler: async (ctx, { userId }) => {
+        const categories = await ctx.db
+            .query("categories")
+            .withIndex("by_user")
+            .filter((row) => row.eq(row.field("userId"), userId))
+            .collect();
+
+        const categoriesWithGroups = await Promise.all(
+            categories.map(async (category) => {
+                let groupName = "";
+                if (category.groupId) {
+                    const group = await ctx.db.get(category.groupId);
+                    if (group) {
+                        groupName = group.name;
+                    }
+                }
+                return {
+                    _id: category._id,
+                    name: category.name,
+                    groupName,
+                    transactionType: category.transactionType,
+                };
+            })
+        );
+
+        return categoriesWithGroups;
+    },
+});

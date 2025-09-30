@@ -1,5 +1,6 @@
 // components/goals/GoalCardItem.tsx
 import { Calendar, DollarSign, MoreVertical, Edit, Trash2, Eye, Target, Pencil, ArrowRightLeft, TrendingDown, BarChart3 } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -128,14 +129,12 @@ export function GoalCardItem({
                                         </DropdownMenuItem>
                                     )}
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem>
-                                        <BarChart3 className="h-4 w-4 mr-2" />
-                                        View Analytics
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        View History
-                                    </DropdownMenuItem>
+                                    <Link href={`/goals/${goal._id}`}>
+                                        <DropdownMenuItem>
+                                            <Eye className="h-4 w-4 mr-2" />
+                                            View Details
+                                        </DropdownMenuItem>
+                                    </Link>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={handleDeleteGoal} className="text-red-600 hover:text-red-800">
                                         <Trash2 className="h-4 w-4 mr-2" />
@@ -151,12 +150,14 @@ export function GoalCardItem({
                     <div className="space-y-4 flex flex-col justify-between h-full">
                         <div className="flex justify-between items-start">
                             <div className="flex-1 space-y-2">
-                                <div className="flex items-end">
-                                    {goal.emoji && (
-                                        <span className="text-2xl mr-2">{goal.emoji}</span>
-                                    )}
-                                    <h3 className="font-semibold text-lg">{goal.name}</h3>
-                                </div>
+                                <Link href={`/goals/${goal._id}`}>
+                                    <div className="flex items-end cursor-pointer hover:opacity-80 transition-opacity">
+                                        {goal.emoji && (
+                                            <span className="text-2xl mr-2">{goal.emoji}</span>
+                                        )}
+                                        <h3 className="font-semibold text-lg">{goal.name}</h3>
+                                    </div>
+                                </Link>
                                 {goal.note ?
                                     (
                                         <p className="text-sm text-muted-foreground italic line-clamp-2">{goal.note}</p>
@@ -241,6 +242,17 @@ export function GoalCardItem({
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <div className="h-2 w-2 bg-green-500 rounded-full" />
                                 <span>Linked to {goal.linked_account.name}</span>
+                            </div>
+                        )}
+
+                        {/* Category Tracking */}
+                        {goal.linked_category && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <div className="h-2 w-2 bg-pink-500 rounded-full" />
+                                <span>
+                                    Linked to {goal.linked_category.group_name ? `${goal.linked_category.group_name} → ` : ""}
+                                    {goal.linked_category.name}
+                                </span>
                             </div>
                         )}
 
