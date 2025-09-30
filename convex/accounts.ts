@@ -78,3 +78,86 @@ export const getPresetAccounts = query({
         return accounts.filter(Boolean);
     },
 });
+
+// Get account details with related data
+export const getAccountDetails = query({
+    args: {
+        accountId: v.id("accounts"),
+        userId: v.id("users")
+    },
+    handler: async (ctx, { accountId, userId }) => {
+        const account = await ctx.db.get(accountId);
+
+        if (!account || account.userId !== userId) {
+            throw new Error("Account not found or unauthorized");
+        }
+
+        // Get transactions count
+        const transactions = await ctx.db
+            .query("transactions")
+            .withIndex("by_account", (q) => q.eq("accountId", accountId))
+            .collect();
+
+        // Get linked goals
+        const goals = await ctx.db
+            .query("goals")
+            .withIndex("by_account", (q) => q.eq("linked_account_id", accountId))
+            .collect();
+
+        // Calculate account statistics
+        const totalDeposits = transactions
+            .filter(t => t.amount > 0)
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        const totalWithdrawals = transactions
+            .filter(t => t.amount < 0)
+            .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+        const currentBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
+
+        // Get recent imports
+        const imports = await ctx.db
+            .query("imports")
+            .withIndex("by_account", (q) => q.eq("accountId", accountId))
+            .order("desc")
+            .take(5);
+
+        return {
+            account,
+            stats: {
+                totalTransactions: transactions.length,
+                totalDeposits,
+                totalWithdrawals,
+                currentBalance,
+                linkedGoalsCount: goals.length,
+                importsCount: imports.length,
+            },
+            linkedGoals: goals,
+            recentImports: imports,
+        };
+    },
+});
+
+// Get transactions for an account with pagination
+export const getAccountTransactions = query({
+    args: {
+        accountId: v.id("accounts"),
+        userId: v.id("users"),
+        limit: v.optional(v.number()),
+    },
+    handler: async (ctx, { accountId, userId, limit = 50 }) => {
+        const account = await ctx.db.get(accountId);
+
+        if (!account || account.userId !== userId) {
+            throw new Error("Account not found or unauthorized");
+        }
+
+        const transactions = await ctx.db
+            .query("transactions")
+            .withIndex("by_account", (q) => q.eq("accountId", accountId))
+            .order("desc")
+            .take(limit);
+
+        return transactions;
+    },
+});

@@ -660,6 +660,51 @@ export const deleteAllTransactions = mutation({
     },
 });
 
+// export const mergeTransaction = mutation({
+//     args: {
+//         existingTransactionId: v.id("transactions"),
+//         newTransactionData: v.object({
+//             date: v.number(),
+//             amount: v.number(),
+//             description: v.string(),
+//             transactionType: v.optional(v.string()),
+//             rawData: v.any(), // Raw CSV data - keeping v.any() for Convex compatibility
+//         }),
+//         userId: v.id("users"),
+//     },
+//     handler: async (ctx, args) => {
+//         const { existingTransactionId, newTransactionData, userId } = args;
+
+//         // Get the existing transaction
+//         const existingTransaction = await ctx.db.get(existingTransactionId);
+//         if (!existingTransaction) {
+//             throw new Error("Transaction not found");
+//         }
+
+//         // Verify the transaction belongs to the user
+//         if (existingTransaction.userId !== userId) {
+//             throw new Error("Transaction not owned by user");
+//         }
+
+//         // Merge: preserve user edits (category, type if manually set) but update file-driven values
+//         const mergedTransaction = {
+//             ...existingTransaction,
+//             date: newTransactionData.date,
+//             amount: newTransactionData.amount,
+//             description: newTransactionData.description,
+//             // Only update transactionType if user hasn't manually set one (preserve user edits)
+//             transactionType: existingTransaction.updatedAt
+//                 ? existingTransaction.transactionType // Keep existing if user edited
+//                 : newTransactionData.transactionType, // Use new if never edited
+//             updatedAt: Date.now(),
+//         };
+
+//         await ctx.db.replace(existingTransactionId, mergedTransaction);
+
+//         return { success: true };
+//     },
+// });
+
 export const mergeTransaction = mutation({
     args: {
         existingTransactionId: v.id("transactions"),
@@ -668,7 +713,8 @@ export const mergeTransaction = mutation({
             amount: v.number(),
             description: v.string(),
             transactionType: v.optional(v.string()),
-            rawData: v.any(), // Raw CSV data - keeping v.any() for Convex compatibility
+            importId: v.optional(v.id("imports")), // ✅ Add this
+            rawData: v.any(),
         }),
         userId: v.id("users"),
     },
@@ -686,16 +732,18 @@ export const mergeTransaction = mutation({
             throw new Error("Transaction not owned by user");
         }
 
-        // Merge: preserve user edits (category, type if manually set) but update file-driven values
+        // Merge: preserve user edits but update file-driven values
         const mergedTransaction = {
             ...existingTransaction,
             date: newTransactionData.date,
             amount: newTransactionData.amount,
             description: newTransactionData.description,
-            // Only update transactionType if user hasn't manually set one (preserve user edits)
+            // Only update transactionType if user hasn't manually set one
             transactionType: existingTransaction.updatedAt
-                ? existingTransaction.transactionType // Keep existing if user edited
-                : newTransactionData.transactionType, // Use new if never edited
+                ? existingTransaction.transactionType
+                : newTransactionData.transactionType,
+            // ✅ Update importId if provided (links old transaction to new import)
+            importId: newTransactionData.importId || existingTransaction.importId,
             updatedAt: Date.now(),
         };
 

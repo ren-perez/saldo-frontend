@@ -11,6 +11,7 @@ import InitUser from "@/components/InitUser";
 import { AddAccountDialog } from "@/components/AddAccountDialog";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import Link from "next/link";
 
 export default function AccountsPage() {
     const { convexUser } = useConvexUser();
@@ -80,14 +81,14 @@ export default function AccountsPage() {
                                         key={acc._id}
                                         className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:shadow-md transition-shadow ease-in-out duration-300"
                                     >
-                                        <div>
+                                        <Link href={`/accounts/${acc._id}`} className="flex-1">
                                             <div className="font-medium text-foreground">
                                                 {acc.bank} {acc.name}
                                             </div>
                                             <div className="text-sm text-muted-foreground capitalize">
                                                 {acc.type} {acc.number && `• ***${acc.number}`}
                                             </div>
-                                        </div>
+                                        </Link>
                                         <div className="flex items-center space-x-2">
                                             <button
                                                 onClick={() => setEditing(acc)}
