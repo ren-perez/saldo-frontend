@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, DollarSign, Target } from "lucide-react"
+import { Calendar, DollarSign, Target, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react"
 import { format } from "date-fns"
 import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
@@ -33,13 +33,16 @@ export function UnallocatedTransactions({ formatCurrency }: UnallocatedTransacti
     const [selectedAccountId, setSelectedAccountId] = useState<Id<"accounts"> | "">("")
     const [selectedTransaction, setSelectedTransaction] = useState<UnallocatedTransaction | null>(null)
     const [allocationDialogOpen, setAllocationDialogOpen] = useState(false)
+    const [isCollapsed, setIsCollapsed] = useState(true)
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 5
 
     // Fetch unallocated transactions
     const transactions = useQuery(api.contributions.getUnallocatedTransactions,
         convexUser ? {
             userId: convexUser._id,
-            accountId: selectedAccountId ? selectedAccountId as Id<"accounts"> : undefined,
-            limit: 20
+            accountId: selectedAccountId && selectedAccountId !== "" ? selectedAccountId as Id<"accounts"> : undefined,
+            limit: selectedAccountId ? 20 : 100  // Show more when viewing all accounts
         } : "skip"
     )
 
@@ -55,90 +58,141 @@ export function UnallocatedTransactions({ formatCurrency }: UnallocatedTransacti
 
     const positiveTransactions = transactions?.filter(t => t.amount > 0) || []
 
+    // Pagination
+    const totalPages = Math.ceil(positiveTransactions.length / itemsPerPage)
+    const paginatedTransactions = positiveTransactions.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    )
+
+    // Reset to page 1 when filter changes
+    useState(() => {
+        setCurrentPage(1)
+    })
+
+    if (positiveTransactions.length === 0) {
+        return null // Hide completely if no unallocated transactions
+    }
+
     return (
         <>
-            <Card>
+            <Card className="mb-6">
                 <CardHeader>
                     <div className="flex justify-between items-center">
-                        <CardTitle className="flex items-center gap-2">
-                            <Target className="h-5 w-5" />
-                            Unallocated Transactions
-                        </CardTitle>
-                        <div className="flex items-center gap-2">
-                            <Select value={selectedAccountId} onValueChange={(value) => setSelectedAccountId(value as Id<"accounts"> | "")}>
-                                <SelectTrigger className="w-48">
-                                    <SelectValue placeholder="All accounts" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">All accounts</SelectItem>
-                                    {accounts?.map((account) => (
-                                        <SelectItem key={account._id} value={account._id}>
-                                            {account.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                        <div className="flex items-center gap-3">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsCollapsed(!isCollapsed)}
+                                className="p-0 hover:bg-transparent h-10 w-10"
+                            >
+                                {isCollapsed ? (
+                                    <ChevronDown className="h-5 w-5" />
+                                ) : (
+                                    <ChevronUp className="h-5 w-5" />
+                                )}
+                            </Button>
+                            <CardTitle className="flex items-center gap-2">
+                                {/* <Target className="h-5 w-5" /> */}
+                                Unallocated Transactions
+                                <Badge variant="secondary" className="ml-2">
+                                    {positiveTransactions.length}
+                                </Badge>
+                            </CardTitle>
                         </div>
+                        {!isCollapsed && (
+                            <div className="flex items-center gap-2">
+                                <Select value={selectedAccountId} onValueChange={(value) => setSelectedAccountId(value === "__all__" ? "" : value as Id<"accounts">)}>
+                                    <SelectTrigger className="w-48">
+                                        <SelectValue placeholder="All accounts" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__all__">All accounts</SelectItem>
+                                        {accounts?.map((account) => (
+                                            <SelectItem key={account._id} value={account._id}>
+                                                {account.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                     </div>
                 </CardHeader>
-                <CardContent>
-                    {positiveTransactions.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                            <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p className="text-lg font-medium mb-2">No unallocated transactions</p>
-                            <p className="text-sm">
-                                All positive transactions have been allocated to goals.
-                            </p>
+                {!isCollapsed && (
+                    <CardContent>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center text-sm text-muted-foreground">
+                            <span>
+                                Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, positiveTransactions.length)} of {positiveTransactions.length} transactions
+                            </span>
+                            {totalPages > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <span className="text-sm">
+                                        Page {currentPage} of {totalPages}
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <div className="space-y-3">
-                            <div className="text-sm text-muted-foreground mb-4">
-                                Showing {positiveTransactions.length} positive transactions ready for goal allocation.
-                            </div>
 
-                            {positiveTransactions.map((transaction) => (
+                        <div className="space-y-2">
+                            {paginatedTransactions.map((transaction) => (
                                 <div
                                     key={transaction._id}
-                                    className="border rounded-lg p-4 hover:bg-muted/30 transition-colors"
+                                    className="border rounded-lg p-3 hover:bg-muted/30 transition-colors"
                                 >
-                                    <div className="flex justify-between items-start">
-                                        <div className="space-y-2 flex-1">
-                                            <div className="flex justify-between items-start">
-                                                <p className="font-medium">{transaction.description}</p>
-                                                <p className="text-lg font-semibold text-green-600">
-                                                    {formatCurrency(transaction.amount)}
-                                                </p>
-                                            </div>
-
-                                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                <div className="flex items-center gap-1">
-                                                    <Calendar className="h-4 w-4" />
-                                                    {format(new Date(transaction.date), 'MMM d, yyyy')}
-                                                </div>
+                                    <div className="flex justify-between items-center gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <p className="font-medium text-sm truncate">{transaction.description}</p>
                                                 {transaction.account && (
-                                                    <Badge variant="outline" className="text-xs">
+                                                    <Badge variant="outline" className="text-xs shrink-0">
                                                         {transaction.account.name}
                                                     </Badge>
                                                 )}
                                             </div>
+                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                <Calendar className="h-3 w-3" />
+                                                {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <div className="mt-3 flex justify-end">
-                                        <Button
-                                            size="sm"
-                                            onClick={() => handleAllocateTransaction(transaction)}
-                                            className="gap-2"
-                                        >
-                                            <DollarSign className="h-4 w-4" />
-                                            Allocate to Goals
-                                        </Button>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            <p className="font-semibold text-green-600">
+                                                {formatCurrency(transaction.amount)}
+                                            </p>
+                                            <Button
+                                                size="sm"
+                                                onClick={() => handleAllocateTransaction(transaction)}
+                                                className="gap-1 h-8"
+                                            >
+                                                <DollarSign className="h-3 w-3" />
+                                                Allocate
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    )}
-                </CardContent>
+                    </div>
+                    </CardContent>
+                )}
             </Card>
 
             <TransactionAllocationDialog

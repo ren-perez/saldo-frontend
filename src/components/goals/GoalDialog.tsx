@@ -223,7 +223,7 @@ export function GoalDialog({
 
     const compressImage = async (file: File): Promise<File> => {
         // If file is already small, skip compression
-        if (file.size < 0.3 * 1024 * 1024) {
+        if (file.size < 0.5 * 1024 * 1024) {
             return file
         }
 

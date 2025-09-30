@@ -10,6 +10,7 @@ import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import DuplicateReview from "@/components/DuplicateReview";
+import { ImportAllocationStatus } from "@/components/goals/ImportAllocationStatus";
 import { Button } from "@/components/ui/button";
 import {
     processTransactions,
@@ -34,6 +35,7 @@ export default function CsvImporterPage() {
     } | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [completedImportId, setCompletedImportId] = useState<Id<"imports"> | null>(null);
     const [importPhase, setImportPhase] = useState<"upload" | "preview" | "reviewing" | "completed">("upload");
 
     // Queries & Mutations
@@ -89,6 +91,7 @@ export default function CsvImporterPage() {
         setValidationErrors([]);
         setProcessingStats(null);
         setCurrentSessionId(null);
+        setCompletedImportId(null);
         setImportPhase("upload");
         localStorage.removeItem('import_session_id');
     };
@@ -382,6 +385,7 @@ export default function CsvImporterPage() {
                 setImportPhase("reviewing");
             } else {
                 await updateImportStatusMutation({ importId, status: "completed" });
+                setCompletedImportId(importId);
                 setImportPhase("completed");
                 alert(`Successfully imported ${importResult.inserted} transactions!`);
             }
@@ -416,6 +420,11 @@ export default function CsvImporterPage() {
                 sessionId: currentSessionId,
                 userId: convexUser._id,
             });
+
+            // Get the importId from the session before completing
+            if (importSession?.importId) {
+                setCompletedImportId(importSession.importId as Id<"imports">);
+            }
 
             localStorage.removeItem('import_session_id');
             setImportPhase("completed");
@@ -460,14 +469,37 @@ export default function CsvImporterPage() {
 
                 {/* Completion Message */}
                 {importPhase === "completed" && (
-                    <div className="mb-6 p-4 rounded-md border bg-green-50 dark:bg-green-950/20">
-                        <h2 className="text-xl font-semibold text-green-700 dark:text-green-300 mb-2">
-                            ✅ Import Completed Successfully!
-                        </h2>
-                        <p className="text-green-600 dark:text-green-400">
-                            All transactions have been processed and imported to your account.
-                        </p>
-                    </div>
+                    <>
+                        <div className="mb-6 p-4 rounded-md border bg-green-50 dark:bg-green-950/20">
+                            <h2 className="text-xl font-semibold text-green-700 dark:text-green-300 mb-2">
+                                ✅ Import Completed Successfully!
+                            </h2>
+                            <p className="text-green-600 dark:text-green-400">
+                                All transactions have been processed and imported to your account.
+                            </p>
+                        </div>
+
+                        {/* Import Allocation Status */}
+                        {completedImportId && (
+                            <div className="mb-6">
+                                <ImportAllocationStatus
+                                    importId={completedImportId}
+                                    formatCurrency={(amount: number) =>
+                                        new Intl.NumberFormat('en-US', {
+                                            style: 'currency',
+                                            currency: 'USD'
+                                        }).format(amount)
+                                    }
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex gap-4">
+                            <Button onClick={resetImportState}>
+                                Import Another File
+                            </Button>
+                        </div>
+                    </>
                 )}
 
                 {/* Upload/Preview Phase */}

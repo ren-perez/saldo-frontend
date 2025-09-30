@@ -376,7 +376,7 @@ export const getGoalsForAllocation = query({
             return !goal.linked_account_id || goal.linked_account_id === args.accountId;
         });
 
-        // Add current balance to each goal
+        // Add current balance and account info to each goal
         const goalsWithBalance = await Promise.all(
             availableGoals.map(async (goal) => {
                 const contributions = await ctx.db
@@ -386,6 +386,19 @@ export const getGoalsForAllocation = query({
 
                 const currentAmount = contributions.reduce((sum, contrib) => sum + contrib.amount, 0);
 
+                // Get account info if linked
+                let account = null;
+                if (goal.linked_account_id) {
+                    const accountData = await ctx.db.get(goal.linked_account_id);
+                    if (accountData) {
+                        account = {
+                            _id: accountData._id,
+                            name: (accountData as any).name,
+                            type: (accountData as any).type,
+                        };
+                    }
+                }
+
                 return {
                     _id: goal._id,
                     name: goal.name,
@@ -394,6 +407,7 @@ export const getGoalsForAllocation = query({
                     emoji: goal.emoji,
                     color: goal.color,
                     linked_account_id: goal.linked_account_id,
+                    account,
                 };
             })
         );

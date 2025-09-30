@@ -29,6 +29,8 @@ import {
   CreditCard,
   Tag,
   Lightbulb,
+  History,
+  BarChart3,
 } from "lucide-react"
 
 const navItems = [
@@ -36,6 +38,8 @@ const navItems = [
   { href: "/review", label: "Review", icon: Lightbulb },
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/goals", label: "Goals", icon: Target },
+  { href: "/goals/history", label: "Contribution History", icon: History },
+  { href: "/goals/analytics", label: "Goal Analytics", icon: BarChart3 },
   { href: "/presets", label: "Presets", icon: Settings },
   { href: "/import-csv", label: "Import CSV", icon: Upload },
   { href: "/transactions", label: "Transactions", icon: CreditCard },

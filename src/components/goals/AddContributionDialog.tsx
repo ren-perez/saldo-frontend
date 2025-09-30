@@ -63,7 +63,7 @@ export function AddContributionDialog({
         convexUser ? { userId: convexUser._id } : "skip"
     )
 
-    const addContributionMutation = useMutation(api.goals.addContribution)
+    const addContributionMutation = useMutation(api.contributions.createContribution)
 
     const handleClose = () => {
         setFormData({

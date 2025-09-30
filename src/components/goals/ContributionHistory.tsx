@@ -129,14 +129,14 @@ export function ContributionHistory({ goalId, formatCurrency }: ContributionHist
                         <div className="space-y-1">
                             <Label className="text-xs font-medium">Goal</Label>
                             <Select
-                                value={filters.goalId}
-                                onValueChange={(value) => setFilters(prev => ({ ...prev, goalId: value as Id<"goals"> | "" }))}
+                                value={filters.goalId || "__all__"}
+                                onValueChange={(value) => setFilters(prev => ({ ...prev, goalId: value === "__all__" ? "" : value as Id<"goals"> }))}
                             >
                                 <SelectTrigger className="h-8">
                                     <SelectValue placeholder="All goals" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All goals</SelectItem>
+                                    <SelectItem value="__all__">All goals</SelectItem>
                                     {goals?.map((goal) => (
                                         <SelectItem key={goal._id} value={goal._id}>
                                             {goal.emoji} {goal.name}
@@ -151,14 +151,14 @@ export function ContributionHistory({ goalId, formatCurrency }: ContributionHist
                     <div className="space-y-1">
                         <Label className="text-xs font-medium">Source</Label>
                         <Select
-                            value={filters.source}
-                            onValueChange={(value) => setFilters(prev => ({ ...prev, source: value }))}
+                            value={filters.source || "__all__"}
+                            onValueChange={(value) => setFilters(prev => ({ ...prev, source: value === "__all__" ? "" : value }))}
                         >
                             <SelectTrigger className="h-8">
                                 <SelectValue placeholder="All sources" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All sources</SelectItem>
+                                <SelectItem value="__all__">All sources</SelectItem>
                                 {Object.entries(SOURCE_LABELS).map(([key, label]) => (
                                     <SelectItem key={key} value={key}>{label}</SelectItem>
                                 ))}

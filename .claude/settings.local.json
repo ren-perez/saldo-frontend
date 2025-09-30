@@ -8,7 +8,9 @@
       "Bash(npx convex:*)",
       "Bash(pnpm build:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(pnpm run:*)"
+      "Bash(pnpm run:*)",
+      "Bash(npx next build:*)",
+      "Bash(timeout 10 pnpm run dev)"
     ],
     "deny": [],
     "ask": []

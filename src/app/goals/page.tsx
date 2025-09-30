@@ -10,6 +10,7 @@ import { NotebookText, Plus, Target } from "lucide-react"
 import { GoalDialog } from "@/components/goals/GoalDialog"
 import { GoalFilters } from "@/components/goals/GoalFilters"
 import { GoalCardItem } from "@/components/goals/GoalCardItem"
+import { UnallocatedTransactions } from "@/components/goals/UnallocatedTransactions"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"
 import { Goal, FilterOptions, Filters } from "@/types/goals"
@@ -162,6 +163,11 @@ export default function GoalsPage() {
           onFiltersChange={setFilters}
           filterOptions={filterOptions}
         />
+
+        {/* Unallocated Transactions */}
+        <div className="mb-8">
+          <UnallocatedTransactions formatCurrency={formatCurrency} />
+        </div>
 
         {/* Goals Grid */}
         {filteredGoals.length === 0 ? (

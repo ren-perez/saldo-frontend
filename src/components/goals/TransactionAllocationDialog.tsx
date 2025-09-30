@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { DollarSign, Plus, X, Target, Calendar, AlertCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DollarSign, Plus, X, Target, Calendar, AlertCircle, Link as LinkIcon } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { useMutation, useQuery } from "convex/react"
@@ -232,19 +233,43 @@ export function TransactionAllocationDialog({
                                     {/* Goal Selection */}
                                     <div className="space-y-2">
                                         <Label className="text-sm">Goal</Label>
-                                        <select
+                                        <Select
                                             value={allocation.goalId}
-                                            onChange={(e) => updateAllocation(index, 'goalId', e.target.value)}
-                                            className="w-full p-2 border rounded-md text-sm"
-                                            required
+                                            onValueChange={(value) => updateAllocation(index, 'goalId', value)}
                                         >
-                                            <option value="">Select a goal...</option>
-                                            {goals?.map((goal) => (
-                                                <option key={goal._id} value={goal._id}>
-                                                    {goal.emoji} {goal.name} ({formatCurrency(goal.current_amount)}/{formatCurrency(goal.total_amount)})
-                                                </option>
-                                            ))}
-                                        </select>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Select a goal..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {goals?.map((goal) => {
+                                                    const isLinkedToAccount = transaction?.account &&
+                                                        goal.linked_account_id === transaction.account._id
+                                                    const goalAccount = 'account' in goal ? goal.account : null
+
+                                                    return (
+                                                        <SelectItem key={goal._id} value={goal._id}>
+                                                            <div className="flex items-center gap-2 w-full">
+                                                                <span>{goal.emoji} {goal.name}</span>
+                                                                {goalAccount && (
+                                                                    <Badge variant="outline" className="text-xs">
+                                                                        {goalAccount.name}
+                                                                    </Badge>
+                                                                )}
+                                                                {isLinkedToAccount && (
+                                                                    <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                                                        <LinkIcon className="h-3 w-3" />
+                                                                        Linked
+                                                                    </Badge>
+                                                                )}
+                                                                <span className="text-xs text-muted-foreground ml-auto">
+                                                                    {formatCurrency(goal.current_amount)}/{formatCurrency(goal.total_amount)}
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    )
+                                                })}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
 
                                     {/* Amount Input */}

@@ -386,7 +386,10 @@ export const deleteGoal = mutation({
     },
 });
 
-// Mutation to add a contribution to a goal (enhanced version)
+// @deprecated - Use api.contributions.createContribution instead
+// This function is kept for backward compatibility but should not be used in new code.
+// The contributions API provides better type safety, withdrawal support, and transaction linking.
+// TODO: Remove after confirming no external dependencies
 export const addContribution = mutation({
     args: {
         userId: v.id("users"),
