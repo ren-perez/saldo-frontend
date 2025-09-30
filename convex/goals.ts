@@ -1,5 +1,6 @@
 // convex/goals.ts
 import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 // Helper function to calculate current amount based on tracking type
@@ -385,7 +386,7 @@ export const deleteGoal = mutation({
     },
 });
 
-// Mutation to add a contribution to a goal
+// Mutation to add a contribution to a goal (enhanced version)
 export const addContribution = mutation({
     args: {
         userId: v.id("users"),
@@ -393,6 +394,8 @@ export const addContribution = mutation({
         amount: v.number(),
         note: v.optional(v.string()),
         contribution_date: v.string(),
+        accountId: v.optional(v.id("accounts")), // For creating linked transaction
+        source: v.optional(v.string()), // Defaults to "manual_ui"
     },
     handler: async (ctx, args) => {
         const { userId } = args;
@@ -404,19 +407,45 @@ export const addContribution = mutation({
             throw new Error("Goal not found");
         }
 
-        // Type assertion to ensure this is a goal document
         const goal = existingGoal as any;
         if (goal.userId !== userId) {
             throw new Error("Not authorized");
+        }
+
+        // let transactionId = null;
+        let transactionId: Id<"transactions"> | undefined = undefined;
+
+
+        // Create transaction if account is provided
+        if (args.accountId) {
+            // Validate account belongs to user
+            const account = await ctx.db.get(args.accountId);
+            if (!account || (account as any).userId !== userId) {
+                throw new Error("Account not found or not authorized");
+            }
+
+            // Create transaction
+            transactionId = await ctx.db.insert("transactions", {
+                userId,
+                accountId: args.accountId,
+                amount: args.amount,
+                date: new Date(args.contribution_date).getTime(),
+                description: `Goal contribution: ${goal.name}`,
+                transactionType: "deposit",
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            });
         }
 
         // Add the contribution
         const contributionId = await ctx.db.insert("goal_contributions", {
             userId,
             goalId,
+            transactionId,
             amount: args.amount,
             note: args.note,
             contribution_date: args.contribution_date,
+            source: args.source || "manual_ui",
             createdAt: Date.now(),
         });
 
@@ -436,6 +465,6 @@ export const addContribution = mutation({
             });
         }
 
-        return { _id: contributionId, ...args };
+        return { _id: contributionId, transactionId, ...args };
     },
 });

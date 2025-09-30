@@ -16,6 +16,7 @@ import type {
 import type * as accounts from "../accounts.js";
 import type * as categories from "../categories.js";
 import type * as categoryGroups from "../categoryGroups.js";
+import type * as contributions from "../contributions.js";
 import type * as demo from "../demo.js";
 import type * as goals from "../goals.js";
 import type * as importActions from "../importActions.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   categories: typeof categories;
   categoryGroups: typeof categoryGroups;
+  contributions: typeof contributions;
   demo: typeof demo;
   goals: typeof goals;
   importActions: typeof importActions;

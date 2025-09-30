@@ -1,5 +1,5 @@
 // components/goals/GoalCardItem.tsx
-import { Calendar, DollarSign, NotebookText, MoreVertical, Edit, Trash2, Eye, Share, Film, Target, Pencil } from "lucide-react"
+import { Calendar, DollarSign, MoreVertical, Edit, Trash2, Eye, Target, Pencil, ArrowRightLeft, TrendingDown, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -9,10 +9,11 @@ import { useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
-import Link from "next/link"
 import { EnhancedImage } from "@/components/enhanced-image"
 import { useState } from "react"
 import { AddContributionDialog } from "@/components/goals/AddContributionDialog"
+import { GoalTransferDialog } from "@/components/goals/GoalTransferDialog"
+import { GoalWithdrawalDialog } from "@/components/goals/GoalWithdrawalDialog"
 import { Goal } from "@/types/goals"
 
 interface GoalCardItemProps {
@@ -39,6 +40,8 @@ export function GoalCardItem({
     const { convexUser } = useConvexUser()
     const deleteGoalMutation = useMutation(api.goals.deleteGoal)
     const [showAddContribution, setShowAddContribution] = useState(false)
+    const [showTransferDialog, setShowTransferDialog] = useState(false)
+    const [showWithdrawalDialog, setShowWithdrawalDialog] = useState(false)
 
     const progressPercentage = getProgressPercentage(goal.current_amount || 0, goal.total_amount);
 
@@ -105,24 +108,38 @@ export function GoalCardItem({
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={() => onEditGoal(goal)}>
                                         <Edit className="h-4 w-4 mr-2" />
-                                        Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleDeleteGoal} className="text-red-600 hover:text-red-800">
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Delete
+                                        Edit Goal
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setShowAddContribution(true)}>
+                                        <DollarSign className="h-4 w-4 mr-2" />
+                                        Add Contribution
+                                    </DropdownMenuItem>
+                                    {(goal.current_amount > 0) && (
+                                        <DropdownMenuItem onClick={() => setShowTransferDialog(true)}>
+                                            <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                            Transfer Funds
+                                        </DropdownMenuItem>
+                                    )}
+                                    {(goal.current_amount > 0) && (
+                                        <DropdownMenuItem onClick={() => setShowWithdrawalDialog(true)}>
+                                            <TrendingDown className="h-4 w-4 mr-2" />
+                                            Withdraw Funds
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem>
+                                        <BarChart3 className="h-4 w-4 mr-2" />
+                                        View Analytics
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem>
                                         <Eye className="h-4 w-4 mr-2" />
-                                        View Details
+                                        View History
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                        <Share className="h-4 w-4 mr-2" />
-                                        Share
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                        <Film className="h-4 w-4 mr-2" />
-                                        View Progress Video
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleDeleteGoal} className="text-red-600 hover:text-red-800">
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete Goal
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -228,7 +245,7 @@ export function GoalCardItem({
                         )}
 
                         {/* Action Buttons */}
-                        {!goal.linked_account && !goal.is_completed && (
+                        {!goal.is_completed && (
                             <div className="flex gap-2 w-full">
                                 <Button
                                     size="sm"
@@ -239,6 +256,17 @@ export function GoalCardItem({
                                     <DollarSign className="h-3 w-3" />
                                     Add Contribution
                                 </Button>
+                                {goal.current_amount > 0 && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="gap-1"
+                                        onClick={() => setShowTransferDialog(true)}
+                                    >
+                                        <ArrowRightLeft className="h-3 w-3" />
+                                        Transfer
+                                    </Button>
+                                )}
                             </div>
                         )}
 
@@ -250,6 +278,20 @@ export function GoalCardItem({
                 goal={goal}
                 open={showAddContribution}
                 onOpenChange={setShowAddContribution}
+                formatCurrency={formatCurrency}
+            />
+
+            <GoalTransferDialog
+                sourceGoal={goal}
+                open={showTransferDialog}
+                onOpenChange={setShowTransferDialog}
+                formatCurrency={formatCurrency}
+            />
+
+            <GoalWithdrawalDialog
+                goal={goal}
+                open={showWithdrawalDialog}
+                onOpenChange={setShowWithdrawalDialog}
                 formatCurrency={formatCurrency}
             />
         </>

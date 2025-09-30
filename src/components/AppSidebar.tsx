@@ -33,13 +33,13 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
+  { href: "/review", label: "Review", icon: Lightbulb },
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/presets", label: "Presets", icon: Settings },
   { href: "/import-csv", label: "Import CSV", icon: Upload },
   { href: "/transactions", label: "Transactions", icon: CreditCard },
   { href: "/categories", label: "Categories", icon: Tag },
-  { href: "/reflection", label: "Reflection", icon: Lightbulb },
 ]
 
 export function AppSidebar() {

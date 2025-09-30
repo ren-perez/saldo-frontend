@@ -5,7 +5,10 @@
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
       "Bash(pnpm add:*)",
-      "Bash(npx convex:*)"
+      "Bash(npx convex:*)",
+      "Bash(pnpm build:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(pnpm run:*)"
     ],
     "deny": [],
     "ask": []

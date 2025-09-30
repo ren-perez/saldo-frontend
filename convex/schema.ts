@@ -109,12 +109,21 @@ export default defineSchema({
     goal_contributions: defineTable({
         userId: v.id("users"),
         goalId: v.id("goals"),
+        transactionId: v.optional(v.id("transactions")),
         amount: v.number(),
         note: v.optional(v.string()),
         contribution_date: v.string(),
+        source: v.string(), // "manual_ui" | "manual_tx" | "import" | "auto"
+        transfer_pair_id: v.optional(v.string()), // For goal-to-goal transfers
+        is_withdrawal: v.optional(v.boolean()), // Track negative contributions
         createdAt: v.number(),
+        updatedAt: v.optional(v.number()),
     }).index("by_user", ["userId"])
-        .index("by_goal", ["goalId"]),
+        .index("by_goal", ["goalId"])
+        .index("by_transaction", ["transactionId"])
+        .index("by_transfer_pair", ["transfer_pair_id"])
+        .index("by_source", ["source"])
+        .index("by_date", ["contribution_date"]),
 
     goal_monthly_plans: defineTable({
         userId: v.id("users"),
