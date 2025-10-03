@@ -1,5 +1,5 @@
 // components/goals/GoalCardItem.tsx
-import { Calendar, DollarSign, MoreVertical, Edit, Trash2, Eye, Target, Pencil, ArrowRightLeft, TrendingDown, BarChart3 } from "lucide-react"
+import { Calendar, DollarSign, MoreVertical, Edit, Trash2, Eye, Target, Pencil, ArrowRightLeft, TrendingDown, BarChart3, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -178,14 +178,15 @@ export function GoalCardItem({
                         {/* Progress Bar */}
                         <div className="pt-4 space-y-2">
                             <div className="flex justify-between items-center text-sm">
-                                <span className="text-muted-foreground">Progress</span>
-                                <span className="font-medium">
+                                {/* <span className="text-muted-foreground">Progress</span> */}
+                                <span className="text-muted-foreground">
                                     {formatCurrency(Math.ceil(goal.current_amount || 0))} / {formatCurrency(Math.ceil(goal.total_amount))}
                                 </span>
+                                <span className="font-medium">{formatCurrency(Math.ceil(goal.total_amount) - Math.ceil(goal.current_amount || 0))} left</span>
 
                             </div>
                             <Progress value={progressPercentage} className="h-2" />
-                            <div className="text-right text-xs text-muted-foreground">
+                            <div className="text-left text-xs text-muted-foreground">
                                 {progressPercentage.toFixed(1)}%
                             </div>
                         </div>
@@ -194,7 +195,7 @@ export function GoalCardItem({
                 </GoalCardContent>
 
                 <GoalCardFooter>
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 mt-2">
                         {/* Due date */}
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-4 w-4" />
@@ -240,7 +241,7 @@ export function GoalCardItem({
                         {/* Account Tracking */}
                         {goal.linked_account && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <div className="h-2 w-2 bg-green-500 rounded-full" />
+                                <div className="h-2 w-2 bg-green-500 rounded-full mx-1" />
                                 <span>Linked to {goal.linked_account.name}</span>
                             </div>
                         )}
@@ -248,17 +249,27 @@ export function GoalCardItem({
                         {/* Category Tracking */}
                         {goal.linked_category && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <div className="h-2 w-2 bg-pink-500 rounded-full" />
+                                <div className="h-2 w-2 bg-pink-500 rounded-full mx-1" />
                                 <span>
-                                    Linked to {goal.linked_category.group_name ? `${goal.linked_category.group_name} → ` : ""}
-                                    {goal.linked_category.name}
+                                    {/* Linked to {goal.linked_category.group_name ? `${goal.linked_category.group_name} → ` : ""} */}
+                                    Linked to {goal.linked_category.group_name ? `${goal.linked_category.group_name}` : ""}
+                                    {/* {goal.linked_category.name} */}
                                 </span>
+                                <ArrowRight className="h-3 w-3" />
+                                <span>{goal.linked_category.name}</span>
+                            </div>
+                        )}
+
+                        {goal.tracking_type === "MANUAL" && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <div className="h-2 w-2 bg-gray-500 rounded-full mx-1" />
+                                <span>Manual tracking</span>
                             </div>
                         )}
 
                         {/* Action Buttons */}
                         {!goal.is_completed && (
-                            <div className="flex gap-2 w-full">
+                            <div className="flex gap-2 w-full mt-2">
                                 <Button
                                     size="sm"
                                     variant="secondary"
