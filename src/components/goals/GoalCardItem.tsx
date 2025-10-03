@@ -209,7 +209,7 @@ export function GoalCardItem({
                         {goal.monthly_contribution > 0 && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Target className="h-4 w-4" />
-                                <span>{formatCurrency(Math.ceil(goal.monthly_contribution))}/month</span>
+                                <span>Target: {formatCurrency(Math.ceil(goal.monthly_contribution))}/month</span>
                             </div>
                         )}
 
