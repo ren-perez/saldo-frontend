@@ -617,7 +617,7 @@ export default function DashboardPage() {
               Complete the setup above to start tracking your finances and gain valuable insights into your spending patterns.
             </p>
             <Link
-              href="/import"
+              href="/import-csv"
               className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 border border-transparent text-sm sm:text-base font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary/90"
             >
               Get Started
