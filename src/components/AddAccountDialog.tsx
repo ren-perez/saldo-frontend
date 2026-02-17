@@ -70,6 +70,7 @@ export function AddAccountDialog({ open, onClose }: AddAccountDialogProps) {
                         <SelectContent>
                             <SelectItem value="checking">Checking</SelectItem>
                             <SelectItem value="savings">Savings</SelectItem>
+                            <SelectItem value="investment">Investment</SelectItem>
                             <SelectItem value="credit">Credit</SelectItem>
                         </SelectContent>
                     </Select>

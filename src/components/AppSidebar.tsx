@@ -32,11 +32,15 @@ import {
     History,
     BarChart3,
     FileText,
+    DollarSign,
+    PieChart,
 } from "lucide-react"
 
 const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
     { href: "/review", label: "Review", icon: Lightbulb },
+    { href: "/income", label: "Income", icon: DollarSign },
+    { href: "/allocations", label: "Allocations", icon: PieChart },
     { href: "/accounts", label: "Accounts", icon: Landmark },
     { href: "/goals", label: "Goals", icon: Target },
     { href: "/goals/history", label: "Contribution History", icon: History },

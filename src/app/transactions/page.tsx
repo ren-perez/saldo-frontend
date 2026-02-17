@@ -6,7 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { Search, X, Filter, Download, RefreshCw, Trash2, ArrowRightLeft, ChevronDown } from "lucide-react";
+import { Search, X, Filter, Download, RefreshCw, Trash2, ArrowRightLeft, ChevronDown, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -60,6 +60,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { currencyExact } from "@/lib/format";
 
 function formatTimestampToDate(timestamp: number): string {
     return new Date(timestamp).toLocaleDateString();
@@ -252,7 +254,7 @@ function CategoryCombobox({
 //                                 <Button
 //                                     variant="ghost"
 //                                     size="sm"
-//                                     className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+//                                     className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
 //                                 >
 //                                     <Trash2 className="h-3 w-3" />
 //                                 </Button>
@@ -276,7 +278,7 @@ function CategoryCombobox({
 //                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
 //                                     <AlertDialogAction
 //                                         onClick={onDelete}
-//                                         className="bg-red-600 hover:bg-red-700"
+//                                         className="bg-destructive hover:bg-destructive/90"
 //                                     >
 //                                         Delete
 //                                     </AlertDialogAction>
@@ -493,22 +495,19 @@ function MobileTransactionCard({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         <span
-                            className={`text-sm font-semibold ${transaction.amount >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                                }`}
+                            className={cn(
+                                "text-sm font-mono font-semibold",
+                                transaction.amount >= 0 ? "text-primary" : "text-foreground"
+                            )}
                         >
-                            {transaction.amount >= 0 ? "+" : ""}$
-                            {Math.abs(transaction.amount) < 1000000
-                                ? Math.abs(transaction.amount).toFixed(2)
-                                : `${(Math.abs(transaction.amount) / 1000000).toFixed(1)}M`}
+                            {transaction.amount >= 0 ? "+" : ""}{currencyExact(transaction.amount)}
                         </span>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                                 >
                                     <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -532,7 +531,7 @@ function MobileTransactionCard({
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                     <AlertDialogAction
                                         onClick={onDelete}
-                                        className="bg-red-600 hover:bg-red-700"
+                                        className="bg-destructive hover:bg-destructive/90"
                                     >
                                         Delete
                                     </AlertDialogAction>
@@ -777,93 +776,110 @@ export default function TransactionsPage() {
             <InitUser />
             <div className="w-full min-w-0 mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 max-w-7xl">
                 {/* Header */}
-                <div className="mb-6 sm:mb-8">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                <div className="flex flex-col gap-6 mb-6">
+                    <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+                            <h2 className="text-lg font-semibold text-foreground">
                                 Transactions
-                            </h1>
-                            <p className="text-muted-foreground text-sm sm:text-base">
+                            </h2>
+                            <p className="text-sm text-muted-foreground">
                                 View and manage your imported transactions
                             </p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" size="sm" asChild className="text-xs sm:text-sm">
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" asChild>
                                 <Link href="/transfers-inbox">
-                                    <ArrowRightLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                                    <span className="hidden sm:inline">Transfers Inbox</span>
-                                    <span className="sm:hidden">Transfers</span>
+                                    <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                    Transfers Inbox
                                 </Link>
                             </Button>
-                            <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                                <Download className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Export</span>
-                            </Button>
-                            <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Refresh</span>
+                            <Button variant="outline" size="sm">
+                                <Download className="h-4 w-4 mr-2" />
+                                Export
                             </Button>
                         </div>
                     </div>
-                </div>
 
-                {/* Summary Cards */}
-                {transactions && transactions.data.length > 0 && (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                        <Card>
-                            <CardHeader className="pb-2 px-3 sm:px-6">
-                                <CardDescription className="text-xs sm:text-sm">Total Transactions</CardDescription>
-                                <CardTitle className="text-lg sm:text-2xl">{transactions.total}</CardTitle>
-                            </CardHeader>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2 px-3 sm:px-6">
-                                <CardDescription className="text-xs sm:text-sm">Total Income</CardDescription>
-                                <CardTitle className="text-lg sm:text-2xl text-green-600">
-                                    ${transactions.data
-                                        .filter((t) => t.amount > 0)
-                                        .reduce((sum, t) => sum + t.amount, 0) < 1000000
-                                        ? transactions.data
-                                            .filter((t) => t.amount > 0)
-                                            .reduce((sum, t) => sum + t.amount, 0)
-                                            .toFixed(2)
-                                        : `${(transactions.data
-                                            .filter((t) => t.amount > 0)
-                                            .reduce((sum, t) => sum + t.amount, 0) / 1000000).toFixed(1)}M`}
-                                </CardTitle>
-                            </CardHeader>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2 px-3 sm:px-6">
-                                <CardDescription className="text-xs sm:text-sm">Total Expenses</CardDescription>
-                                <CardTitle className="text-lg sm:text-2xl text-red-600">
-                                    ${Math.abs(transactions.data
-                                        .filter((t) => t.amount < 0)
-                                        .reduce((sum, t) => sum + t.amount, 0)) < 1000000
-                                        ? Math.abs(transactions.data
-                                            .filter((t) => t.amount < 0)
-                                            .reduce((sum, t) => sum + t.amount, 0)).toFixed(2)
-                                        : `${(Math.abs(transactions.data
-                                            .filter((t) => t.amount < 0)
-                                            .reduce((sum, t) => sum + t.amount, 0)) / 1000000).toFixed(1)}M`}
-                                </CardTitle>
-                            </CardHeader>
-                        </Card>
-                        <Card className="col-span-2 lg:col-span-1">
-                            <CardHeader className="pb-2 px-3 sm:px-6">
-                                <CardDescription className="text-xs sm:text-sm">Net Amount</CardDescription>
-                                <CardTitle className={`text-lg sm:text-2xl ${transactions.data.reduce((sum, t) => sum + t.amount, 0) >= 0
-                                    ? 'text-green-600'
-                                    : 'text-red-600'
-                                    }`}>
-                                    ${Math.abs(transactions.data.reduce((sum, t) => sum + t.amount, 0)) < 1000000
-                                        ? transactions.data.reduce((sum, t) => sum + t.amount, 0).toFixed(2)
-                                        : `${(transactions.data.reduce((sum, t) => sum + t.amount, 0) / 1000000).toFixed(1)}M`}
-                                </CardTitle>
-                            </CardHeader>
-                        </Card>
+                    {/* Summary Cards */}
+                    {transactions && transactions.data.length > 0 && (() => {
+                        const totalIncome = transactions.data
+                            .filter((t) => t.amount > 0)
+                            .reduce((sum, t) => sum + t.amount, 0);
+                        const totalExpenses = Math.abs(transactions.data
+                            .filter((t) => t.amount < 0)
+                            .reduce((sum, t) => sum + t.amount, 0));
+                        const net = totalIncome - totalExpenses;
+                        return (
+                            <div className="grid grid-cols-3 gap-4">
+                                <Card>
+                                    <CardContent className="flex items-center gap-3 p-4">
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                                            <ArrowDownLeft className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground">Total Income</p>
+                                            <p className="text-lg font-bold text-foreground">{currencyExact(totalIncome)}</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="flex items-center gap-3 p-4">
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-destructive/10">
+                                            <ArrowUpRight className="h-4 w-4 text-destructive" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground">Total Expenses</p>
+                                            <p className="text-lg font-bold text-foreground">{currencyExact(totalExpenses)}</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="flex items-center gap-3 p-4">
+                                        <div className={cn(
+                                            "flex h-9 w-9 items-center justify-center rounded-lg",
+                                            net >= 0 ? "bg-primary/10" : "bg-destructive/10"
+                                        )}>
+                                            <ArrowDownLeft className={cn("h-4 w-4", net >= 0 ? "text-primary" : "text-destructive")} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground">Net</p>
+                                            <p className={cn("text-lg font-bold", net >= 0 ? "text-foreground" : "text-destructive")}>
+                                                {currencyExact(net)}
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        );
+                    })()}
+
+                    {/* Type Filter Tabs */}
+                    <div className="flex items-center gap-2">
+                        {([
+                            { value: null, label: "All" },
+                            { value: "income", label: "Income" },
+                            { value: "expense", label: "Expenses" },
+                            { value: "transfer", label: "Transfers" },
+                            { value: "UNTYPED", label: "Untyped" },
+                        ] as const).map((tab) => (
+                            <Button
+                                key={tab.label}
+                                variant={typeFilter === tab.value ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleFilterChange(() => setTypeFilter(tab.value))}
+                            >
+                                {tab.label}
+                                {transactions && (
+                                    <span className="ml-1.5 text-xs opacity-70">
+                                        {tab.value === null
+                                            ? transactions.total
+                                            : ""}
+                                    </span>
+                                )}
+                            </Button>
+                        ))}
                     </div>
-                )}
+                </div>
 
                 {/* Filters */}
                 <Card className="mb-6">
@@ -1170,7 +1186,7 @@ export default function TransactionsPage() {
                             <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow className="bg-muted dark:bg-muted">
+                                        <TableRow>
                                             <TableHead className="text-xs">Date</TableHead>
                                             <TableHead className="text-xs">Description</TableHead>
                                             <TableHead className="text-xs">Account</TableHead>
@@ -1182,7 +1198,7 @@ export default function TransactionsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {transactions.data.map((transaction, idx) => {
+                                        {transactions.data.map((transaction) => {
                                             const account = accounts?.find(
                                                 (a) => a._id === transaction.accountId
                                             );
@@ -1193,10 +1209,8 @@ export default function TransactionsPage() {
                                                 (g) => g._id === category?.groupId
                                             );
 
-                                            const rowBgClass =
-                                                idx % 2 === 0 ? "bg-background" : "bg-muted/30";
                                             return (
-                                                <TableRow key={transaction._id} className={rowBgClass}>
+                                                <TableRow key={transaction._id}>
                                                     <TableCell className="font-medium text-sm">
                                                         {formatTimestampToDate(transaction.date)}
                                                     </TableCell>
@@ -1280,18 +1294,11 @@ export default function TransactionsPage() {
                                                             placeholder="Select..."
                                                         />
                                                     </TableCell>
-                                                    <TableCell className="text-right font-medium">
-                                                        <span
-                                                            className={`text-sm ${transaction.amount >= 0
-                                                                ? "text-green-600 font-semibold"
-                                                                : "text-red-600 font-semibold"
-                                                                }`}
-                                                        >
-                                                            {transaction.amount >= 0 ? "+" : ""}$
-                                                            {Math.abs(transaction.amount) < 1000000
-                                                                ? Math.abs(transaction.amount).toFixed(2)
-                                                                : `${(Math.abs(transaction.amount) / 1000000).toFixed(1)}M`}
-                                                        </span>
+                                                    <TableCell className={cn(
+                                                        "text-right font-mono font-semibold text-sm",
+                                                        transaction.amount >= 0 ? "text-primary" : "text-foreground"
+                                                    )}>
+                                                        {transaction.amount >= 0 ? "+" : ""}{currencyExact(transaction.amount)}
                                                     </TableCell>
                                                     <TableCell>
                                                         <AlertDialog>
@@ -1299,7 +1306,7 @@ export default function TransactionsPage() {
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </Button>
@@ -1325,7 +1332,7 @@ export default function TransactionsPage() {
                                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                                     <AlertDialogAction
                                                                         onClick={() => handleDeleteTransaction(transaction._id)}
-                                                                        className="bg-red-600 hover:bg-red-700"
+                                                                        className="bg-destructive hover:bg-destructive/90"
                                                                     >
                                                                         Delete
                                                                     </AlertDialogAction>

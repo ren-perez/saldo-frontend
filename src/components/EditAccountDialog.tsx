@@ -75,6 +75,7 @@ export function EditAccountDialog({ open, onClose, onSave, account }: EditAccoun
                         <SelectContent>
                             <SelectItem value="checking">Checking</SelectItem>
                             <SelectItem value="savings">Savings</SelectItem>
+                            <SelectItem value="investment">Investment</SelectItem>
                             <SelectItem value="credit">Credit</SelectItem>
                         </SelectContent>
                     </Select>

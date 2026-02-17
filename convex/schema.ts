@@ -226,6 +226,48 @@ export default defineSchema({
         .index("by_import", ["importId"])
         .index("by_user", ["userId"]),
 
+    // ─── Planning Layer ────────────────────────────────────
+
+    income_plans: defineTable({
+        userId: v.id("users"),
+        expected_date: v.string(),      // ISO date string "2026-02-15"
+        expected_amount: v.number(),
+        label: v.string(),              // e.g. "Acme Corp", "Freelance"
+        recurrence: v.string(),         // "none" | "weekly" | "biweekly" | "monthly"
+        status: v.string(),             // "planned" | "matched" | "missed"
+        notes: v.optional(v.string()),
+        matched_transaction_id: v.optional(v.id("transactions")),
+        actual_amount: v.optional(v.number()),
+        date_received: v.optional(v.string()),
+        createdAt: v.number(),
+    }).index("by_user", ["userId"])
+        .index("by_status", ["status"])
+        .index("by_date", ["expected_date"]),
+
+    allocation_rules: defineTable({
+        userId: v.id("users"),
+        accountId: v.id("accounts"),
+        category: v.string(),           // "savings" | "investing" | "spending" | "debt"
+        ruleType: v.string(),           // "percent" | "fixed"
+        value: v.number(),
+        priority: v.number(),           // ordering (0 = first)
+        active: v.boolean(),
+        createdAt: v.number(),
+    }).index("by_user", ["userId"]),
+
+    allocation_records: defineTable({
+        userId: v.id("users"),
+        income_plan_id: v.id("income_plans"),
+        accountId: v.id("accounts"),
+        rule_id: v.id("allocation_rules"),
+        amount: v.number(),
+        category: v.string(),           // denormalized from rule
+        is_forecast: v.boolean(),       // true = planned, false = matched/actual
+        createdAt: v.number(),
+    }).index("by_user", ["userId"])
+        .index("by_income_plan", ["income_plan_id"])
+        .index("by_account", ["accountId"]),
+
     ignored_transfer_pairs: defineTable({
         userId: v.id("users"),
         outgoingTransactionId: v.id("transactions"),
