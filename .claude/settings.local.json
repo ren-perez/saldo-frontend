@@ -10,7 +10,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(pnpm run:*)",
       "Bash(npx next build:*)",
-      "Bash(timeout 10 pnpm run dev)"
+      "Bash(timeout 10 pnpm run dev)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

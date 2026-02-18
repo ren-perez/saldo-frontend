@@ -10,8 +10,6 @@ import { Id } from "../../../convex/_generated/dataModel";
 
 import {
   Card,
-  CardHeader,
-  CardTitle,
   CardContent,
 } from "@/components/ui/card";
 import {
@@ -20,6 +18,20 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,6 +41,7 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
+import { Plus, ChevronDown, Tag, FolderOpen } from "lucide-react";
 
 export default function CategoriesPage() {
   const { convexUser } = useConvexUser();
@@ -53,6 +66,10 @@ export default function CategoriesPage() {
   const updateCategoryGroup = useMutation(api.categoryGroups.updateCategoryGroup);
   const deleteCategoryGroup = useMutation(api.categoryGroups.deleteCategoryGroup);
 
+  // Dialog states
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
+
   // Form states
   const [categoryForm, setCategoryForm] = useState({
     name: "",
@@ -64,14 +81,14 @@ export default function CategoriesPage() {
     name: "",
   });
 
-  // Edit states - Fixed type definitions
+  // Edit states
   const [editingCategory, setEditingCategory] = useState<{
     _id: Id<"categories">;
     name: string;
     groupId?: Id<"category_groups">;
     transactionType?: string;
   } | null>(null);
-  
+
   const [editingGroup, setEditingGroup] = useState<{
     _id: Id<"category_groups">;
     name: string;
@@ -102,6 +119,7 @@ export default function CategoriesPage() {
     });
 
     setCategoryForm({ name: "", groupId: "", transactionType: "" });
+    setShowCategoryDialog(false);
   };
 
   const handleCreateGroup = async (e: React.FormEvent) => {
@@ -114,6 +132,7 @@ export default function CategoriesPage() {
     });
 
     setGroupForm({ name: "" });
+    setShowGroupDialog(false);
   };
 
   const handleUpdateCategory = async (e: React.FormEvent) => {
@@ -173,9 +192,9 @@ export default function CategoriesPage() {
 
   const getTransactionTypeDisplay = (transactionType?: string) => {
     switch (transactionType) {
-      case "income": return "💰 Income";
-      case "expense": return "💸 Expense";
-      case "transfer": return "🔄 Transfer";
+      case "income": return "Income";
+      case "expense": return "Expense";
+      case "transfer": return "Transfer";
       default: return "No Type";
     }
   };
@@ -183,92 +202,56 @@ export default function CategoriesPage() {
   return (
     <AppLayout>
       <InitUser />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Categories & Groups</h1>
-          <p className="text-muted-foreground">
-            Organize your transaction categories
-          </p>
+      <div className="container mx-auto py-6 px-4">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">Categories & Groups</h1>
+            <p className="text-muted-foreground">
+              Organize your transaction categories
+            </p>
+          </div>
+
+          {/* Combined New dropdown - Category as default */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                New
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowCategoryDialog(true)} className="gap-2">
+                <Tag className="h-4 w-4" />
+                New Category
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowGroupDialog(true)} className="gap-2">
+                <FolderOpen className="h-4 w-4" />
+                New Group
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Tabs defaultValue="categories" className="w-full">
           <TabsList>
-            <TabsTrigger value="categories">🏷️ Categories</TabsTrigger>
-            <TabsTrigger value="groups">📁 Category Groups</TabsTrigger>
+            <TabsTrigger value="categories">Categories</TabsTrigger>
+            <TabsTrigger value="groups">Groups</TabsTrigger>
           </TabsList>
 
           {/* Categories */}
           <TabsContent value="categories">
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Add New Category</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateCategory} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Input
-                      value={categoryForm.name}
-                      onChange={(e) =>
-                        setCategoryForm((p) => ({ ...p, name: e.target.value }))
-                      }
-                      placeholder="e.g., Groceries, Gas"
-                      required
-                    />
-                    <Select
-                      value={categoryForm.transactionType}
-                      onValueChange={(val) =>
-                        setCategoryForm((p) => ({
-                          ...p,
-                          transactionType: val === "none" ? "" : val,
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Transaction Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Type</SelectItem>
-                        <SelectItem value="income">💰 Income</SelectItem>
-                        <SelectItem value="expense">💸 Expense</SelectItem>
-                        <SelectItem value="transfer">🔄 Transfer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={categoryForm.groupId}
-                      onValueChange={(val) =>
-                        setCategoryForm((p) => ({
-                          ...p,
-                          groupId: val === "none" ? "" : val,
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="No Group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Group</SelectItem>
-                        {categoryGroups?.map((g) => (
-                          <SelectItem key={g._id} value={g._id}>
-                            {g.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit">Add Category</Button>
-                </form>
-              </CardContent>
-            </Card>
-
             <Card>
-              <CardHeader>
-                <CardTitle>Your Categories</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 {!categories || categories.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <div className="text-4xl mb-2">🏷️</div>
-                    No categories yet
+                    <Tag className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                    <p className="text-sm mb-1">No categories yet</p>
+                    <p className="text-xs mb-4">Create your first category to organize transactions</p>
+                    <Button size="sm" variant="outline" onClick={() => setShowCategoryDialog(true)} className="gap-1.5">
+                      <Plus className="h-3.5 w-3.5" />
+                      New Category
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -289,49 +272,51 @@ export default function CategoriesPage() {
                               }
                               required
                             />
-                            <Select
-                              value={editingCategory.transactionType || "none"}
-                              onValueChange={(val) =>
-                                setEditingCategory((p) => p ? ({
-                                  ...p,
-                                  transactionType: val === "none" ? undefined : val,
-                                }) : null)
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Transaction Type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No Type</SelectItem>
-                                <SelectItem value="income">💰 Income</SelectItem>
-                                <SelectItem value="expense">💸 Expense</SelectItem>
-                                <SelectItem value="transfer">🔄 Transfer</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={editingCategory.groupId || "none"}
-                              onValueChange={(val) =>
-                                setEditingCategory((p) => p ? ({
-                                  ...p,
-                                  groupId: val === "none" ? undefined : (val as Id<"category_groups">),
-                                }) : null)
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="No Group" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No Group</SelectItem>
-                                {categoryGroups?.map((g) => (
-                                  <SelectItem key={g._id} value={g._id}>
-                                    {g.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Select
+                                value={editingCategory.transactionType || "none"}
+                                onValueChange={(val) =>
+                                  setEditingCategory((p) => p ? ({
+                                    ...p,
+                                    transactionType: val === "none" ? undefined : val,
+                                  }) : null)
+                                }
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Transaction Type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No Type</SelectItem>
+                                  <SelectItem value="income">Income</SelectItem>
+                                  <SelectItem value="expense">Expense</SelectItem>
+                                  <SelectItem value="transfer">Transfer</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={editingCategory.groupId || "none"}
+                                onValueChange={(val) =>
+                                  setEditingCategory((p) => p ? ({
+                                    ...p,
+                                    groupId: val === "none" ? undefined : (val as Id<"category_groups">),
+                                  }) : null)
+                                }
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="No Group" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No Group</SelectItem>
+                                  {categoryGroups?.map((g) => (
+                                    <SelectItem key={g._id} value={g._id}>
+                                      {g.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                             <div className="flex gap-2">
                               <Button type="submit" size="sm">
-                                💾 Save
+                                Save
                               </Button>
                               <Button
                                 type="button"
@@ -339,29 +324,31 @@ export default function CategoriesPage() {
                                 size="sm"
                                 onClick={() => setEditingCategory(null)}
                               >
-                                ❌ Cancel
+                                Cancel
                               </Button>
                             </div>
                           </form>
                         ) : (
-                          <div className="flex items-center justify-between rounded-md border p-3 hover:bg-accent">
+                          <div className="flex items-center justify-between rounded-md border p-3 hover:bg-accent/50 transition-colors">
                             <div>
-                              <div className="font-medium">{cat.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                Type: {getTransactionTypeDisplay(cat.transactionType)} • Group: {getGroupName(cat.groupId)}
+                              <div className="font-medium text-sm">{cat.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {getTransactionTypeDisplay(cat.transactionType)} &middot; {getGroupName(cat.groupId)}
                               </div>
                             </div>
-                            <div className="space-x-2">
+                            <div className="flex gap-1">
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
+                                className="h-7 text-xs"
                                 onClick={() => setEditingCategory(cat)}
                               >
                                 Edit
                               </Button>
                               <Button
-                                variant="destructive"
+                                variant="ghost"
                                 size="sm"
+                                className="h-7 text-xs text-muted-foreground hover:text-destructive"
                                 onClick={() => handleDeleteCategory(cat._id)}
                               >
                                 Delete
@@ -379,36 +366,17 @@ export default function CategoriesPage() {
 
           {/* Groups */}
           <TabsContent value="groups">
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Add New Group</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateGroup} className="space-y-4">
-                  <Input
-                    value={groupForm.name}
-                    onChange={(e) =>
-                      setGroupForm((p) => ({ ...p, name: e.target.value }))
-                    }
-                    placeholder="e.g., Bills, Food & Dining"
-                    required
-                  />
-                  <Button type="submit">
-                    Add Group
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
             <Card>
-              <CardHeader>
-                <CardTitle>Your Groups</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 {!categoryGroups || categoryGroups.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <div className="text-4xl mb-2">📁</div>
-                    No groups yet
+                    <FolderOpen className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+                    <p className="text-sm mb-1">No groups yet</p>
+                    <p className="text-xs mb-4">Create groups to organize your categories</p>
+                    <Button size="sm" variant="outline" onClick={() => setShowGroupDialog(true)} className="gap-1.5">
+                      <Plus className="h-3.5 w-3.5" />
+                      New Group
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -434,7 +402,7 @@ export default function CategoriesPage() {
                               />
                               <div className="flex gap-2">
                                 <Button type="submit" size="sm">
-                                  💾 Save
+                                  Save
                                 </Button>
                                 <Button
                                   type="button"
@@ -442,29 +410,31 @@ export default function CategoriesPage() {
                                   size="sm"
                                   onClick={() => setEditingGroup(null)}
                                 >
-                                  ❌ Cancel
+                                  Cancel
                                 </Button>
                               </div>
                             </form>
                           ) : (
-                            <div className="flex items-center justify-between rounded-md border p-3 hover:bg-accent">
+                            <div className="flex items-center justify-between rounded-md border p-3 hover:bg-accent/50 transition-colors">
                               <div>
-                                <div className="font-medium">📁 {g.name}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {gCats.length} categories
+                                <div className="font-medium text-sm">{g.name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {gCats.length} {gCats.length === 1 ? "category" : "categories"}
                                 </div>
                               </div>
-                              <div className="space-x-2">
+                              <div className="flex gap-1">
                                 <Button
-                                  variant="outline"
+                                  variant="ghost"
                                   size="sm"
+                                  className="h-7 text-xs"
                                   onClick={() => setEditingGroup(g)}
                                 >
                                   Edit
                                 </Button>
                                 <Button
-                                  variant="destructive"
+                                  variant="ghost"
                                   size="sm"
+                                  className="h-7 text-xs text-muted-foreground hover:text-destructive"
                                   onClick={() => handleDeleteGroup(g._id)}
                                 >
                                   Delete
@@ -481,6 +451,116 @@ export default function CategoriesPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Create Category Dialog */}
+        <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New Category</DialogTitle>
+              <DialogDescription>
+                Create a new category to organize your transactions.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateCategory} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Name</label>
+                <Input
+                  value={categoryForm.name}
+                  onChange={(e) =>
+                    setCategoryForm((p) => ({ ...p, name: e.target.value }))
+                  }
+                  placeholder="e.g., Groceries, Gas"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Transaction Type</label>
+                  <Select
+                    value={categoryForm.transactionType || "none"}
+                    onValueChange={(val) =>
+                      setCategoryForm((p) => ({
+                        ...p,
+                        transactionType: val === "none" ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="No Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Type</SelectItem>
+                      <SelectItem value="income">Income</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                      <SelectItem value="transfer">Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Group</label>
+                  <Select
+                    value={categoryForm.groupId || "none"}
+                    onValueChange={(val) =>
+                      setCategoryForm((p) => ({
+                        ...p,
+                        groupId: val === "none" ? "" : val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="No Group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Group</SelectItem>
+                      {categoryGroups?.map((g) => (
+                        <SelectItem key={g._id} value={g._id}>
+                          {g.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowCategoryDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Create Category</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Group Dialog */}
+        <Dialog open={showGroupDialog} onOpenChange={setShowGroupDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New Group</DialogTitle>
+              <DialogDescription>
+                Create a new group to organize related categories.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateGroup} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Group Name</label>
+                <Input
+                  value={groupForm.name}
+                  onChange={(e) =>
+                    setGroupForm((p) => ({ ...p, name: e.target.value }))
+                  }
+                  placeholder="e.g., Bills, Food & Dining"
+                  required
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowGroupDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Create Group</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

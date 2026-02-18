@@ -6,7 +6,13 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { Search, X, Filter, Download, RefreshCw, Trash2, ArrowRightLeft, ChevronDown, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -49,19 +55,14 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { currencyExact } from "@/lib/format";
+import { currencyExact, formatDate } from "@/lib/format";
 
 function formatTimestampToDate(timestamp: number): string {
     return new Date(timestamp).toLocaleDateString();
@@ -146,213 +147,6 @@ function CategoryCombobox({
         </Popover>
     );
 }
-
-// Mobile Transaction Card Component
-// function MobileTransactionCard({
-//     transaction,
-//     account,
-//     category,
-//     group,
-//     categories,
-//     categoryGroups,
-//     onUpdate,
-//     onUpdateByGroup,
-//     onDelete
-// }: {
-//     transaction: any;
-//     account: any;
-//     category: any;
-//     group: any;
-//     categories: any[];
-//     categoryGroups: any[];
-//     onUpdate: (updates: any) => void;
-//     onUpdateByGroup: (groupId: string | undefined, clearGroup: boolean) => void;
-//     onDelete: () => void;
-// }) {
-//     const getFilteredCategoryOptions = (transactionType: string | undefined, selectedGroupId: string | undefined) => {
-//         let filtered = categories || [];
-
-//         if (transactionType) {
-//             filtered = filtered.filter(cat =>
-//                 !cat.transactionType || cat.transactionType === transactionType
-//             );
-//         }
-
-//         if (selectedGroupId) {
-//             filtered = filtered.filter(cat => cat.groupId === selectedGroupId);
-//         }
-
-//         return filtered.map(cat => ({
-//             value: cat._id,
-//             label: cat.name
-//         })).filter(option => option.value && option.value.trim() !== "");
-//     };
-
-//     const getFilteredGroupOptions = (transactionType: string | undefined) => {
-//         if (!transactionType || !categories || !categoryGroups) {
-//             return categoryGroups?.map(group => ({
-//                 value: group._id,
-//                 label: group.name
-//             })).filter(option => option.value && option.value.trim() !== "") || [];
-//         }
-
-//         const validGroupIds = new Set(
-//             categories
-//                 .filter(cat => !cat.transactionType || cat.transactionType === transactionType)
-//                 .map(cat => cat.groupId)
-//                 .filter(Boolean)
-//         );
-
-//         return categoryGroups
-//             .filter(group => validGroupIds.has(group._id))
-//             .map(group => ({
-//                 value: group._id,
-//                 label: group.name
-//             }))
-//             .filter(option => option.value && option.value.trim() !== "");
-//     };
-
-//     return (
-//         <Card className="mb-3">
-//             <CardContent className="p-4 space-y-3">
-//                 <div className="flex justify-between items-start gap-2">
-//                     <div className="flex-1 min-w-0">
-//                         <Popover>
-//                             <PopoverTrigger asChild>
-//                                 <Button
-//                                     variant="ghost"
-//                                     className="w-full justify-start p-0 h-auto font-medium text-sm text-left"
-//                                 >
-//                                     <div className="truncate">{transaction.description || "—"}</div>
-//                                 </Button>
-//                             </PopoverTrigger>
-//                             <PopoverContent className="max-w-sm whitespace-pre-wrap break-words text-sm">
-//                                 {transaction.description || "—"}
-//                             </PopoverContent>
-//                         </Popover>
-//                         <div className="text-xs text-muted-foreground">
-//                             {formatTimestampToDate(transaction.date)}
-//                         </div>
-//                         <Badge variant="outline" className="text-xs mt-1">
-//                             {account?.name || "Unknown"}
-//                         </Badge>
-//                     </div>
-//                     <div className="flex items-center gap-2 flex-shrink-0">
-//                         <span
-//                             className={`text-sm font-semibold ${transaction.amount >= 0
-//                                 ? "text-green-600"
-//                                 : "text-red-600"
-//                                 }`}
-//                         >
-//                             {transaction.amount >= 0 ? "+" : ""}$
-//                             {Math.abs(transaction.amount) < 1000000
-//                                 ? Math.abs(transaction.amount).toFixed(2)
-//                                 : `${(Math.abs(transaction.amount) / 1000000).toFixed(1)}M`}
-//                         </span>
-//                         <AlertDialog>
-//                             <AlertDialogTrigger asChild>
-//                                 <Button
-//                                     variant="ghost"
-//                                     size="sm"
-//                                     className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-//                                 >
-//                                     <Trash2 className="h-3 w-3" />
-//                                 </Button>
-//                             </AlertDialogTrigger>
-//                             <AlertDialogContent>
-//                                 <AlertDialogHeader>
-//                                     <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
-//                                     <AlertDialogDescription>
-//                                         Are you sure you want to delete this transaction?
-//                                         <br /><br />
-//                                         <strong>Description:</strong> {transaction.description}
-//                                         <br />
-//                                         <strong>Amount:</strong> ${Math.abs(transaction.amount).toFixed(2)}
-//                                         <br />
-//                                         <strong>Date:</strong> {formatTimestampToDate(transaction.date)}
-//                                         <br /><br />
-//                                         This action cannot be undone.
-//                                     </AlertDialogDescription>
-//                                 </AlertDialogHeader>
-//                                 <AlertDialogFooter>
-//                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-//                                     <AlertDialogAction
-//                                         onClick={onDelete}
-//                                         className="bg-destructive hover:bg-destructive/90"
-//                                     >
-//                                         Delete
-//                                     </AlertDialogAction>
-//                                 </AlertDialogFooter>
-//                             </AlertDialogContent>
-//                         </AlertDialog>
-//                     </div>
-//                 </div>
-
-//                 <div className="grid grid-cols-1 gap-2">
-//                     <div>
-//                         <Label className="text-xs text-muted-foreground">Type</Label>
-//                         {transaction.transfer_pair_id ? (
-//                             <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs">
-//                                 <ArrowRightLeft className="h-3 w-3 mr-1" />
-//                                 Transfer
-//                             </Badge>
-//                         ) : (
-//                             <Select
-//                                 value={transaction.transactionType || "NONE"}
-//                                 onValueChange={(value) =>
-//                                     onUpdate(value === "NONE"
-//                                         ? { clearTransactionType: true }
-//                                         : { transactionType: value })
-//                                 }
-//                             >
-//                                 <SelectTrigger className="w-full h-7 text-xs">
-//                                     <SelectValue placeholder="—" />
-//                                 </SelectTrigger>
-//                                 <SelectContent>
-//                                     <SelectItem value="NONE">—</SelectItem>
-//                                     <SelectItem value="income">Income</SelectItem>
-//                                     <SelectItem value="expense">Expense</SelectItem>
-//                                     <SelectItem value="transfer">Transfer</SelectItem>
-//                                 </SelectContent>
-//                             </Select>
-//                         )}
-//                     </div>
-
-//                     <div className="grid grid-cols-2 gap-2">
-//                         <div>
-//                             <Label className="text-xs text-muted-foreground">Group</Label>
-//                             <CategoryCombobox
-//                                 value={group?._id || "NONE"}
-//                                 onValueChange={(value) =>
-//                                     onUpdateByGroup(
-//                                         value === "NONE" ? undefined : value as Id<"category_groups">,
-//                                         value === "NONE"
-//                                     )
-//                                 }
-//                                 options={getFilteredGroupOptions(transaction.transactionType)}
-//                                 placeholder="Select..."
-//                                 emptyLabel="— No Group —"
-//                             />
-//                         </div>
-//                         <div>
-//                             <Label className="text-xs text-muted-foreground">Category</Label>
-//                             <CategoryCombobox
-//                                 value={transaction.categoryId || "NONE"}
-//                                 onValueChange={(value) =>
-//                                     onUpdate(value === "NONE"
-//                                         ? { clearCategoryId: true }
-//                                         : { categoryId: value as Id<"categories"> })
-//                                 }
-//                                 options={getFilteredCategoryOptions(transaction.transactionType, group?._id)}
-//                                 placeholder="Select..."
-//                             />
-//                         </div>
-//                     </div>
-//                 </div>
-//             </CardContent>
-//         </Card>
-//     );
-// }
 
 interface Transaction {
     _id: Id<"transactions">;
@@ -616,10 +410,8 @@ export default function TransactionsPage() {
     const [groupFilter, setGroupFilter] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<string | null>(null);
     const [endDate, setEndDate] = useState<string | null>(null);
-    const [filtersOpen, setFiltersOpen] = useState(false);
-
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(25);
+    const [pageSize, setPageSize] = useState(15);
 
     const updateTransaction = useMutation(api.transactions.updateTransaction);
     const updateTransactionByGroup = useMutation(api.transactions.updateTransactionByGroup);
@@ -774,9 +566,9 @@ export default function TransactionsPage() {
     return (
         <AppLayout>
             <InitUser />
-            <div className="w-full min-w-0 mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 max-w-7xl">
+            <div className="container mx-auto py-6 px-4">
                 {/* Header */}
-                <div className="flex flex-col gap-6 mb-6">
+                <div className="flex flex-col gap-6 mb-8">
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-lg font-semibold text-foreground">
@@ -786,7 +578,31 @@ export default function TransactionsPage() {
                                 View and manage your imported transactions
                             </p>
                         </div>
+
                         <div className="flex items-center gap-2">
+                            {/* Add/Create dropdown - CSV default, manual option */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button size="sm" className="gap-1.5">
+                                        <Plus className="h-4 w-4" />
+                                        Add
+                                        <ChevronDown className="h-3 w-3" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/import-csv" className="flex items-center gap-2">
+                                            <Upload className="h-4 w-4" />
+                                            Import CSV
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="flex items-center gap-2">
+                                        <Plus className="h-4 w-4" />
+                                        Add Transaction
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
                             <Button variant="outline" size="sm" asChild>
                                 <Link href="/transfers-inbox">
                                     <ArrowRightLeft className="h-4 w-4 mr-2" />
@@ -800,317 +616,177 @@ export default function TransactionsPage() {
                         </div>
                     </div>
 
-                    {/* Summary Cards */}
-                    {transactions && transactions.data.length > 0 && (() => {
-                        const totalIncome = transactions.data
-                            .filter((t) => t.amount > 0)
-                            .reduce((sum, t) => sum + t.amount, 0);
-                        const totalExpenses = Math.abs(transactions.data
-                            .filter((t) => t.amount < 0)
-                            .reduce((sum, t) => sum + t.amount, 0));
-                        const net = totalIncome - totalExpenses;
-                        return (
-                            <div className="grid grid-cols-3 gap-4">
-                                <Card>
-                                    <CardContent className="flex items-center gap-3 p-4">
-                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                                            <ArrowDownLeft className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Total Income</p>
-                                            <p className="text-lg font-bold text-foreground">{currencyExact(totalIncome)}</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardContent className="flex items-center gap-3 p-4">
-                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-destructive/10">
-                                            <ArrowUpRight className="h-4 w-4 text-destructive" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Total Expenses</p>
-                                            <p className="text-lg font-bold text-foreground">{currencyExact(totalExpenses)}</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardContent className="flex items-center gap-3 p-4">
-                                        <div className={cn(
-                                            "flex h-9 w-9 items-center justify-center rounded-lg",
-                                            net >= 0 ? "bg-primary/10" : "bg-destructive/10"
-                                        )}>
-                                            <ArrowDownLeft className={cn("h-4 w-4", net >= 0 ? "text-primary" : "text-destructive")} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Net</p>
-                                            <p className={cn("text-lg font-bold", net >= 0 ? "text-foreground" : "text-destructive")}>
-                                                {currencyExact(net)}
-                                            </p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        );
-                    })()}
-
-                    {/* Type Filter Tabs */}
-                    <div className="flex items-center gap-2">
-                        {([
-                            { value: null, label: "All" },
-                            { value: "income", label: "Income" },
-                            { value: "expense", label: "Expenses" },
-                            { value: "transfer", label: "Transfers" },
-                            { value: "UNTYPED", label: "Untyped" },
-                        ] as const).map((tab) => (
-                            <Button
-                                key={tab.label}
-                                variant={typeFilter === tab.value ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleFilterChange(() => setTypeFilter(tab.value))}
-                            >
-                                {tab.label}
-                                {transactions && (
-                                    <span className="ml-1.5 text-xs opacity-70">
-                                        {tab.value === null
-                                            ? transactions.total
-                                            : ""}
-                                    </span>
-                                )}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <Card className="mb-6">
-                    <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-                        <CardHeader className="pb-4">
-                            <CollapsibleTrigger asChild>
-                                <div className="flex justify-between items-center cursor-pointer">
-                                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                                        <Filter className="h-4 w-4 sm:h-5 sm:w-5" />
-                                        Filters
-                                        {activeFiltersCount > 0 && (
-                                            <Badge variant="secondary" className="ml-2 text-xs">
-                                                {activeFiltersCount}
-                                            </Badge>
+                    {/* Filters */}
+                    <div className="flex flex-col gap-3">
+                        {/* Row 1: Transaction Types + Search + Clear All */}
+                        <div className="flex items-center gap-3">
+                            {/* Transaction Types */}
+                            <div className="flex items-center gap-1.5">
+                                {([
+                                    { value: null, label: "All" },
+                                    { value: "income", label: "Income" },
+                                    { value: "expense", label: "Expenses" },
+                                    { value: "transfer", label: "Transfers" },
+                                    { value: "UNTYPED", label: "Untyped" },
+                                ] as const).map((tab) => (
+                                    <Button
+                                        key={tab.label}
+                                        variant={typeFilter === tab.value ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-8 text-xs"
+                                        onClick={() => handleFilterChange(() => setTypeFilter(tab.value))}
+                                    >
+                                        {tab.label}
+                                        {transactions && tab.value === null && (
+                                            <span className="ml-1.5 text-xs opacity-70">
+                                                {transactions.total}
+                                            </span>
                                         )}
-                                        <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
-                                    </CardTitle>
-                                    {activeFiltersCount > 0 && (
-                                        <Button variant="ghost" size="sm" onClick={clearAllFilters} className="text-xs sm:text-sm">
-                                            Clear all
-                                        </Button>
+                                    </Button>
+                                ))}
+                            </div>
+
+                            {/* Search Bar */}
+                            <div className="flex-1 max-w-xs">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        id="search"
+                                        type="text"
+                                        placeholder="Search transactions..."
+                                        value={search}
+                                        onChange={(e) => {
+                                            setSearch(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                        className="pl-9 pr-9 h-8 text-sm"
+                                    />
+                                    {search && (
+                                        <button
+                                            onClick={clearSearch}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
                                     )}
                                 </div>
-                            </CollapsibleTrigger>
-                        </CardHeader>
-                        <CollapsibleContent>
-                            <CardContent className="space-y-4">
-                                {/* Search */}
-                                <div>
-                                    <Label htmlFor="search" className="block mb-2 text-xs sm:text-sm font-medium">
-                                        Search Description
-                                    </Label>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-                                        <Input
-                                            id="search"
-                                            type="text"
-                                            placeholder="Search transactions..."
-                                            value={search}
-                                            onChange={(e) => {
-                                                setSearch(e.target.value);
-                                                setCurrentPage(1);
-                                            }}
-                                            className="pl-8 sm:pl-10 pr-8 sm:pr-10 text-sm"
-                                        />
-                                        {search && (
-                                            <button
-                                                onClick={clearSearch}
-                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                            >
-                                                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
+                            </div>
 
-                                {/* Filter Selects */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div>
-                                        <Label className="block mb-2 text-xs sm:text-sm font-medium">
-                                            Account
-                                        </Label>
-                                        <Select
-                                            value={selectedAccount || "ALL_ACCOUNTS"}
-                                            onValueChange={(value) =>
-                                                handleFilterChange(() =>
-                                                    setSelectedAccount(value === "ALL_ACCOUNTS" ? null : value as Id<"accounts">)
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className="text-xs sm:text-sm">
-                                                <SelectValue placeholder="All Accounts" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="ALL_ACCOUNTS">All Accounts</SelectItem>
-                                                {accounts?.filter(account => account._id && account._id.trim()).map((account) => (
-                                                    <SelectItem key={account._id} value={account._id}>
-                                                        {account.name} ({account.bank})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div>
-                                        <Label className="block mb-2 text-xs sm:text-sm font-medium">
-                                            Transaction Type
-                                        </Label>
-                                        <Select
-                                            value={typeFilter || "ALL_TYPES"}
-                                            onValueChange={(value) =>
-                                                handleFilterChange(() =>
-                                                    setTypeFilter(value === "ALL_TYPES" ? null : value)
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className="text-xs sm:text-sm">
-                                                <SelectValue placeholder="All Types" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="ALL_TYPES">All Types</SelectItem>
-                                                <SelectItem value="UNTYPED">— Untyped —</SelectItem>
-                                                <SelectItem value="income">Income</SelectItem>
-                                                <SelectItem value="expense">Expense</SelectItem>
-                                                <SelectItem value="transfer">Transfer</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div>
-                                        <Label className="block mb-2 text-xs sm:text-sm font-medium">
-                                            Category
-                                        </Label>
-                                        <Select
-                                            value={categoryFilter === "NONE" ? "UNCATEGORIZED" : (categoryFilter || "ALL_CATEGORIES")}
-                                            onValueChange={(value) =>
-                                                handleFilterChange(() =>
-                                                    setCategoryFilter(value === "ALL_CATEGORIES" ? null : (value === "UNCATEGORIZED" ? "NONE" : value))
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className="text-xs sm:text-sm">
-                                                <SelectValue placeholder="All Categories" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="ALL_CATEGORIES">All Categories</SelectItem>
-                                                <SelectItem value="UNCATEGORIZED">— Uncategorized —</SelectItem>
-                                                {categoryOptions
-                                                    .sort((a, b) => a.label.localeCompare(b.label))
-                                                    .map((option) => (
-                                                        <SelectItem key={option.value} value={option.value}>
-                                                            {option.label}
-                                                        </SelectItem>
-                                                    ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div>
-                                        <Label className="block mb-2 text-xs sm:text-sm font-medium">
-                                            Category Group
-                                        </Label>
-                                        <Select
-                                            value={groupFilter === "NONE" ? "UNGROUPED" : (groupFilter || "ALL_GROUPS")}
-                                            onValueChange={(value) =>
-                                                handleFilterChange(() =>
-                                                    setGroupFilter(value === "ALL_GROUPS" ? null : (value === "UNGROUPED" ? "NONE" : value))
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className="text-xs sm:text-sm">
-                                                <SelectValue placeholder="All Groups" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="ALL_GROUPS">All Groups</SelectItem>
-                                                <SelectItem value="UNGROUPED">— No Group —</SelectItem>
-                                                {groupOptions
-                                                    .sort((a, b) => a.label.localeCompare(b.label))
-                                                    .map((option) => (
-                                                        <SelectItem key={option.value} value={option.value}>
-                                                            {option.label}
-                                                        </SelectItem>
-                                                    ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                {/* Date Filters */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="block mb-2 text-xs sm:text-sm font-medium">
-                                            Start Date
-                                        </Label>
-                                        <Input
-                                            type="date"
-                                            value={startDate || ""}
-                                            onChange={(e) =>
-                                                handleFilterChange(() => setStartDate(e.target.value || null))
-                                            }
-                                            className="text-xs sm:text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="block mb-2 text-xs sm:text-sm font-medium">
-                                            End Date
-                                        </Label>
-                                        <Input
-                                            type="date"
-                                            value={endDate || ""}
-                                            onChange={(e) =>
-                                                handleFilterChange(() => setEndDate(e.target.value || null))
-                                            }
-                                            className="text-xs sm:text-sm"
-                                        />
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Collapsible>
-                </Card>
-
-                {/* Page Size + Info */}
-                <div className="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs sm:text-sm text-muted-foreground">Show</span>
-                        <Select
-                            value={pageSize.toString()}
-                            onValueChange={(value) => {
-                                setPageSize(parseInt(value));
-                                setCurrentPage(1);
-                            }}
-                        >
-                            <SelectTrigger className="w-16 sm:w-20 text-xs sm:text-sm">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="10">10</SelectItem>
-                                <SelectItem value="25">25</SelectItem>
-                                <SelectItem value="50">50</SelectItem>
-                                <SelectItem value="100">100</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <span className="text-xs sm:text-sm text-muted-foreground">per page</span>
-                    </div>
-
-                    {transactions && transactions.total > 0 && (
-                        <div className="text-xs sm:text-sm text-muted-foreground">
-                            Showing {startItem} to {endItem} of {transactions.total} transactions
+                            {/* Clear All with badge */}
+                            {activeFiltersCount > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearAllFilters}
+                                    className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    Clear all
+                                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
+                                        {activeFiltersCount}
+                                    </Badge>
+                                </Button>
+                            )}
                         </div>
-                    )}
+
+                        {/* Row 2: Accounts, Categories, Groups, Date Range */}
+                        <div className="flex items-center gap-3">
+                            {/* Accounts */}
+                            <Select
+                                value={selectedAccount || "ALL_ACCOUNTS"}
+                                onValueChange={(value) =>
+                                    handleFilterChange(() =>
+                                        setSelectedAccount(value === "ALL_ACCOUNTS" ? null : value as Id<"accounts">)
+                                    )
+                                }
+                            >
+                                <SelectTrigger className="w-[160px] h-8 text-xs">
+                                    <SelectValue placeholder="All Accounts" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ALL_ACCOUNTS">All Accounts</SelectItem>
+                                    {accounts?.filter(account => account._id && account._id.trim()).map((account) => (
+                                        <SelectItem key={account._id} value={account._id}>
+                                            {account.name} ({account.bank})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {/* Category */}
+                            <Select
+                                value={categoryFilter === "NONE" ? "UNCATEGORIZED" : (categoryFilter || "ALL_CATEGORIES")}
+                                onValueChange={(value) =>
+                                    handleFilterChange(() =>
+                                        setCategoryFilter(value === "ALL_CATEGORIES" ? null : (value === "UNCATEGORIZED" ? "NONE" : value))
+                                    )
+                                }
+                            >
+                                <SelectTrigger className="w-[160px] h-8 text-xs">
+                                    <SelectValue placeholder="All Categories" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ALL_CATEGORIES">All Categories</SelectItem>
+                                    <SelectItem value="UNCATEGORIZED">-- Uncategorized --</SelectItem>
+                                    {categoryOptions
+                                        .sort((a, b) => a.label.localeCompare(b.label))
+                                        .map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                </SelectContent>
+                            </Select>
+
+                            {/* Group */}
+                            <Select
+                                value={groupFilter === "NONE" ? "UNGROUPED" : (groupFilter || "ALL_GROUPS")}
+                                onValueChange={(value) =>
+                                    handleFilterChange(() =>
+                                        setGroupFilter(value === "ALL_GROUPS" ? null : (value === "UNGROUPED" ? "NONE" : value))
+                                    )
+                                }
+                            >
+                                <SelectTrigger className="w-[140px] h-8 text-xs">
+                                    <SelectValue placeholder="All Groups" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ALL_GROUPS">All Groups</SelectItem>
+                                    <SelectItem value="UNGROUPED">-- No Group --</SelectItem>
+                                    {groupOptions
+                                        .sort((a, b) => a.label.localeCompare(b.label))
+                                        .map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                </SelectContent>
+                            </Select>
+
+                            {/* Date Filters - inline labels */}
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
+                                <Input
+                                    type="date"
+                                    value={startDate || ""}
+                                    onChange={(e) =>
+                                        handleFilterChange(() => setStartDate(e.target.value || null))
+                                    }
+                                    className="w-[130px] h-8 text-xs"
+                                />
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
+                                <Input
+                                    type="date"
+                                    value={endDate || ""}
+                                    onChange={(e) =>
+                                        handleFilterChange(() => setEndDate(e.target.value || null))
+                                    }
+                                    className="w-[130px] h-8 text-xs"
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Mobile/Desktop View Toggle */}
@@ -1183,18 +859,52 @@ export default function TransactionsPage() {
 
                         {/* Desktop Table View */}
                         <Card className="hidden lg:block">
+                            {/* Page Size + Info */}
+                            <div className="px-6 mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                                <div className="text-xs sm:text-sm text-muted-foreground">
+                                    {!transactions ? (
+                                        "Loading..."
+                                    ) : transactions.total === 0 ? (
+                                        "Showing 0 transactions"
+                                    ) : (
+                                        `Showing ${startItem} to ${endItem} of ${transactions.total} transactions`
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs sm:text-sm text-muted-foreground">Show</span>
+                                    <Select
+                                        value={pageSize.toString()}
+                                        onValueChange={(value) => {
+                                            setPageSize(parseInt(value));
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-16 sm:w-20 text-xs sm:text-sm">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="15">15</SelectItem>
+                                            <SelectItem value="25">25</SelectItem>
+                                            <SelectItem value="50">50</SelectItem>
+                                            <SelectItem value="100">100</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <span className="text-xs sm:text-sm text-muted-foreground">per page</span>
+                                </div>
+                            </div>
                             <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="text-xs">Date</TableHead>
-                                            <TableHead className="text-xs">Description</TableHead>
-                                            <TableHead className="text-xs">Account</TableHead>
-                                            <TableHead className="text-xs">Type</TableHead>
-                                            <TableHead className="text-xs">Group</TableHead>
-                                            <TableHead className="text-xs">Category</TableHead>
-                                            <TableHead className="text-right text-xs">Amount</TableHead>
-                                            <TableHead className="w-12 text-xs">Actions</TableHead>
+                                            <TableHead className="font-bold pl-6 text-xs">Date</TableHead>
+                                            <TableHead className="font-bold text-xs">Description</TableHead>
+                                            <TableHead className="font-bold text-xs">Account</TableHead>
+                                            <TableHead className="font-bold text-xs">Type</TableHead>
+                                            <TableHead className="font-bold text-xs">Group</TableHead>
+                                            <TableHead className="font-bold text-xs">Category</TableHead>
+                                            <TableHead className="font-bold text-right text-xs">Amount</TableHead>
+                                            <TableHead className="font-bold pr-6 w-12 text-xs">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1211,10 +921,10 @@ export default function TransactionsPage() {
 
                                             return (
                                                 <TableRow key={transaction._id}>
-                                                    <TableCell className="font-medium text-sm">
-                                                        {formatTimestampToDate(transaction.date)}
+                                                    <TableCell className="pl-6 text-sm tabular-nums text-muted-foreground">
+                                                        {formatDate(transaction.date)}
                                                     </TableCell>
-                                                    <TableCell className="max-w-[200px] truncate">
+                                                    <TableCell className="max-w-[180px] truncate">
                                                         <Popover>
                                                             <PopoverTrigger asChild>
                                                                 <Button
@@ -1229,10 +939,8 @@ export default function TransactionsPage() {
                                                             </PopoverContent>
                                                         </Popover>
                                                     </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline" className="text-xs">
-                                                            {account?.name || "Unknown"}
-                                                        </Badge>
+                                                    <TableCell className="text-sm text-muted-foreground">
+                                                        {account?.name || "None"}
                                                     </TableCell>
                                                     <TableCell>
                                                         {transaction.transfer_pair_id ? (
@@ -1294,12 +1002,16 @@ export default function TransactionsPage() {
                                                             placeholder="Select..."
                                                         />
                                                     </TableCell>
-                                                    <TableCell className={cn(
-                                                        "text-right font-mono font-semibold text-sm",
-                                                        transaction.amount >= 0 ? "text-primary" : "text-foreground"
-                                                    )}>
-                                                        {transaction.amount >= 0 ? "+" : ""}{currencyExact(transaction.amount)}
+                                                    <TableCell
+                                                        className={cn(
+                                                            "text-right font-mono font-semibold text-sm",
+                                                            transaction.amount > 0 && "text-green-600"
+                                                        )}
+                                                    >
+                                                        {transaction.amount > 0 ? "+" : ""}
+                                                        {currencyExact(transaction.amount)}
                                                     </TableCell>
+
                                                     <TableCell>
                                                         <AlertDialog>
                                                             <AlertDialogTrigger asChild>

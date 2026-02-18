@@ -135,6 +135,21 @@ export const previewAllocation = query({
     },
 });
 
+// Update a single allocation record amount (for per-income customization)
+export const updateAllocationAmount = mutation({
+    args: {
+        recordId: v.id("allocation_records"),
+        amount: v.number(),
+    },
+    handler: async (ctx, { recordId, amount }) => {
+        const record = await ctx.db.get(recordId);
+        if (!record) throw new Error("Allocation record not found");
+        // Only allow editing forecast (planned) allocations
+        if (!record.is_forecast) throw new Error("Cannot edit matched allocations");
+        await ctx.db.patch(recordId, { amount: Math.max(0, amount) });
+    },
+});
+
 // Get allocation records for a specific income plan
 export const getAllocationsForPlan = query({
     args: { incomePlanId: v.id("income_plans") },

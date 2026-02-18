@@ -917,3 +917,112 @@ export const resolveImportSession = mutation({
         return { success: true };
     },
 });
+
+export const getDashboardStats = query({
+    args: {
+        userId: v.id("users"),
+        startDate: v.number(),
+        endDate: v.number(),
+    },
+    handler: async (ctx, { userId, startDate, endDate }) => {
+        const transactions = await ctx.db
+            .query("transactions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .filter((q) =>
+                q.and(
+                    q.gte(q.field("date"), startDate),
+                    q.lte(q.field("date"), endDate)
+                )
+            )
+            .collect();
+
+        const accounts = await ctx.db
+            .query("accounts")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+        const accountMap = new Map(accounts.map((a) => [a._id.toString(), a.name]));
+
+        const categoryGroups = await ctx.db
+            .query("category_groups")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+        const groupMap = new Map(categoryGroups.map((g) => [g._id.toString(), g.name]));
+
+        const categories = await ctx.db
+            .query("categories")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+        const categoryToGroup = new Map(
+            categories
+                .filter((c) => c.groupId)
+                .map((c) => [c._id.toString(), c.groupId!.toString()])
+        );
+
+        let totalIncome = 0;
+        let totalExpenses = 0;
+        const groupSpending = new Map<string, number>();
+        const accountFlowMap = new Map<string, { inflow: number; outflow: number }>();
+
+        const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+        const weekBuckets: { weekStart: number; income: number; expenses: number }[] = [];
+        let weekStart = startDate;
+        while (weekStart < endDate) {
+            weekBuckets.push({ weekStart, income: 0, expenses: 0 });
+            weekStart += msPerWeek;
+        }
+
+        for (const tx of transactions) {
+            if (tx.transactionType === "transfer") continue;
+
+            if (tx.amount > 0) {
+                totalIncome += tx.amount;
+            } else {
+                totalExpenses += Math.abs(tx.amount);
+            }
+
+            if (tx.amount < 0 && tx.categoryId) {
+                const groupId = categoryToGroup.get(tx.categoryId.toString());
+                const groupName = groupId ? (groupMap.get(groupId) ?? "Uncategorized") : "Uncategorized";
+                groupSpending.set(groupName, (groupSpending.get(groupName) ?? 0) + Math.abs(tx.amount));
+            } else if (tx.amount < 0) {
+                groupSpending.set("Uncategorized", (groupSpending.get("Uncategorized") ?? 0) + Math.abs(tx.amount));
+            }
+
+            const accId = tx.accountId.toString();
+            const flow = accountFlowMap.get(accId) ?? { inflow: 0, outflow: 0 };
+            if (tx.amount > 0) flow.inflow += tx.amount;
+            else flow.outflow += Math.abs(tx.amount);
+            accountFlowMap.set(accId, flow);
+
+            for (const bucket of weekBuckets) {
+                const bucketEnd = bucket.weekStart + msPerWeek;
+                if (tx.date >= bucket.weekStart && tx.date < bucketEnd) {
+                    if (tx.amount > 0) bucket.income += tx.amount;
+                    else bucket.expenses += Math.abs(tx.amount);
+                    break;
+                }
+            }
+        }
+
+        const topCategoryGroups = Array.from(groupSpending.entries())
+            .map(([groupName, amount]) => ({ groupName, amount }))
+            .sort((a, b) => b.amount - a.amount)
+            .slice(0, 5);
+
+        const accountFlows = Array.from(accountFlowMap.entries()).map(([accId, flow]) => ({
+            accountId: accId,
+            accountName: accountMap.get(accId) ?? "Unknown",
+            inflow: flow.inflow,
+            outflow: flow.outflow,
+        }));
+
+        return {
+            totalIncome,
+            totalExpenses,
+            netFlow: totalIncome - totalExpenses,
+            topCategoryGroups,
+            weeklyBreakdown: weekBuckets,
+            accountFlows,
+        };
+    },
+});

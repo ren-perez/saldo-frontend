@@ -312,8 +312,15 @@ export const getUnallocatedTransactions = query({
         userId: v.id("users"),
         accountId: v.optional(v.id("accounts")),
         limit: v.optional(v.number()),
+        incomeOnly: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
+        const desiredLimit = args.limit || 50;
+        // Fetch more than needed since we filter after fetching.
+        // With "all accounts" most transactions may be expenses,
+        // so we need a larger pool to find enough income transactions.
+        const fetchLimit = args.incomeOnly ? desiredLimit * 6 : desiredLimit * 2;
+
         let transactions;
 
         if (args.accountId) {
@@ -322,18 +329,25 @@ export const getUnallocatedTransactions = query({
                 .query("transactions")
                 .withIndex("by_account", (q) => q.eq("accountId", accountId))
                 .order("desc")
-                .take(args.limit || 50);
+                .take(fetchLimit);
         } else {
             transactions = await ctx.db
                 .query("transactions")
                 .withIndex("by_user", (q) => q.eq("userId", args.userId))
                 .order("desc")
-                .take(args.limit || 50);
+                .take(fetchLimit);
+        }
+
+        // Filter for income-only if requested
+        if (args.incomeOnly) {
+            transactions = transactions.filter(t => t.amount > 0);
         }
 
         // Filter out transactions that already have contributions
         const unallocatedTransactions = [];
         for (const transaction of transactions) {
+            if (unallocatedTransactions.length >= desiredLimit) break;
+
             const existingContributions = await ctx.db
                 .query("goal_contributions")
                 .withIndex("by_transaction", (q) => q.eq("transactionId", transaction._id))

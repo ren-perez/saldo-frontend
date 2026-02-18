@@ -34,22 +34,24 @@ import {
     FileText,
     DollarSign,
     PieChart,
+    FileSpreadsheet,
 } from "lucide-react"
 
 const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
-    { href: "/review", label: "Review", icon: Lightbulb },
+    // { href: "/review", label: "Review", icon: Lightbulb },
     { href: "/income", label: "Income", icon: DollarSign },
-    { href: "/allocations", label: "Allocations", icon: PieChart },
-    { href: "/accounts", label: "Accounts", icon: Landmark },
     { href: "/goals", label: "Goals", icon: Target },
-    { href: "/goals/history", label: "Contribution History", icon: History },
-    { href: "/goals/analytics", label: "Goal Analytics", icon: BarChart3 },
-    { href: "/presets", label: "Presets", icon: Settings },
-    { href: "/import-csv", label: "Import CSV", icon: Upload },
-    { href: "/imports", label: "Import History", icon: FileText },
+    // { href: "/goals/history", label: "Contribution History", icon: History },
+    // { href: "/goals/analytics", label: "Goal Analytics", icon: BarChart3 },
+    // { href: "/allocations", label: "Allocations", icon: PieChart },
+
+    { href: "/accounts", label: "Accounts", icon: Landmark },
     { href: "/transactions", label: "Transactions", icon: CreditCard },
     { href: "/categories", label: "Categories", icon: Tag },
+    { href: "/presets", label: "Presets", icon: FileSpreadsheet },
+    // { href: "/import-csv", label: "Import CSV", icon: Upload },
+    // { href: "/imports", label: "Import History", icon: FileText },
 ]
 
 export function AppSidebar() {
@@ -104,7 +106,7 @@ export function AppSidebar() {
 
             <SidebarContent className="flex-1 overflow-y-auto">
                 <SidebarGroup>
-                    <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+                    <SidebarGroupLabel>Planning</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu className="space-y-1">
                             {navItems.map((item) => {

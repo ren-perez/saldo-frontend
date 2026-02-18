@@ -158,11 +158,11 @@ export default function GoalsPage() {
         </div>
 
         {/* Filters */}
-        <GoalFilters
+        {/* <GoalFilters
           filters={filters}
           onFiltersChange={setFilters}
           filterOptions={filterOptions}
-        />
+        /> */}
 
         {/* Unallocated Transactions */}
         <div className="mb-8">

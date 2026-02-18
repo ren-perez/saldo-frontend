@@ -152,7 +152,7 @@ export const getSuggestedMatches = query({
             .collect();
 
         const expectedDate = new Date(plan.expected_date).getTime();
-        const dayRange = 7 * 24 * 60 * 60 * 1000; // 7 days
+        const dayRange = 30 * 24 * 60 * 60 * 1000; // 30 days
 
         // Filter to income transactions near the expected date/amount
         const candidates = transactions
@@ -186,6 +186,46 @@ export const getSuggestedMatches = query({
             dateDiff: c.dateDiff,
             alreadyMatched: matchedTxIds.has(c._id.toString()),
         }));
+    },
+});
+
+// Find planned income plans that could match a given transaction (reverse flow)
+export const getPlansForTransaction = query({
+    args: {
+        transactionId: v.id("transactions"),
+        userId: v.id("users"),
+    },
+    handler: async (ctx, { transactionId, userId }) => {
+        const transaction = await ctx.db.get(transactionId);
+        if (!transaction) return [];
+
+        const txDate = transaction.date;
+        const txAmount = transaction.amount;
+        const dayRange = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+        // Get all planned income plans for this user
+        const plans = await ctx.db
+            .query("income_plans")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+
+        return plans
+            .filter((p) => p.status === "planned")
+            .map((p) => {
+                const expectedDate = new Date(p.expected_date).getTime();
+                return {
+                    _id: p._id,
+                    label: p.label,
+                    expected_date: p.expected_date,
+                    expected_amount: p.expected_amount,
+                    recurrence: p.recurrence,
+                    amountDiff: Math.abs(txAmount - p.expected_amount),
+                    dateDiff: Math.abs(txDate - expectedDate),
+                };
+            })
+            .filter((p) => p.dateDiff <= dayRange)
+            .sort((a, b) => a.amountDiff - b.amountDiff)
+            .slice(0, 10);
     },
 });
 
