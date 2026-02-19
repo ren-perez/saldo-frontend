@@ -79,7 +79,9 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
     return (
         <AppLayout>
             <InitUser />
-            {/* Notion-style Header Image - full width */}
+            {/* Goal Detail Card */}
+            <div className="max-w-4xl mx-auto w-full rounded-xl border overflow-hidden bg-card">
+            {/* Header Image */}
             <div className="relative w-full h-[280px] lg:h-[320px] bg-gradient-to-br from-muted/60 via-muted/30 to-background overflow-hidden">
                 {headerImage ? (
                     <img
@@ -111,7 +113,6 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Content - overlaps the header image slightly */}
-            <div className="flex flex-col max-w-4xl mx-auto w-full">
                 <div className="relative -mt-16 px-6 pb-12">
                     {/* Emoji + Title */}
                     <div className="flex flex-col gap-1 mb-8">

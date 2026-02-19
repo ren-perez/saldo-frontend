@@ -27,9 +27,9 @@ interface GoalCardItemProps {
 }
 
 const priorityColors = {
-    1: "bg-red-500",
-    2: "bg-yellow-500",
-    3: "bg-green-500",
+    1: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+    2: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300",
+    3: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
 }
 
 export function GoalCardItem({
@@ -67,11 +67,7 @@ export function GoalCardItem({
 
     return (
         <>
-            <GoalCard
-                style={{
-                    borderColor: goal.color ? `${goal.color}30` : undefined,
-                }}
-            >
+            <GoalCard>
 
                 <GoalCardHeader>
                     <div className="relative h-48 w-full">
@@ -109,9 +105,9 @@ export function GoalCardItem({
                             <Badge
                                 variant="secondary"
                                 className={`${goal.is_completed
-                                        ? "bg-slate-600" // or another class for 'Achieved'
-                                        : priorityColors[goal.priority as keyof typeof priorityColors] || "bg-gray-500"
-                                    } text-white`}
+                                        ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                        : priorityColors[goal.priority as keyof typeof priorityColors] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                                    }`}
                             >
                                 {goal.is_completed ? "Completed" : goal.priority_label}
                             </Badge>

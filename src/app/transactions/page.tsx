@@ -7,7 +7,8 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus } from "lucide-react";
+import { Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -583,60 +584,82 @@ function TransactionsContent() {
             <InitUser />
             <div className="container mx-auto py-6 px-4">
                 {/* Header */}
-                <div className="flex flex-col gap-6 mb-8">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-lg font-semibold text-foreground">
-                                Transactions
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
+                <div className="flex flex-col gap-4 mb-8">
+                    {/* Title */}
+                    <div className="flex items-center gap-1.5">
+                        <h2 className="text-lg font-semibold text-foreground">
+                            Transactions
+                        </h2>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
                                 View and manage your imported transactions
-                            </p>
-                        </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
 
-                        <div className="flex items-center gap-2">
-                            {/* Add/Create dropdown - CSV default, manual option */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button size="sm" className="gap-1.5">
-                                        <Plus className="h-4 w-4" />
-                                        Add
-                                        <ChevronDown className="h-3 w-3" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem asChild>
-                                        <Link href="/import-csv" className="flex items-center gap-2">
-                                            <Upload className="h-4 w-4" />
-                                            Import CSV
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="flex items-center gap-2">
-                                        <Plus className="h-4 w-4" />
-                                        Add Transaction
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                    {/* CTAs */}
+                    <div className="flex items-center gap-2">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" className="gap-1.5">
+                                    <Plus className="h-4 w-4" />
+                                    Add
+                                    <ChevronDown className="h-3 w-3" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                                <DropdownMenuItem asChild>
+                                    <Link href="/import-csv" className="flex items-center gap-2">
+                                        <Upload className="h-4 w-4" />
+                                        Import CSV
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="flex items-center gap-2">
+                                    <Plus className="h-4 w-4" />
+                                    Add Transaction
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href="/transfers-inbox">
-                                    <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                    Transfers Inbox
-                                </Link>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/transfers-inbox">
+                                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                Transfers Inbox
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm">
+                            <Download className="h-4 w-4 mr-2" />
+                            Export
+                        </Button>
+                    </div>
+
+                    {/* Divider with Clear All */}
+                    <div className="flex items-center gap-3">
+                        <div className="flex-1 border-t border-border" />
+                        {activeFiltersCount > 0 && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearAllFilters}
+                                className="h-6 gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2"
+                            >
+                                Clear all
+                                <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
+                                    {activeFiltersCount}
+                                </Badge>
                             </Button>
-                            <Button variant="outline" size="sm">
-                                <Download className="h-4 w-4 mr-2" />
-                                Export
-                            </Button>
-                        </div>
+                        )}
                     </div>
 
                     {/* Filters */}
                     <div className="flex flex-col gap-3">
-                        {/* Row 1: Transaction Types + Search + Clear All */}
-                        <div className="flex items-center gap-3">
+                        {/* Row 1: Transaction Types | Search */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-3">
                             {/* Transaction Types */}
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 overflow-x-auto">
                                 {([
                                     { value: null, label: "All" },
                                     { value: "income", label: "Income" },
@@ -648,7 +671,7 @@ function TransactionsContent() {
                                         key={tab.label}
                                         variant={typeFilter === tab.value ? "default" : "outline"}
                                         size="sm"
-                                        className="h-8 text-xs"
+                                        className="h-8 text-xs flex-shrink-0"
                                         onClick={() => handleFilterChange(() => setTypeFilter(tab.value))}
                                     >
                                         {tab.label}
@@ -662,143 +685,128 @@ function TransactionsContent() {
                             </div>
 
                             {/* Search Bar */}
-                            <div className="flex-1 max-w-xs">
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                                    <Input
-                                        id="search"
-                                        type="text"
-                                        placeholder="Search transactions..."
-                                        value={search}
-                                        onChange={(e) => {
-                                            setSearch(e.target.value);
-                                            setCurrentPage(1);
-                                        }}
-                                        className="pl-9 pr-9 h-8 text-sm"
-                                    />
-                                    {search && (
-                                        <button
-                                            onClick={clearSearch}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    )}
-                                </div>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                    id="search"
+                                    type="text"
+                                    placeholder="Search transactions..."
+                                    value={search}
+                                    onChange={(e) => {
+                                        setSearch(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="pl-9 pr-9 h-8 text-sm"
+                                />
+                                {search && (
+                                    <button
+                                        onClick={clearSearch}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
                             </div>
-
-                            {/* Clear All with badge */}
-                            {activeFiltersCount > 0 && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={clearAllFilters}
-                                    className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                                >
-                                    Clear all
-                                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
-                                        {activeFiltersCount}
-                                    </Badge>
-                                </Button>
-                            )}
                         </div>
 
-                        {/* Row 2: Accounts, Categories, Groups, Date Range */}
-                        <div className="flex items-center gap-3">
-                            {/* Accounts */}
-                            <Select
-                                value={selectedAccount || "ALL_ACCOUNTS"}
-                                onValueChange={(value) =>
-                                    handleFilterChange(() =>
-                                        setSelectedAccount(value === "ALL_ACCOUNTS" ? null : value as Id<"accounts">)
-                                    )
-                                }
-                            >
-                                <SelectTrigger className="w-[160px] h-8 text-xs">
-                                    <SelectValue placeholder="All Accounts" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL_ACCOUNTS">All Accounts</SelectItem>
-                                    {accounts?.filter(account => account._id && account._id.trim()).map((account) => (
-                                        <SelectItem key={account._id} value={account._id}>
-                                            {account.name} ({account.bank})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            {/* Category */}
-                            <Select
-                                value={categoryFilter === "NONE" ? "UNCATEGORIZED" : (categoryFilter || "ALL_CATEGORIES")}
-                                onValueChange={(value) =>
-                                    handleFilterChange(() =>
-                                        setCategoryFilter(value === "ALL_CATEGORIES" ? null : (value === "UNCATEGORIZED" ? "NONE" : value))
-                                    )
-                                }
-                            >
-                                <SelectTrigger className="w-[160px] h-8 text-xs">
-                                    <SelectValue placeholder="All Categories" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL_CATEGORIES">All Categories</SelectItem>
-                                    <SelectItem value="UNCATEGORIZED">-- Uncategorized --</SelectItem>
-                                    {categoryOptions
-                                        .sort((a, b) => a.label.localeCompare(b.label))
-                                        .map((option) => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </SelectItem>
-                                        ))}
-                                </SelectContent>
-                            </Select>
-
-                            {/* Group */}
-                            <Select
-                                value={groupFilter === "NONE" ? "UNGROUPED" : (groupFilter || "ALL_GROUPS")}
-                                onValueChange={(value) =>
-                                    handleFilterChange(() =>
-                                        setGroupFilter(value === "ALL_GROUPS" ? null : (value === "UNGROUPED" ? "NONE" : value))
-                                    )
-                                }
-                            >
-                                <SelectTrigger className="w-[140px] h-8 text-xs">
-                                    <SelectValue placeholder="All Groups" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL_GROUPS">All Groups</SelectItem>
-                                    <SelectItem value="UNGROUPED">-- No Group --</SelectItem>
-                                    {groupOptions
-                                        .sort((a, b) => a.label.localeCompare(b.label))
-                                        .map((option) => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </SelectItem>
-                                        ))}
-                                </SelectContent>
-                            </Select>
-
-                            {/* Date Filters - inline labels */}
-                            <div className="flex items-center gap-1.5">
-                                <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
-                                <Input
-                                    type="date"
-                                    value={startDate || ""}
-                                    onChange={(e) =>
-                                        handleFilterChange(() => setStartDate(e.target.value || null))
+                        {/* Row 2: Accounts + Categories + Groups | From + To */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-3">
+                            {/* Left: Accounts, Categories, Groups */}
+                            <div className="flex items-center gap-2">
+                                <Select
+                                    value={selectedAccount || "ALL_ACCOUNTS"}
+                                    onValueChange={(value) =>
+                                        handleFilterChange(() =>
+                                            setSelectedAccount(value === "ALL_ACCOUNTS" ? null : value as Id<"accounts">)
+                                        )
                                     }
-                                    className="w-[130px] h-8 text-xs"
-                                />
+                                >
+                                    <SelectTrigger className="h-8 text-xs flex-1 min-w-0">
+                                        <SelectValue placeholder="All Accounts" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL_ACCOUNTS">All Accounts</SelectItem>
+                                        {accounts?.filter(account => account._id && account._id.trim()).map((account) => (
+                                            <SelectItem key={account._id} value={account._id}>
+                                                {account.name} ({account.bank})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Select
+                                    value={categoryFilter === "NONE" ? "UNCATEGORIZED" : (categoryFilter || "ALL_CATEGORIES")}
+                                    onValueChange={(value) =>
+                                        handleFilterChange(() =>
+                                            setCategoryFilter(value === "ALL_CATEGORIES" ? null : (value === "UNCATEGORIZED" ? "NONE" : value))
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 text-xs flex-1 min-w-0">
+                                        <SelectValue placeholder="All Categories" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL_CATEGORIES">All Categories</SelectItem>
+                                        <SelectItem value="UNCATEGORIZED">-- Uncategorized --</SelectItem>
+                                        {categoryOptions
+                                            .sort((a, b) => a.label.localeCompare(b.label))
+                                            .map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Select
+                                    value={groupFilter === "NONE" ? "UNGROUPED" : (groupFilter || "ALL_GROUPS")}
+                                    onValueChange={(value) =>
+                                        handleFilterChange(() =>
+                                            setGroupFilter(value === "ALL_GROUPS" ? null : (value === "UNGROUPED" ? "NONE" : value))
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 text-xs flex-1 min-w-0">
+                                        <SelectValue placeholder="All Groups" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL_GROUPS">All Groups</SelectItem>
+                                        <SelectItem value="UNGROUPED">-- No Group --</SelectItem>
+                                        {groupOptions
+                                            .sort((a, b) => a.label.localeCompare(b.label))
+                                            .map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                                <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
-                                <Input
-                                    type="date"
-                                    value={endDate || ""}
-                                    onChange={(e) =>
-                                        handleFilterChange(() => setEndDate(e.target.value || null))
-                                    }
-                                    className="w-[130px] h-8 text-xs"
-                                />
+
+                            {/* Right: Date Filters */}
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 flex-1">
+                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
+                                    <Input
+                                        type="date"
+                                        value={startDate || ""}
+                                        onChange={(e) =>
+                                            handleFilterChange(() => setStartDate(e.target.value || null))
+                                        }
+                                        className="h-8 text-xs"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-1">
+                                    <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
+                                    <Input
+                                        type="date"
+                                        value={endDate || ""}
+                                        onChange={(e) =>
+                                            handleFilterChange(() => setEndDate(e.target.value || null))
+                                        }
+                                        className="h-8 text-xs"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -936,7 +944,7 @@ function TransactionsContent() {
 
                                             return (
                                                 <TableRow key={transaction._id}>
-                                                    <TableCell className="pl-6 text-sm tabular-nums text-muted-foreground">
+                                                    <TableCell className="pl-6 text-[11px] tabular-nums text-muted-foreground">
                                                         {formatDate(transaction.date)}
                                                     </TableCell>
                                                     <TableCell className="max-w-[180px] truncate">
@@ -954,7 +962,7 @@ function TransactionsContent() {
                                                             </PopoverContent>
                                                         </Popover>
                                                     </TableCell>
-                                                    <TableCell className="text-sm text-muted-foreground">
+                                                    <TableCell className="text-[11px] text-muted-foreground">
                                                         {account?.name || "None"}
                                                     </TableCell>
                                                     <TableCell>
