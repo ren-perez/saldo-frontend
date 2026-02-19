@@ -51,8 +51,7 @@ export default function CsvImporterPage() {
     );
 
     const importTransactions = useMutation(api.transactions.importTransactions);
-    const resolveDuplicates = useMutation(api.transactions.resolveDuplicates);
-    const resolveImportSession = useMutation(api.transactions.resolveImportSession); // ✅ Added
+    const resolveImportSession = useMutation(api.transactions.resolveImportSession);
     // const uploadFileToR2 = useMutation(api.imports.uploadFileToR2);
     const getUploadUrl = useAction(api.importActions.getUploadUrl);
     const registerImportMutation = useMutation(api.imports.registerImport);

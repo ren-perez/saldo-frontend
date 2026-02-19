@@ -67,10 +67,10 @@ export default function DashboardPage() {
     convexUser ? { userId: convexUser._id } : "skip"
   )
 
-  const isLoading =
+  // Only block on initial data – avoid full-page flash when month changes
+  const isInitialLoad =
     accounts === undefined ||
     goals === undefined ||
-    dashboardStats === undefined ||
     incomeSummary === undefined ||
     potentialTransfers === undefined
 
@@ -82,9 +82,9 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <InitUser />
-      <div className="flex flex-col">
-        <div className="flex flex-col gap-6 p-6">
-          {isLoading ? (
+      <div className="container flex flex-col">
+        <div className="flex flex-col gap-10 p-6">
+          {isInitialLoad ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-sm text-muted-foreground">Loading dashboard...</div>
             </div>
@@ -95,22 +95,23 @@ export default function DashboardPage() {
                 pendingTransferCount={pendingTransferCount}
                 activeGoalCount={activeGoalCount}
               />
+
               <GoalsProgress goals={goals ?? []} />
+
               <div className="grid gap-6 lg:grid-cols-2">
                 <MonthlyOverview
-                  stats={dashboardStats ?? {
-                    totalIncome: 0,
-                    totalExpenses: 0,
-                    netFlow: 0,
-                    topCategoryGroups: [],
-                    weeklyBreakdown: [],
-                    accountFlows: [],
-                  }}
+                  stats={dashboardStats}
                   month={month}
                   year={year}
                   onMonthChange={handleMonthChange}
+                  onGoToToday={() => {
+                    const today = new Date()
+                    setMonth(today.getMonth())
+                    setYear(today.getFullYear())
+                  }}
                 />
-                <AccountsSnapshot accounts={accounts ?? []} />
+                
+                <AccountsSnapshot accounts={accounts ?? []} incomeSummary={incomeSummary} />
               </div>
             </>
           )}

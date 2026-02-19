@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
 import { useConvexUser } from "@/hooks/useConvexUser"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,11 +56,6 @@ export function IncomeView() {
 
   const summary = useQuery(
     convexUser ? api.incomePlans.getIncomeSummary : ("skip" as never),
-    convexUser ? { userId: convexUser._id } : "skip"
-  )
-
-  const accounts = useQuery(
-    convexUser ? api.accounts.listAccounts : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
   )
 

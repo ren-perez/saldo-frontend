@@ -19,21 +19,13 @@ import {
 } from "@/components/ui/sidebar"
 import { UserButton } from "@clerk/nextjs"
 import { ThemeToggle } from "./theme-toggle"
-import { AccountsSidebarGroup } from "@/components/AccountsSidebarGroup"
 import {
     Home,
     Landmark,
     Target,
-    Settings,
-    Upload,
     CreditCard,
     Tag,
-    Lightbulb,
-    History,
-    BarChart3,
-    FileText,
     DollarSign,
-    PieChart,
     FileSpreadsheet,
 } from "lucide-react"
 

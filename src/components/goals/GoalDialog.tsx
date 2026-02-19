@@ -73,8 +73,8 @@ export function GoalDialog({
         imageChanged: false,
     })
 
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-    const [previousImageUrl, setPreviousImageUrl] = useState<string | null>(editingGoal?.image_url || null)
+    const [, setPreviewUrl] = useState<string | null>(null)
+    const [, setPreviousImageUrl] = useState<string | null>(editingGoal?.image_url || null)
     const [imageState, setImageState] = useState<ImageState | null>(
         editingGoal?.image_url ? { type: "original", url: editingGoal.image_url } : null
     )
@@ -486,7 +486,7 @@ export function GoalDialog({
     }
 
     const isEditing = mode === 'edit'
-    const isLoading = false // Convex mutations don't have isPending like TanStack Query
+    const _isLoading = false // Convex mutations don't have isPending like TanStack Query
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

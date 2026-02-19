@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { Loader2, AlertCircle } from "lucide-react"
 import { useQuery } from "convex/react"
 import { api } from "../../convex/_generated/api"
@@ -21,7 +20,7 @@ export function AccountsSidebarGroup() {
         convexUser ? api.accounts.listAccounts : ("skip" as never),
         convexUser ? { userId: convexUser._id } : "skip"
     )
-    const [open, setOpen] = useState(false)
+    const [open] = useState(false)
 
     // Format currency for display
     const currencyLocales: Record<string, string> = {

@@ -29,7 +29,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format, addMonths, subMonths } from "date-fns";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, PiggyBank, CreditCard } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, PiggyBank, CreditCard } from "lucide-react";
 import Link from "next/link";
 
 type TrendTransaction = {

@@ -1,6 +1,5 @@
 "use client"
 
-import { useConvexUser } from "@/hooks/useConvexUser"
 import { ContributionAnalytics } from "@/components/goals/ContributionAnalytics"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"

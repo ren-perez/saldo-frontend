@@ -962,6 +962,7 @@ export const getDashboardStats = query({
         let totalExpenses = 0;
         const groupSpending = new Map<string, number>();
         const accountFlowMap = new Map<string, { inflow: number; outflow: number }>();
+        const dailyNetMap = new Map<string, number>();
 
         const msPerWeek = 7 * 24 * 60 * 60 * 1000;
         const weekBuckets: { weekStart: number; income: number; expenses: number }[] = [];
@@ -994,6 +995,10 @@ export const getDashboardStats = query({
             else flow.outflow += Math.abs(tx.amount);
             accountFlowMap.set(accId, flow);
 
+            // Daily net flow for heatmap (positive = income, negative = expense)
+            const dateKey = new Date(tx.date).toISOString().split("T")[0];
+            dailyNetMap.set(dateKey, (dailyNetMap.get(dateKey) ?? 0) + tx.amount);
+
             for (const bucket of weekBuckets) {
                 const bucketEnd = bucket.weekStart + msPerWeek;
                 if (tx.date >= bucket.weekStart && tx.date < bucketEnd) {
@@ -1016,6 +1021,8 @@ export const getDashboardStats = query({
             outflow: flow.outflow,
         }));
 
+        const dailyNet: Record<string, number> = Object.fromEntries(dailyNetMap);
+
         return {
             totalIncome,
             totalExpenses,
@@ -1023,6 +1030,7 @@ export const getDashboardStats = query({
             topCategoryGroups,
             weeklyBreakdown: weekBuckets,
             accountFlows,
+            dailyNet,
         };
     },
 });

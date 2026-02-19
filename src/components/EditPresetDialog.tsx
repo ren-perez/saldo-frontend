@@ -402,7 +402,7 @@ export function EditPresetDialog({ open, onClose, onSave, preset }: EditPresetDi
                                             onChange={(e) => {
                                                 try {
                                                     updateField("amountProcessing", JSON.parse(e.target.value));
-                                                } catch (error) {
+                                                } catch {
                                                     // Keep the invalid JSON in the textarea but don't update state
                                                 }
                                             }}

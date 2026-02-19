@@ -14,12 +14,10 @@ import { Button } from "@/components/ui/button"
 import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
-import { IncomePlan, UnmatchedTransaction, formatCurrency } from "./income-shared"
-import { UnmatchedIncomeSection } from "./unmatched-income-section"
+import { IncomePlan, formatCurrency } from "./income-shared"
 import { IncomePlanCard } from "./income-plan-card"
 import { IncomeFormDialog } from "./income-form-dialog"
 import { MatchIncomeDialog } from "./match-income-dialog"
-import { MatchTransactionDialog } from "./match-transaction-dialog"
 
 // ─── Month Summary ────────────────────────────────────────────────────────────
 
@@ -70,10 +68,6 @@ export function IncomeTimeline() {
   const [matchingPlan, setMatchingPlan] = useState<IncomePlan | null>(null)
   const [planMatchOpen, setPlanMatchOpen] = useState(false)
 
-  // Transaction → Plan match (from unmatched income section)
-  const [matchingTx, setMatchingTx] = useState<UnmatchedTransaction | null>(null)
-  const [txMatchOpen, setTxMatchOpen] = useState(false)
-
   const plans = useQuery(
     api.incomePlans.listIncomePlans,
     userId ? { userId } : "skip"
@@ -117,23 +111,11 @@ export function IncomeTimeline() {
     setPlanMatchOpen(true)
   }
 
-  // Unmatched transaction → "Match" button
-  function handleUnmatchedTxMatch(tx: UnmatchedTransaction) {
-    setMatchingTx(tx)
-    setTxMatchOpen(true)
-  }
-
   if (!userId) return null
 
   return (
     <div className="flex flex-col gap-8">
-      {/* ── Section 1: Unmatched Income ── */}
-      <UnmatchedIncomeSection
-        userId={userId}
-        onMatchTransaction={handleUnmatchedTxMatch}
-      />
-
-      {/* ── Section 2: Income Plans Timeline ── */}
+      {/* ── Income Plans Timeline ── */}
       <div className="flex flex-col gap-4">
         {/* Section header */}
         <div className="flex items-center justify-between">
@@ -251,16 +233,6 @@ export function IncomeTimeline() {
         }}
       />
 
-      {/* Transaction → Plan match (from unmatched income) */}
-      <MatchTransactionDialog
-        transaction={matchingTx}
-        userId={userId}
-        open={txMatchOpen}
-        onOpenChange={(v: boolean) => {
-          setTxMatchOpen(v)
-          if (!v) setMatchingTx(null)
-        }}
-      />
     </div>
   )
 }

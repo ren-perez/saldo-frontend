@@ -83,7 +83,7 @@ export function GoalFilters({ filters, onFiltersChange, filterOptions }: GoalFil
     };
 
     const getActiveFiltersCount = () => {
-        return Object.entries(filters).filter(([key, value]) => value && value !== '').length;
+        return Object.entries(filters).filter(([, value]) => value && value !== '').length;
     };
 
     const getAccountTypeIcon = (accountType: string) => {

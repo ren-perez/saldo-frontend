@@ -1,24 +1,6 @@
 "use client"
 
-import { useState } from "react"
-// import { MonthlyOverviewCard } from "@/components/planner/monthly-overview-card"
-// import { WeeklyPlanCard } from "@/components/planner/weekly-plan-card"
-// import { WeekDetailModal } from "@/components/planner/week-detail-modal"
-// import { mockWeeklyPlans } from "@/lib/mock-data"
-
 export default function PlannerPage() {
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null)
-
-  const handleWeekClick = (week: number) => {
-    setSelectedWeek(week)
-  }
-
-  const handleCloseModal = () => {
-    setSelectedWeek(null)
-  }
-
-//   const selectedWeekData = selectedWeek ? mockWeeklyPlans.find((w) => w.week === selectedWeek) : null
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-8">

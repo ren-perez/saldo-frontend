@@ -25,14 +25,34 @@ import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
 import { formatCurrency, type UnmatchedTransaction } from "./income-shared"
 
+export function useUnmatchedIncomeCount(userId: Id<"users"> | undefined) {
+  const transactions = useQuery(
+    api.contributions.getUnallocatedTransactions,
+    userId ? { userId, limit: 50, incomeOnly: true } : "skip"
+  )
+  const positive = useMemo(
+    () => (transactions ?? []).filter((t) => t.amount > 0),
+    [transactions]
+  )
+  return {
+    count: positive.length,
+    total: positive.reduce((s, t) => s + t.amount, 0),
+  }
+}
+
 export function UnmatchedIncomeSection({
   userId,
   onMatchTransaction,
+  externalOpen,
+  hideBanner,
 }: {
   userId: Id<"users">
   onMatchTransaction?: (tx: UnmatchedTransaction) => void
+  externalOpen?: boolean
+  hideBanner?: boolean
 }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [internalExpanded, setInternalExpanded] = useState(false)
+  const isExpanded = externalOpen ?? internalExpanded
   const [selectedAccountId, setSelectedAccountId] = useState<string>("__all__")
 
   const transactions = useQuery(api.contributions.getUnallocatedTransactions, {
@@ -61,45 +81,47 @@ export function UnmatchedIncomeSection({
   return (
     <div className="flex flex-col gap-3">
       {/* ── CTA Banner ── */}
-      <button
-        onClick={() => setIsExpanded((e) => !e)}
-        className="w-full text-left"
-      >
-        <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-transparent hover:from-amber-500/10 transition-colors cursor-pointer">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-amber-500/15 shrink-0">
-                <Inbox className="size-5 text-amber-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {positive.length} Unmatched Income Transaction
-                    {positive.length !== 1 ? "s" : ""}
-                  </h3>
-                  <Badge
-                    variant="secondary"
-                    className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30"
-                  >
-                    {formatCurrency(totalUnmatched)}
-                  </Badge>
+      {!hideBanner && (
+        <button
+          onClick={() => setInternalExpanded((e) => !e)}
+          className="w-full text-left"
+        >
+          <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-transparent hover:from-amber-500/10 transition-colors cursor-pointer">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-amber-500/15 shrink-0">
+                  <Inbox className="size-5 text-amber-600" />
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Match these deposits to your income plans to track allocations
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {positive.length} Unmatched Income Transaction
+                      {positive.length !== 1 ? "s" : ""}
+                    </h3>
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30"
+                    >
+                      {formatCurrency(totalUnmatched)}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Match these deposits to your income plans to track allocations
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-medium text-amber-600">
+                    {isExpanded ? "Hide" : "Review"}
+                  </span>
+                  <ChevronRight
+                    className={`size-4 text-amber-600 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs font-medium text-amber-600">
-                  {isExpanded ? "Hide" : "Review"}
-                </span>
-                <ChevronRight
-                  className={`size-4 text-amber-600 transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </button>
+            </CardContent>
+          </Card>
+        </button>
+      )}
 
       {/* ── Expanded Transaction List ── */}
       {isExpanded && (

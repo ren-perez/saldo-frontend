@@ -19,12 +19,12 @@ import {
   AlertTriangle,
   Filter
 } from "lucide-react";
-import { PotentialTransfer, Transaction, Account } from "@/types/transfers";
+import { PotentialTransfer } from "@/types/transfers";
 import Link from "next/link";
 
 function TransferInboxPage() {
   const { convexUser } = useConvexUser();
-  const [selectedPair, setSelectedPair] = useState<string | null>(null);
+  const [, setSelectedPair] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const potentialTransfers = useQuery(
@@ -78,7 +78,7 @@ function TransferInboxPage() {
     return null;
   };
 
-  const getMatchBadge = (matchType: string, confidence: string) => {
+  const getMatchBadge = (matchType: string, _confidence: string) => {
     if (matchType === 'exact') {
       return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">EXACT MATCH</Badge>;
     }

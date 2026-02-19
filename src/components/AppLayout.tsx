@@ -1,4 +1,3 @@
-// src/components/AppLayout.tsx
 "use client"
 
 import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs"
@@ -40,10 +39,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <>
             <SignedIn>
                 <AppSidebar />
-                <SidebarInset>
-                    {/* <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4"> */}
+                {/* h-svh + overflow-hidden keeps scroll inside main, not the body */}
+                <SidebarInset className="h-svh overflow-hidden">
                     <header className="sticky top-0 z-50 w-full flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-                        {/* <SidebarTrigger className="-ml-1" /> */}
                         <SidebarTrigger className="ml-3 mr-2" />
                         <Separator orientation="vertical" className="h-4" />
                         <div className="flex flex-1 items-center justify-between">
@@ -53,7 +51,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             </div>
                         </div>
                     </header>
-                    <main className="flex flex-1 flex-col gap-4 p-4">
+                    {/* main scrolls vertically; carousel inside handles its own x-axis */}
+                    <main className="flex-1 overflow-y-auto">
                         {children}
                     </main>
                 </SidebarInset>
@@ -82,7 +81,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     </div>
                 </SidebarInset>
             </SignedOut>
-
         </>
     )
 }
