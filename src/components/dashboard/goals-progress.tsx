@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Calendar, Plus, TrendingUp } from "lucide-react"
+import { ArrowRight, Calendar, PiggyBank, Plus, Target, TrendingUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -177,7 +177,7 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                           {/* Top */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-2 flex-1 min-w-0">
-                              <div
+                              {/* <div
                                 className="flex size-8 shrink-0 items-center justify-center rounded-lg text-lg shadow backdrop-blur-sm"
                                 style={{
                                   backgroundColor: `${goal.color}30`,
@@ -185,12 +185,14 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                                   textShadow: "0 2px 4px rgba(0,0,0,0.3)",
                                 }}
                               >
-                                {goal.emoji}
-                              </div>
+                              </div> */}
                               <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-bold leading-tight tracking-tight text-white drop-shadow-md">
-                                  {goal.name}
-                                </h3>
+                                <div className="flex items-center gap-2">
+                                  {goal.emoji}
+                                  <h3 className="text-sm font-bold leading-tight tracking-tight text-white drop-shadow-md">
+                                    {goal.name}
+                                  </h3>
+                                </div>
                                 {goal.note && (
                                   <p className="mt-0.5 line-clamp-1 text-xs text-white/90 drop-shadow">
                                     {goal.note}
@@ -234,19 +236,27 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
 
                           {/* Bottom stats */}
                           <div className="flex items-center justify-between gap-2 text-xs">
-                            <div className="flex items-center gap-4 text-white/95 drop-shadow">
+                            
+                            <div className="flex items-center gap-6 text-white/95 drop-shadow">
                               <div className="flex flex-col">
-                                <span className="text-[9px] font-medium uppercase tracking-wider text-white/70">
-                                  Saved
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <PiggyBank className="h-3.5 w-3.5 text-white/70" />
+                                  <span className="text-[11px] font-medium uppercase tracking-wider text-white/70">
+                                    Saved
+                                  </span>
+                                </div>
                                 <span className="font-semibold tabular-nums">
                                   {currencyExact(goal.current_amount)}
                                 </span>
                               </div>
-                              <div className="flex flex-col">
-                                <span className="text-[9px] font-medium uppercase tracking-wider text-white/70">
-                                  Monthly
-                                </span>
+
+                              <div className="flex flex-col text-right">
+                                <div className="flex items-center gap-1.5">
+                                  <Target className="h-3.5 w-3.5 text-white/70" />
+                                  <span className="text-[11px] font-medium uppercase tracking-wider text-white/70">
+                                    Monthly
+                                  </span>
+                                </div>
                                 <span className="font-semibold tabular-nums">
                                   {currencyExact(goal.monthly_contribution)}
                                 </span>
