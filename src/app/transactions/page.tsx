@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -403,6 +403,14 @@ function MobileTransactionCard({
 }
 
 export default function TransactionsPage() {
+    return (
+        <Suspense fallback={<AppLayout><div className="flex items-center justify-center h-64"><div className="text-lg text-foreground">Loading...</div></div></AppLayout>}>
+            <TransactionsContent />
+        </Suspense>
+    );
+}
+
+function TransactionsContent() {
     const { convexUser } = useConvexUser();
     const searchParams = useSearchParams();
     const [selectedAccount, setSelectedAccount] = useState<Id<"accounts"> | null>(null);
