@@ -20,7 +20,7 @@ export function AccountsSidebarGroup() {
         convexUser ? api.accounts.listAccounts : ("skip" as never),
         convexUser ? { userId: convexUser._id } : "skip"
     )
-    const [open] = useState(false)
+    const [open, setOpen] = useState(false)
 
     // Format currency for display
     const currencyLocales: Record<string, string> = {

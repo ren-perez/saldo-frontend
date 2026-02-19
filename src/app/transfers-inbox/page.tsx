@@ -24,7 +24,7 @@ import Link from "next/link";
 
 function TransferInboxPage() {
   const { convexUser } = useConvexUser();
-  const [, setSelectedPair] = useState<string | null>(null);
+  const [selectedPair, setSelectedPair] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const potentialTransfers = useQuery(
