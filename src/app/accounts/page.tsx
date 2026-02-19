@@ -48,7 +48,9 @@ import {
     Wallet,
     LayoutGrid,
     Table as TableIcon,
+    Info,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 type AccountType = "checking" | "savings" | "investment" | "credit";
 
@@ -158,17 +160,18 @@ export default function AccountsPage() {
     return (
         <AppLayout>
             <InitUser />
-            <div className="w-full min-w-0 mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 max-w-7xl">
-                <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6 p-6">
                     <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-lg font-semibold text-foreground">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-3xl font-bold text-foreground">
                                 Accounts
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
-                                Manage your financial accounts. Click an account
-                                to view details.
-                            </p>
+                            </h1>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Info className="size-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>Manage your financial accounts. Click an account to view details.</TooltipContent>
+                            </Tooltip>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="flex items-center rounded-lg border p-1">
@@ -566,7 +569,6 @@ export default function AccountsPage() {
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
-                </div>
             </div>
         </AppLayout>
     );

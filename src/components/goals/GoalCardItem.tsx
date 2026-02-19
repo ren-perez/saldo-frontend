@@ -23,6 +23,7 @@ interface GoalCardItemProps {
     formatCurrency: (amount: number) => string
     formatDate: (dateString?: string) => string | null
     getProgressPercentage: (current: number, target: number) => number
+    onGoalCompleted?: (goal: Goal) => void
 }
 
 const priorityColors = {
@@ -36,7 +37,8 @@ export function GoalCardItem({
     onEditGoal,
     formatCurrency,
     formatDate,
-    getProgressPercentage
+    getProgressPercentage,
+    onGoalCompleted
 }: GoalCardItemProps) {
     const { convexUser } = useConvexUser()
     const deleteGoalMutation = useMutation(api.goals.deleteGoal)
@@ -65,24 +67,41 @@ export function GoalCardItem({
 
     return (
         <>
-            <GoalCard>
+            <GoalCard
+                style={{
+                    borderColor: goal.color ? `${goal.color}30` : undefined,
+                }}
+            >
 
                 <GoalCardHeader>
                     <div className="relative h-48 w-full">
                         {goal.image_url ? (
-                            <EnhancedImage
-                                src={goal.image_url}
-                                alt={goal.name}
-                                width={300}
-                                height={200}
-                            />
-                        ) : (
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-600 rounded-t-lg flex items-center justify-center">
-                                <div className="text-6xl z-10">{goal.emoji}</div>
-                                <div
-                                    className="absolute inset-0 opacity-20 rounded-t-lg"
-                                    style={{ backgroundColor: goal.color }}
+                            <>
+                                <EnhancedImage
+                                    src={goal.image_url}
+                                    alt={goal.name}
+                                    width={300}
+                                    height={200}
                                 />
+                                {goal.color && (
+                                    <div
+                                        className="absolute inset-0 rounded-t-xl pointer-events-none"
+                                        style={{
+                                            background: `linear-gradient(to top, ${goal.color}40 0%, transparent 40%)`,
+                                        }}
+                                    />
+                                )}
+                            </>
+                        ) : (
+                            <div
+                                className="absolute inset-0 rounded-t-lg flex items-center justify-center"
+                                style={{
+                                    background: goal.color
+                                        ? `linear-gradient(135deg, ${goal.color}90 0%, ${goal.color}50 100%)`
+                                        : undefined,
+                                }}
+                            >
+                                <div className="text-6xl z-10">{goal.emoji}</div>
                             </div>
                         )}
 
@@ -111,22 +130,26 @@ export function GoalCardItem({
                                         <Edit className="h-4 w-4 mr-2" />
                                         Edit Goal
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => setShowAddContribution(true)}>
-                                        <DollarSign className="h-4 w-4 mr-2" />
-                                        Add Contribution
-                                    </DropdownMenuItem>
-                                    {(goal.current_amount > 0) && (
-                                        <DropdownMenuItem onClick={() => setShowTransferDialog(true)}>
-                                            <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                            Transfer Funds
-                                        </DropdownMenuItem>
-                                    )}
-                                    {(goal.current_amount > 0) && (
-                                        <DropdownMenuItem onClick={() => setShowWithdrawalDialog(true)}>
-                                            <TrendingDown className="h-4 w-4 mr-2" />
-                                            Withdraw Funds
-                                        </DropdownMenuItem>
+                                    {!goal.is_completed && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => setShowAddContribution(true)}>
+                                                <DollarSign className="h-4 w-4 mr-2" />
+                                                Add Contribution
+                                            </DropdownMenuItem>
+                                            {(goal.current_amount > 0) && (
+                                                <DropdownMenuItem onClick={() => setShowTransferDialog(true)}>
+                                                    <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                                    Transfer Funds
+                                                </DropdownMenuItem>
+                                            )}
+                                            {(goal.current_amount > 0) && (
+                                                <DropdownMenuItem onClick={() => setShowWithdrawalDialog(true)}>
+                                                    <TrendingDown className="h-4 w-4 mr-2" />
+                                                    Withdraw Funds
+                                                </DropdownMenuItem>
+                                            )}
+                                        </>
                                     )}
                                     <DropdownMenuSeparator />
                                     <Link href={`/goals/${goal._id}`}>
@@ -185,7 +208,15 @@ export function GoalCardItem({
                                 <span className="font-medium">{formatCurrency(Math.ceil(goal.total_amount) - Math.ceil(goal.current_amount || 0))} left</span>
 
                             </div>
-                            <Progress value={progressPercentage} className="h-2" />
+                            <Progress
+                                value={progressPercentage}
+                                className="h-2"
+                                style={goal.color ? { backgroundColor: `${goal.color}20` } : undefined}
+                                indicatorStyle={goal.color ? {
+                                    backgroundColor: goal.color,
+                                    boxShadow: `0 0 8px ${goal.color}`,
+                                } : undefined}
+                            />
                             <div className="text-left text-xs text-muted-foreground">
                                 {progressPercentage.toFixed(1)}%
                             </div>
@@ -302,6 +333,7 @@ export function GoalCardItem({
                 open={showAddContribution}
                 onOpenChange={setShowAddContribution}
                 formatCurrency={formatCurrency}
+                onGoalCompleted={onGoalCompleted}
             />
 
             <GoalTransferDialog

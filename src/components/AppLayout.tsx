@@ -41,18 +41,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <AppSidebar />
                 {/* h-svh + overflow-hidden keeps scroll inside main, not the body */}
                 <SidebarInset className="h-svh overflow-hidden">
-                    <header className="sticky top-0 z-50 w-full flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-                        <SidebarTrigger className="ml-3 mr-2" />
-                        <Separator orientation="vertical" className="h-4" />
-                        <div className="flex flex-1 items-center justify-between">
-                            <h1 className="text-lg font-semibold pl-4">Saldo</h1>
-                            <div className="text-sm text-gray-500 font-medium pr-6">
-                                {today}
+                    {/* main scrolls vertically; header is inside so blur works over content */}
+                    <main className="relative flex-1 overflow-y-auto">
+                        <header className="sticky top-0 z-50 w-full flex h-16 shrink-0 items-center gap-2 border-b bg-background/60 backdrop-blur-xl">
+                            <SidebarTrigger className="ml-3 mr-2" />
+                            <Separator orientation="vertical" className="h-4" />
+                            <div className="flex flex-1 items-center justify-between">
+                                <h1 className="text-lg font-semibold pl-4">Saldo</h1>
+                                <div className="text-sm text-gray-500 font-medium pr-6">
+                                    {today}
+                                </div>
                             </div>
-                        </div>
-                    </header>
-                    {/* main scrolls vertically; carousel inside handles its own x-axis */}
-                    <main className="flex-1 overflow-y-auto">
+                        </header>
                         {children}
                     </main>
                 </SidebarInset>

@@ -12,7 +12,9 @@
       "Bash(npx next build:*)",
       "Bash(timeout 10 pnpm run dev)",
       "Bash(cd:*)",
-      "Read(//c/Users/Ren/**)"
+      "Read(//c/Users/Ren/**)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

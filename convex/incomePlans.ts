@@ -246,7 +246,7 @@ export const getIncomeSummary = query({
         const matched = thisMonth.filter((p) => p.status === "matched");
         const missed = thisMonth.filter((p) => p.status === "missed");
 
-        const totalPlanned = thisMonth.reduce((sum, p) => sum + p.expected_amount, 0);
+        const totalPlanned = planned.reduce((sum, p) => sum + p.expected_amount, 0);
         const totalMatched = matched.reduce((sum, p) => sum + (p.actual_amount ?? p.expected_amount), 0);
         const totalMissed = missed.reduce((sum, p) => sum + p.expected_amount, 0);
 

@@ -25,6 +25,23 @@ export const createContribution = mutation({
             throw new Error("Goal not found or not authorized");
         }
 
+        // Cap contribution so it doesn't exceed the goal target
+        let contributionAmount = args.amount;
+        if (!args.is_withdrawal) {
+            const contributions = await ctx.db
+                .query("goal_contributions")
+                .withIndex("by_goal", (q: any) => q.eq("goalId", args.goalId))
+                .collect();
+            const currentTotal = contributions.reduce((sum: number, c: any) => sum + c.amount, 0);
+            const remaining = (goal as any).total_amount - currentTotal;
+            if (remaining <= 0) {
+                throw new Error("Goal is already completed");
+            }
+            if (contributionAmount > remaining) {
+                contributionAmount = remaining;
+            }
+        }
+
         let transactionId = args.transactionId;
 
         // Create transaction if account is provided and no transaction exists
@@ -42,7 +59,7 @@ export const createContribution = mutation({
             transactionId = await ctx.db.insert("transactions", {
                 userId,
                 accountId: args.accountId,
-                amount: args.is_withdrawal ? -Math.abs(args.amount) : Math.abs(args.amount),
+                amount: args.is_withdrawal ? -Math.abs(contributionAmount) : Math.abs(contributionAmount),
                 date: new Date(args.contribution_date).getTime(),
                 description,
                 transactionType,
@@ -56,7 +73,7 @@ export const createContribution = mutation({
             userId,
             goalId: args.goalId,
             transactionId,
-            amount: args.amount,
+            amount: contributionAmount,
             note: args.note,
             contribution_date: args.contribution_date,
             source: args.source,

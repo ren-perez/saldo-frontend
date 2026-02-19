@@ -7,21 +7,51 @@ export const listAccounts = query({
     handler: async (ctx, { userId }) => {
         const accounts = await ctx.db.query("accounts").withIndex("by_user", q => q.eq("userId", userId)).collect();
 
-        const withLastUpload = await Promise.all(
+        const enriched = await Promise.all(
             accounts.map(async (account) => {
-                const lastImport = await ctx.db
-                    .query("imports")
-                    .withIndex("by_account", q => q.eq("accountId", account._id))
-                    .order("desc")
-                    .first();
+                const [lastImport, recentImports, linkedGoals, transactions] = await Promise.all([
+                    ctx.db
+                        .query("imports")
+                        .withIndex("by_account", q => q.eq("accountId", account._id))
+                        .order("desc")
+                        .first(),
+                    ctx.db
+                        .query("imports")
+                        .withIndex("by_account", q => q.eq("accountId", account._id))
+                        .order("desc")
+                        .take(3),
+                    ctx.db
+                        .query("goals")
+                        .withIndex("by_account", q => q.eq("linked_account_id", account._id))
+                        .collect(),
+                    ctx.db
+                        .query("transactions")
+                        .withIndex("by_account", q => q.eq("accountId", account._id))
+                        .collect(),
+                ]);
                 return {
                     ...account,
                     lastUploadedAt: lastImport?.uploadedAt ?? null,
+                    recentImports: recentImports.map(i => ({
+                        _id: i._id,
+                        fileName: i.fileName,
+                        uploadedAt: i.uploadedAt,
+                        status: i.status,
+                    })),
+                    linkedGoals: linkedGoals.map(g => ({
+                        _id: g._id,
+                        name: g.name,
+                        emoji: g.emoji,
+                        total_amount: g.total_amount,
+                        current_amount: g.current_amount,
+                        is_completed: g.is_completed,
+                    })),
+                    transactionCount: transactions.length,
                 };
             })
         );
 
-        return withLastUpload;
+        return enriched;
     },
 });
 

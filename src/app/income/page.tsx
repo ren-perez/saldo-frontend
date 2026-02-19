@@ -2,11 +2,12 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Inbox, Plus, Calendar, ArrowRight, Link2, DollarSign } from "lucide-react"
+import { Inbox, Plus, Calendar, ArrowRight, Link2, DollarSign, Info } from "lucide-react"
 import { AllocationsView } from "@/components/allocation/allocations-view"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -51,9 +52,14 @@ export default function IncomePage() {
     <AppLayout>
       <InitUser />
       <div className="flex flex-col gap-6 p-6">
-        <div>
+        <div className="flex items-center gap-2">
           <h1 className="text-3xl font-bold text-foreground">Income</h1>
-          <p className="text-muted-foreground">Track and allocate your income across accounts.</p>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="size-4 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>Track and allocate your income across accounts.</TooltipContent>
+          </Tooltip>
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between gap-3">

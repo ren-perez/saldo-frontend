@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { CheckCircle2, Clock, XCircle, CalendarClock, Wallet, PiggyBank, TrendingUp, CreditCard } from "lucide-react"
+import { CheckCircle2, Clock, XCircle, CalendarClock, Wallet, PiggyBank, TrendingUp, CreditCard, SquareArrowOutUpRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { currency, currencyExact, formatDate } from "@/lib/format"
@@ -43,7 +43,7 @@ type IncomeSummary = {
     totalMatched: number
     totalMissed: number
   }
-  upcoming: Array<{ expected_amount: number; expected_date: string; label: string }>
+  upcoming: Array<{ _id: string; expected_amount: number; expected_date: string; label: string }>
 }
 
 interface AccountsSnapshotProps {
@@ -65,7 +65,7 @@ export function AccountsSnapshot({ accounts, incomeSummary }: AccountsSnapshotPr
       <Tabs defaultValue="income">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Overview</CardTitle>
+            <CardTitle className="text-base">Finances</CardTitle>
             <TabsList className="h-8">
               <TabsTrigger value="income" className="text-xs px-3 h-7">Income</TabsTrigger>
               <TabsTrigger value="accounts" className="text-xs px-3 h-7">Accounts</TabsTrigger>
@@ -79,10 +79,13 @@ export function AccountsSnapshot({ accounts, incomeSummary }: AccountsSnapshotPr
             {summary ? (
               <div className="flex flex-col gap-4">
                 {/* Total expected this month */}
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm text-muted-foreground">Expected this month</span>
+                <Link href="/income" className="flex items-baseline justify-between group">
+                  <span className="flex items-center text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                    Expected this month
+                    <SquareArrowOutUpRight className="size-3 ml-2 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-foreground transition-opacity" />
+                    </span>
                   <span className="text-2xl font-semibold tabular-nums">{currency(totalExpected)}</span>
-                </div>
+                </Link>
 
                 {/* Progress bar */}
                 <div className="space-y-1.5">
@@ -100,48 +103,52 @@ export function AccountsSnapshot({ accounts, incomeSummary }: AccountsSnapshotPr
 
                 {/* Status rows */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-lg border bg-background p-3">
+                  <Link href="/income" className="rounded-lg border bg-muted/40 p-3 hover:bg-muted/70 transition-colors">
                     <div className="flex items-center gap-1.5 mb-1">
                       <CheckCircle2 className="size-3.5 text-emerald-500" />
                       <span className="text-xs text-muted-foreground">Matched</span>
                     </div>
                     <p className="text-sm font-semibold tabular-nums">{currency(summary.totalMatched)}</p>
                     <p className="text-xs text-muted-foreground">{summary.matchedCount} received</p>
-                  </div>
-                  <div className="rounded-lg border bg-background p-3">
+                  </Link>
+                  <Link href="/income" className="rounded-lg border bg-muted/40 p-3 hover:bg-muted/70 transition-colors">
                     <div className="flex items-center gap-1.5 mb-1">
                       <Clock className="size-3.5 text-amber-500" />
                       <span className="text-xs text-muted-foreground">Planned</span>
                     </div>
                     <p className="text-sm font-semibold tabular-nums">{currency(summary.totalPlanned)}</p>
                     <p className="text-xs text-muted-foreground">{summary.plannedCount} pending</p>
-                  </div>
-                  <div className="rounded-lg border bg-background p-3">
+                  </Link>
+                  <Link href="/income" className="rounded-lg border bg-muted/40 p-3 hover:bg-muted/70 transition-colors">
                     <div className="flex items-center gap-1.5 mb-1">
                       <XCircle className="size-3.5 text-destructive" />
                       <span className="text-xs text-muted-foreground">Missed</span>
                     </div>
                     <p className="text-sm font-semibold tabular-nums">{currency(summary.totalMissed)}</p>
                     <p className="text-xs text-muted-foreground">{summary.missedCount} missed</p>
-                  </div>
+                  </Link>
                 </div>
 
                 {/* Upcoming */}
                 {incomeSummary.upcoming.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-2 mt-3">
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <CalendarClock className="size-3.5" />
                       <span>Upcoming</span>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      {incomeSummary.upcoming.slice(0, 3).map((item, i) => (
-                        <div key={i} className="flex items-center justify-between text-sm">
+                      {incomeSummary.upcoming.slice(0, 3).map((item) => (
+                        <Link
+                          key={item._id}
+                          href="/income"
+                          className="flex items-center justify-between text-sm py-1.5 px-4 -mx-1 rounded-md hover:bg-muted/50 transition-colors"
+                        >
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">{item.expected_date}</span>
                             <span className="font-medium">{item.label}</span>
                           </div>
                           <span className="tabular-nums font-medium">{currency(item.expected_amount)}</span>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   </div>
