@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import {
     Sidebar,
     SidebarContent,
@@ -12,6 +12,7 @@ import {
     SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
+    SidebarMenuBadge,
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
@@ -19,6 +20,9 @@ import {
 } from "@/components/ui/sidebar"
 import { UserButton } from "@clerk/nextjs"
 import { ThemeToggle } from "./theme-toggle"
+import { useConvexUser } from "@/hooks/useConvexUser"
+import { useQuery } from "convex/react"
+import { api } from "../../convex/_generated/api"
 import {
     Home,
     Landmark,
@@ -29,26 +33,32 @@ import {
     FileSpreadsheet,
 } from "lucide-react"
 
-const navItems = [
+const planningItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
-    // { href: "/review", label: "Review", icon: Lightbulb },
     { href: "/income", label: "Income", icon: DollarSign },
     { href: "/goals", label: "Goals", icon: Target },
-    // { href: "/goals/history", label: "Contribution History", icon: History },
-    // { href: "/goals/analytics", label: "Goal Analytics", icon: BarChart3 },
-    // { href: "/allocations", label: "Allocations", icon: PieChart },
+]
 
+const trackingItems = [
     { href: "/accounts", label: "Accounts", icon: Landmark },
     { href: "/transactions", label: "Transactions", icon: CreditCard },
     { href: "/categories", label: "Categories", icon: Tag },
     { href: "/presets", label: "Presets", icon: FileSpreadsheet },
-    // { href: "/import-csv", label: "Import CSV", icon: Upload },
-    // { href: "/imports", label: "Import History", icon: FileText },
 ]
 
 export function AppSidebar() {
     const pathname = usePathname()
     const { setOpenMobile, isMobile } = useSidebar()
+    const { convexUser } = useConvexUser()
+
+    const plans = useQuery(
+        api.incomePlans.listIncomePlans,
+        convexUser ? { userId: convexUser._id } : "skip"
+    )
+    const plannedIncomeCount = useMemo(
+        () => (plans ?? []).filter((p) => p.status === "planned").length,
+        [plans]
+    )
 
     // Close mobile sidebar when pathname changes
     useEffect(() => {
@@ -101,7 +111,35 @@ export function AppSidebar() {
                     <SidebarGroupLabel>Planning</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu className="space-y-1">
-                            {navItems.map((item) => {
+                            {planningItems.map((item) => {
+                                const IconComponent = item.icon
+                                return (
+                                    <SidebarMenuItem key={item.href}>
+                                        <SidebarMenuButton
+                                            asChild
+                                            isActive={pathname === item.href}
+                                            tooltip={item.label}
+                                        >
+                                            <Link href={item.href}>
+                                                <IconComponent className="w-4 h-4" />
+                                                <span>{item.label}</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                        {item.href === "/income" && plannedIncomeCount > 0 && (
+                                            <SidebarMenuBadge>{plannedIncomeCount}</SidebarMenuBadge>
+                                        )}
+                                    </SidebarMenuItem>
+                                )
+                            })}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+
+                <SidebarGroup>
+                    <SidebarGroupLabel>Tracking</SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu className="space-y-1">
+                            {trackingItems.map((item) => {
                                 const IconComponent = item.icon
                                 return (
                                     <SidebarMenuItem key={item.href}>
@@ -121,8 +159,6 @@ export function AppSidebar() {
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
-
-                {/* <AccountsSidebarGroup /> */}
             </SidebarContent>
 
             <SidebarFooter className="p-4 border-t mt-auto">

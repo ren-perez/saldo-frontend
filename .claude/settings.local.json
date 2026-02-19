@@ -11,7 +11,8 @@
       "Bash(pnpm run:*)",
       "Bash(npx next build:*)",
       "Bash(timeout 10 pnpm run dev)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Read(//c/Users/Ren/**)"
     ],
     "deny": [],
     "ask": []

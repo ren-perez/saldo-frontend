@@ -1,10 +1,29 @@
 "use client"
 
-import { Landmark, CheckCircle2, Clock, XCircle, CalendarClock } from "lucide-react"
+import Link from "next/link"
+import { CheckCircle2, Clock, XCircle, CalendarClock, Wallet, PiggyBank, TrendingUp, CreditCard } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { currency, currencyExact } from "@/lib/format"
+import { currency, currencyExact, formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
+
+type AccountType = "checking" | "savings" | "investment" | "credit"
+
+const typeIcons: Record<AccountType, React.ElementType> = {
+  checking: Wallet,
+  savings: PiggyBank,
+  investment: TrendingUp,
+  credit: CreditCard,
+}
+
+const typeLabels: Record<AccountType, string> = {
+  checking: "Checking",
+  savings: "Savings",
+  investment: "Investment",
+  credit: "Credit",
+}
+
+const accountTypeOrder: AccountType[] = ["checking", "savings", "credit", "investment"]
 
 type Account = {
   _id: string
@@ -12,6 +31,7 @@ type Account = {
   type: string
   bank: string
   balance?: number
+  lastUploadedAt?: number | null
 }
 
 type IncomeSummary = {
@@ -138,25 +158,47 @@ export function AccountsSnapshot({ accounts, incomeSummary }: AccountsSnapshotPr
               <span className="text-sm text-muted-foreground">Total balance</span>
               <span className="text-2xl font-semibold tabular-nums">{currencyExact(totalBalance)}</span>
             </div>
-            <div className="flex flex-col gap-1.5">
-              {accounts.map((account) => (
-                <div
-                  key={account._id}
-                  className="flex items-center justify-between rounded-md border px-3 py-2"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Landmark className="size-3.5 text-muted-foreground shrink-0" />
-                    <span className="text-sm font-medium truncate">{account.name}</span>
-                    <span className="text-xs text-muted-foreground shrink-0">{account.bank}</span>
+            <div className="flex flex-col gap-4">
+              {accountTypeOrder.map((type) => {
+                const group = accounts.filter((a) => a.type === type)
+                if (group.length === 0) return null
+                const Icon = typeIcons[type]
+                return (
+                  <div key={type}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Icon className="size-3.5 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{typeLabels[type]}</span>
+                    </div>
+                    <div className="divide-y">
+                      {group.map((account) => (
+                        <Link
+                          key={account._id}
+                          href={`/transactions?accountId=${account._id}`}
+                          className="flex items-center justify-between py-2 px-1 -mx-1 rounded-md hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium truncate">{account.name}</span>
+                              <span className="text-xs text-muted-foreground shrink-0">{account.bank}</span>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground">
+                              {account.lastUploadedAt
+                                ? `Last upload ${formatDate(account.lastUploadedAt)}`
+                                : "No uploads yet"}
+                            </span>
+                          </div>
+                          <span className={cn(
+                            "text-sm font-semibold tabular-nums shrink-0 ml-3",
+                            (account.balance ?? 0) < 0 ? "text-destructive" : "text-foreground"
+                          )}>
+                            {currencyExact(account.balance ?? 0)}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
-                  <span className={cn(
-                    "text-sm font-semibold tabular-nums shrink-0 ml-3",
-                    (account.balance ?? 0) < 0 ? "text-destructive" : "text-foreground"
-                  )}>
-                    {currencyExact(account.balance ?? 0)}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
               {accounts.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">No accounts yet</p>
               )}

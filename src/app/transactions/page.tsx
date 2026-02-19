@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
@@ -403,7 +404,13 @@ function MobileTransactionCard({
 
 export default function TransactionsPage() {
     const { convexUser } = useConvexUser();
+    const searchParams = useSearchParams();
     const [selectedAccount, setSelectedAccount] = useState<Id<"accounts"> | null>(null);
+
+    useEffect(() => {
+        const accountId = searchParams.get("accountId");
+        if (accountId) setSelectedAccount(accountId as Id<"accounts">);
+    }, [searchParams]);
     const [search, setSearch] = useState("");
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
     const [categoryFilter, setCategoryFilter] = useState<string | null>(null);

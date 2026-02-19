@@ -5,7 +5,23 @@ import { v } from "convex/values";
 export const listAccounts = query({
     args: { userId: v.id("users") },
     handler: async (ctx, { userId }) => {
-        return await ctx.db.query("accounts").withIndex("by_user", q => q.eq("userId", userId)).collect();
+        const accounts = await ctx.db.query("accounts").withIndex("by_user", q => q.eq("userId", userId)).collect();
+
+        const withLastUpload = await Promise.all(
+            accounts.map(async (account) => {
+                const lastImport = await ctx.db
+                    .query("imports")
+                    .withIndex("by_account", q => q.eq("accountId", account._id))
+                    .order("desc")
+                    .first();
+                return {
+                    ...account,
+                    lastUploadedAt: lastImport?.uploadedAt ?? null,
+                };
+            })
+        );
+
+        return withLastUpload;
     },
 });
 
