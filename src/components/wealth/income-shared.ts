@@ -17,6 +17,14 @@ export interface IncomePlan {
   date_received?: string
 }
 
+export interface UnmatchedTransaction {
+  _id: Id<"transactions">
+  amount: number
+  date: number
+  description: string
+  account?: { name: string } | null
+}
+
 export interface AllocationRecord {
   _id: Id<"allocation_records">
   accountId: Id<"accounts">
@@ -77,10 +85,5 @@ export function formatCurrency(amount: number) {
 }
 
 export function formatDate(dateStr: string) {
-  try {
-    const { format, parseISO } = require("date-fns")
-    return format(parseISO(dateStr), "MMM d, yyyy")
-  } catch {
-    return dateStr
-  }
+  return format(parseISO(dateStr), "MMM d, yyyy")
 }

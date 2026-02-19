@@ -64,13 +64,13 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
 
     const getTrackingTypeDisplay = () => {
         if (goal.tracking_type === "MANUAL") {
-            return { icon: <HandCoins className="h-3.5 w-3.5" />, label: "Manual" }
+            return { icon: <HandCoins className="h-3.5 w-3.5" />, label: "Manual", className: "" }
         } else if (goal.tracking_type === "LINKED_ACCOUNT") {
-            return { icon: <CreditCard className="h-3.5 w-3.5" />, label: "From Account" }
+            return { icon: <CreditCard className="h-3.5 w-3.5" />, label: "From Account", className: "border-blue-200 bg-blue-50/50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" }
         } else if (goal.tracking_type === "EXPENSE_CATEGORY") {
-            return { icon: <Tag className="h-3.5 w-3.5" />, label: "Expense-Linked" }
+            return { icon: <Tag className="h-3.5 w-3.5" />, label: "Expense-Linked", className: "border-purple-200 bg-purple-50/50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300" }
         }
-        return { icon: null, label: "Unknown" }
+        return { icon: null, label: "Unknown", className: "" }
     }
 
     const trackingDisplay = getTrackingTypeDisplay()
@@ -79,39 +79,39 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
     return (
         <AppLayout>
             <InitUser />
-            <div className="flex flex-col max-w-4xl mx-auto">
-                {/* Notion-style Header Image */}
-                <div className="relative w-full h-[280px] bg-gradient-to-br from-muted/60 via-muted/30 to-background overflow-hidden">
-                    {headerImage ? (
-                        <img
-                            src={headerImage}
-                            alt={goal.name}
-                            className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div
-                            className="w-full h-full"
-                            style={{
-                                background: `linear-gradient(135deg, ${goal.color || 'oklch(0.45 0.12 160)'} 0%, ${goal.color || 'oklch(0.55 0.08 200)'}80 50%, transparent 100%)`,
-                                opacity: 0.4,
-                            }}
-                        />
-                    )}
-                    {/* Gradient overlay for readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+            {/* Notion-style Header Image - full width */}
+            <div className="relative w-full h-[280px] lg:h-[320px] bg-gradient-to-br from-muted/60 via-muted/30 to-background overflow-hidden">
+                {headerImage ? (
+                    <img
+                        src={headerImage}
+                        alt={goal.name}
+                        className="w-full h-full object-cover object-center"
+                    />
+                ) : (
+                    <div
+                        className="w-full h-full"
+                        style={{
+                            background: `linear-gradient(135deg, ${goal.color || 'oklch(0.45 0.12 160)'} 0%, ${goal.color || 'oklch(0.55 0.08 200)'}80 50%, transparent 100%)`,
+                            opacity: 0.4,
+                        }}
+                    />
+                )}
+                {/* Gradient overlay for readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
 
-                    {/* Back button floating on image */}
-                    <div className="absolute top-4 left-4">
-                        <Link href="/goals">
-                            <Button variant="secondary" size="sm" className="backdrop-blur-sm bg-background/70 hover:bg-background/90 shadow-sm">
-                                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                                Goals
-                            </Button>
-                        </Link>
-                    </div>
+                {/* Back button floating on image */}
+                <div className="absolute top-4 left-4">
+                    <Link href="/goals">
+                        <Button variant="secondary" size="sm" className="backdrop-blur-sm bg-background/70 hover:bg-background/90 shadow-sm">
+                            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                            Goals
+                        </Button>
+                    </Link>
                 </div>
+            </div>
 
-                {/* Content - overlaps the header image slightly */}
+            {/* Content - overlaps the header image slightly */}
+            <div className="flex flex-col max-w-4xl mx-auto w-full">
                 <div className="relative -mt-16 px-6 pb-12">
                     {/* Emoji + Title */}
                     <div className="flex flex-col gap-1 mb-8">
@@ -124,8 +124,9 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
                                 {goal.note}
                             </p>
                         )}
+                        
                         <div className="flex items-center gap-2 mt-3">
-                            <Badge variant="outline" className="gap-1 text-xs">
+                            <Badge variant="outline" className={`gap-1 text-xs ${trackingDisplay.className}`}>
                                 {trackingDisplay.icon}
                                 {trackingDisplay.label}
                             </Badge>
@@ -189,34 +190,17 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
                     </div>
 
                     {/* Linked Info */}
-                    {(goal.linked_account || goal.linked_category) && (
+                    {goal.linked_account && (
                         <div className="flex flex-col gap-3 mb-10">
-                            {goal.linked_account && (
-                                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40">
-                                    <CreditCard className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                                    <div>
-                                        <span className="text-xs text-blue-700 dark:text-blue-300">Linked Account</span>
-                                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                            {goal.linked_account.name} ({goal.linked_account.account_type})
-                                        </p>
-                                    </div>
+                            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40">
+                                <CreditCard className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                                <div>
+                                    <span className="text-xs text-blue-700 dark:text-blue-300">Linked Account</span>
+                                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                        {goal.linked_account.name} ({goal.linked_account.account_type})
+                                    </p>
                                 </div>
-                            )}
-                            {goal.linked_category && (
-                                <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-purple-50/50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/40">
-                                    <Tag className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                                    <div>
-                                        <span className="text-xs text-purple-700 dark:text-purple-300">Linked Category</span>
-                                        <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
-                                            {goal.linked_category.group_name ? `${goal.linked_category.group_name} / ` : ""}
-                                            {goal.linked_category.name}
-                                        </p>
-                                        <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">
-                                            Expenses in this category count toward this goal
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     )}
 
