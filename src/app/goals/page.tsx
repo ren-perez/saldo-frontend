@@ -140,7 +140,7 @@ export default function GoalsPage() {
   return (
     <AppLayout>
       <InitUser />
-      <div className="container mx-auto py-6 px-4">
+      <div className="container mx-auto py-6 px-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
@@ -159,10 +159,10 @@ export default function GoalsPage() {
           </TooltipProvider>
         </div>
 
-        <div className="mb-8 text-right">
+        <div className="mb-6 text-right">
           <Button onClick={handleCreateNewGoal} className="gap-2">
             <Plus className="h-4 w-4" />
-            New Goal
+            Add Goal
           </Button>
         </div>
 

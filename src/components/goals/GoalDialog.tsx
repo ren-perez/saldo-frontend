@@ -2,13 +2,12 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
@@ -17,20 +16,22 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "../ui/textarea"
-import { Separator } from "../ui/separator"
 import { useQuery, useMutation, useAction } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
 import {
-    // DollarSign,
     Calendar, AlertCircle,
-    Loader2, HandCoins, CreditCard, Tag
+    Loader2, HandCoins, CreditCard, Tag,
+    ChevronRight, ChevronLeft, Check,
+    Sparkles, ImageIcon
 } from "lucide-react"
 import type { Goal } from "@/types/goals"
 import type { Id } from "../../../convex/_generated/dataModel"
 import Image from "next/image"
 import imageCompression from "browser-image-compression"
+import { cn } from "@/lib/utils"
+import { Separator } from "../ui/separator"
 
 
 type ImageState =
@@ -47,6 +48,80 @@ interface GoalDialogProps {
     mode: 'create' | 'edit'
 }
 
+const GOAL_COLORS = [
+    "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6",
+    "#ec4899", "#06b6d4", "#f97316", "#6366f1", "#14b8a6",
+    "#e11d48", "#84cc16", "#0ea5e9", "#a855f7", "#d946ef",
+]
+
+function getRandomColor(): string {
+    return GOAL_COLORS[Math.floor(Math.random() * GOAL_COLORS.length)]
+}
+
+function extractDominantColor(imageUrl: string): Promise<string> {
+    return new Promise((resolve) => {
+        const img = document.createElement("img")
+        img.crossOrigin = "anonymous"
+        img.onload = () => {
+            try {
+                const canvas = document.createElement("canvas")
+                const ctx = canvas.getContext("2d")
+                if (!ctx) { resolve(getRandomColor()); return }
+
+                // Sample from center region for better results
+                const sampleSize = 50
+                canvas.width = sampleSize
+                canvas.height = sampleSize
+                ctx.drawImage(img, 0, 0, sampleSize, sampleSize)
+
+                const data = ctx.getImageData(0, 0, sampleSize, sampleSize).data
+                let r = 0, g = 0, b = 0, count = 0
+
+                for (let i = 0; i < data.length; i += 16) { // sample every 4th pixel
+                    // Skip very dark and very light pixels
+                    const pr = data[i], pg = data[i + 1], pb = data[i + 2]
+                    const brightness = (pr + pg + pb) / 3
+                    if (brightness > 30 && brightness < 230) {
+                        r += pr; g += pg; b += pb; count++
+                    }
+                }
+
+                if (count === 0) { resolve(getRandomColor()); return }
+
+                r = Math.round(r / count)
+                g = Math.round(g / count)
+                b = Math.round(b / count)
+
+                // Boost saturation slightly for a more vibrant color
+                const max = Math.max(r, g, b)
+                const min = Math.min(r, g, b)
+                const mid = (max + min) / 2
+                if (mid > 0) {
+                    const factor = 1.3
+                    r = Math.min(255, Math.round(mid + (r - mid) * factor))
+                    g = Math.min(255, Math.round(mid + (g - mid) * factor))
+                    b = Math.min(255, Math.round(mid + (b - mid) * factor))
+                }
+
+                const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
+                resolve(hex)
+            } catch {
+                resolve(getRandomColor())
+            }
+        }
+        img.onerror = () => resolve(getRandomColor())
+        img.src = imageUrl
+    })
+}
+
+const STEPS = [
+    { id: "basics", label: "Basics", icon: Sparkles },
+    { id: "tracking", label: "Tracking", icon: CreditCard },
+    { id: "amount", label: "Planning", icon: Calendar },
+] as const
+
+type StepId = typeof STEPS[number]["id"]
+
 export function GoalDialog({
     open,
     onOpenChange,
@@ -56,6 +131,7 @@ export function GoalDialog({
     mode,
 }: GoalDialogProps) {
     const { convexUser } = useConvexUser()
+    const [currentStep, setCurrentStep] = useState<StepId>("basics")
     const [formData, setFormData] = useState({
         name: "",
         note: "",
@@ -99,7 +175,6 @@ export function GoalDialog({
     const getGoalImageUploadUrl = useAction(api.importActions.getGoalImageUploadUrl);
 
     // Get selected account details
-    // const selectedAccount = accounts.find((account) => account.id === formData.linked_account_id)
     const selectedAccount = accounts.find(
         (account) => account._id.toString() === formData.linked_account_id
     )
@@ -126,6 +201,7 @@ export function GoalDialog({
     // Reset form when dialog opens/closes or when editing goal changes
     useEffect(() => {
         if (open && mode === "edit" && editingGoal) {
+            setCurrentStep("basics")
             setFormData({
                 name: editingGoal.name,
                 note: editingGoal.note || "",
@@ -146,10 +222,11 @@ export function GoalDialog({
             setPreviewUrl(editingGoal.image_url || null)
             setImageState(
                 editingGoal.image_url
-                    ? { type: "original", url: editingGoal.image_url } // ⭐ Removed ?t=${Date.now()}
+                    ? { type: "original", url: editingGoal.image_url }
                     : null
             )
         } else if (open && mode === "create") {
+            setCurrentStep("basics")
             setFormData({
                 name: "",
                 note: "",
@@ -160,7 +237,7 @@ export function GoalDialog({
                 tracking_type: "MANUAL",
                 linked_account_id: null,
                 linked_category_id: null,
-                color: "#3b82f6",
+                color: getRandomColor(),
                 emoji: "🎯",
                 priority: 3,
                 image: null,
@@ -314,7 +391,6 @@ export function GoalDialog({
                     headers: { "Content-Type": compressedFile.type },
                 })
 
-                // ⭐ KEY CHANGE: Add version timestamp to prevent caching
                 imageUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${fileKey}?v=${Date.now()}`
 
                 toast.loading("Finalizing...", { id: "goal-save" });
@@ -452,6 +528,10 @@ export function GoalDialog({
 
             const url = URL.createObjectURL(compressedFile)
             setImageState({ type: "new", file: compressedFile, url })
+
+            // Extract dominant color from the image
+            const dominantColor = await extractDominantColor(url)
+            setFormData(prev => ({ ...prev, color: dominantColor }))
         } catch (error) {
             console.error('Error processing image:', error)
             toast.error('Failed to process image. Please try again.')
@@ -463,7 +543,7 @@ export function GoalDialog({
     }
 
 
-    const handleImageRemove = () => {
+    const handleImageRemove = useCallback(() => {
         if (!imageState) return
 
         if (imageState.type === "new") {
@@ -473,11 +553,16 @@ export function GoalDialog({
                     ? { type: "original", url: editingGoal.image_url }
                     : null
             )
+            // Assign a new random color since image is gone
+            if (!editingGoal?.image_url) {
+                setFormData(prev => ({ ...prev, color: getRandomColor() }))
+            }
         } else if (imageState.type === "original") {
             // Mark original image for removal
             setImageState({ type: "removed" })
+            setFormData(prev => ({ ...prev, color: getRandomColor() }))
         }
-    }
+    }, [imageState, editingGoal?.image_url])
 
     const formatBalance = (balance?: number): string => {
         if (balance === null || balance === undefined) return "0.00"
@@ -486,418 +571,534 @@ export function GoalDialog({
     }
 
     const isEditing = mode === 'edit'
-    const _isLoading = false // Convex mutations don't have isPending like TanStack Query
+
+    const currentStepIndex = STEPS.findIndex(s => s.id === currentStep)
+    const isFirstStep = currentStepIndex === 0
+    const isLastStep = currentStepIndex === STEPS.length - 1
+
+    const goNext = () => {
+        if (!isLastStep) setCurrentStep(STEPS[currentStepIndex + 1].id)
+    }
+    const goBack = () => {
+        if (!isFirstStep) setCurrentStep(STEPS[currentStepIndex - 1].id)
+    }
+
+    const canProceedFromBasics = formData.name.trim().length > 0
+    const canProceedFromTracking = formData.tracking_type === "MANUAL"
+        || (formData.tracking_type === "LINKED_ACCOUNT" && formData.linked_account_id)
+        || (formData.tracking_type === "EXPENSE_CATEGORY" && formData.linked_category_id)
+    const canSubmit = canProceedFromBasics && canProceedFromTracking && formData.total_amount
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
-                <DialogHeader className="mb-4 flex-shrink-0">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col gap-0">
+                <DialogHeader className="flex-shrink-0 pb-8">
                     <DialogTitle>
                         {isEditing ? 'Edit Goal' : 'Create New Goal'}
                     </DialogTitle>
-                    <DialogDescription>
+                    {/* <DialogDescription>
                         {isEditing
-                            ? 'Update your financial goal details and track your progress.'
-                            : 'Set up a new financial goal to track your progress and stay motivated.'
+                            ? 'Update your financial goal details.'
+                            : 'Set up a new financial goal step by step.'
                         }
-                    </DialogDescription>
+                    </DialogDescription> */}
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 px-1">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Goal Name *</Label>
-                        <Input
-                            id="name"
-                            placeholder="e.g., Emergency Fund, Dream Vacation"
-                            value={formData.name}
-                            onChange={(e) => handleInputChange("name", e.target.value)}
-                            required
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="emoji">Emoji</Label>
-                            <Input
-                                id="emoji"
-                                placeholder="🎯"
-                                value={formData.emoji}
-                                onChange={(e) => handleInputChange("emoji", e.target.value)}
-                                maxLength={2}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="color">Color</Label>
-                            <Input
-                                id="color"
-                                type="color"
-                                value={formData.color}
-                                onChange={(e) => handleInputChange("color", e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="priority">Priority</Label>
-                            <Select
-                                value={formData.priority.toString()}
-                                onValueChange={(value) => handleInputChange("priority", parseInt(value))}
+                {/* Step indicators */}
+                <div className="flex justify-center items-center gap-2 flex-shrink-0 lg:mx-20 py-1 bg-muted rounded-md">
+                    {STEPS.map((step, index) => {
+                        const Icon = step.icon
+                        const isActive = step.id === currentStep
+                        const isCompleted = index < currentStepIndex
+                        return (
+                            <button
+                                key={step.id}
+                                type="button"
+                                onClick={() => setCurrentStep(step.id)}
+                                disabled={
+                                    (currentStep === "basics" && !canProceedFromBasics) ||
+                                    (currentStep === "tracking" && !canProceedFromTracking)
+                                }
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                    isActive
+                                        ? "bg-primary text-primary-foreground shadow-md"
+                                        : isCompleted
+                                            ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                            : "text-muted-foreground hover:bg-muted/80"
+                                )}
                             >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {priorityOptions.map((option, index) => (
-                                        <SelectItem
-                                            key={`priority-${option.value || index}`}
-                                            value={option.value?.toString() || index.toString()}
+                                {isCompleted ? (
+                                    <Check className="h-3 w-3" />
+                                ) : (
+                                    <Icon className="h-3 w-3" />
+                                )}
+                                {step.label}
+                            </button>
+                        )
+                    })}
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden pt-6">
+                    <div className="flex-1 overflow-y-auto px-1 pb-2">
+                        {/* Step 1: Basics */}
+                        {currentStep === "basics" && (
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Goal Name *</Label>
+                                    <Input
+                                        id="name"
+                                        placeholder="e.g., Emergency Fund, Dream Vacation"
+                                        value={formData.name}
+                                        onChange={(e) => handleInputChange("name", e.target.value)}
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="emoji">Emoji</Label>
+                                        <Input
+                                            id="emoji"
+                                            placeholder="🎯"
+                                            value={formData.emoji}
+                                            onChange={(e) => handleInputChange("emoji", e.target.value)}
+                                            maxLength={2}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="priority">Priority</Label>
+                                        <Select
+                                            value={formData.priority.toString()}
+                                            onValueChange={(value) => handleInputChange("priority", parseInt(value))}
                                         >
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    {/* Image */}
-                    <div className="space-y-2">
-                        <Label htmlFor="image">{mode === "edit" ? 'Update Image' : 'Image'}</Label>
-
-                        {imageState && imageState.type !== "removed" && (
-                            <div className="flex items-center gap-2 p-2 border rounded">
-                                <Image
-                                    src={imageState.url}
-                                    alt="Goal image preview"
-                                    className="w-12 h-12 object-cover rounded"
-                                    width={48}
-                                    height={48}
-                                />
-                                <span className="text-sm text-muted-foreground flex-1">
-                                    {imageState.type === "new" ? "New image selected" : "Current image"}
-                                </span>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleImageRemove}
-                                    disabled={isUploading}
-                                >
-                                    Remove
-                                </Button>
-                            </div>
-                        )}
-
-                        {imageState?.type === "removed" && (
-                            <p className="text-sm text-muted-foreground">
-                                Image will be removed
-                            </p>
-                        )}
-
-                        <div className="flex items-center gap-2">
-                            <Input
-                                id="image"
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileChange}
-                                disabled={isCompressing || isUploading}
-                            />
-                            {isCompressing && (
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            )}
-                        </div>
-
-                        {isCompressing && (
-                            <p className="text-xs text-muted-foreground">
-                                Compressing image...
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="note">Note</Label>
-                        <Textarea
-                            ref={noteRef}
-                            id="note"
-                            placeholder="Optional note about the goal"
-                            value={formData.note}
-                            onChange={(e) => handleInputChange("note", e.target.value)}
-                        />
-                    </div>
-
-                    <Separator className="my-8" />
-
-                    <div className="space-y-3">
-                        <Label>Tracking Type</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                            <Button
-                                type="button"
-                                variant={formData.tracking_type === 'MANUAL' ? 'default' : 'outline'}
-                                className="h-auto p-3 flex flex-col items-center gap-2"
-                                onClick={() => setFormData((prev) => ({
-                                    ...prev,
-                                    tracking_type: "MANUAL",
-                                    linked_account_id: null,
-                                    linked_category_id: null,
-                                }))}
-                            >
-                                <HandCoins className="h-5 w-5" />
-                                <span className="text-xs">Manual</span>
-                            </Button>
-                            <Button
-                                type="button"
-                                variant={formData.tracking_type === 'LINKED_ACCOUNT' ? 'default' : 'outline'}
-                                className="h-auto p-3 flex flex-col items-center gap-2"
-                                onClick={() => setFormData((prev) => ({
-                                    ...prev,
-                                    tracking_type: "LINKED_ACCOUNT",
-                                    linked_category_id: null,
-                                }))}
-                            >
-                                <CreditCard className="h-5 w-5" />
-                                <span className="text-xs">From Account</span>
-                            </Button>
-                            <Button
-                                type="button"
-                                variant={formData.tracking_type === 'EXPENSE_CATEGORY' ? 'default' : 'outline'}
-                                className="h-auto p-3 flex flex-col items-center gap-2"
-                                onClick={() => setFormData((prev) => ({
-                                    ...prev,
-                                    tracking_type: "EXPENSE_CATEGORY",
-                                    linked_account_id: null,
-                                }))}
-                            >
-                                <Tag className="h-5 w-5" />
-                                <span className="text-xs">Expense-Linked</span>
-                            </Button>
-                        </div>
-                    </div>
-
-                    {formData.tracking_type === "LINKED_ACCOUNT" && (
-                        <div className="space-y-2">
-                            <Label htmlFor="linked_account">Select Account *</Label>
-                            <Select
-                                value={formData.linked_account_id || ""}
-                                onValueChange={(value) => handleInputChange("linked_account_id", value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Choose an account" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {accounts.map((account, index) => (
-                                        <SelectItem
-                                            key={`account-${account._id}-${index}`}
-                                            value={account._id}
-                                        >
-                                            {account.name} ({account.account_type})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground">
-                                Goal progress will track the balance of this account
-                            </p>
-                            {selectedAccount && (
-                                <div className="p-3 bg-muted rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-medium">{selectedAccount.name}</p>
-                                            <p className="text-sm text-muted-foreground">{selectedAccount.account_type}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm text-muted-foreground">Current Balance</p>
-                                            <p className="font-semibold text-lg">${formatBalance(selectedAccount.balance)}</p>
-                                        </div>
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {priorityOptions.map((option, index) => (
+                                                    <SelectItem
+                                                        key={`priority-${option.value || index}`}
+                                                        value={option.value?.toString() || index.toString()}
+                                                    >
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
 
-                    {formData.tracking_type === "EXPENSE_CATEGORY" && (
-                        <div className="space-y-2">
-                            <Label htmlFor="linked_category">Select Category *</Label>
-                            <Select
-                                value={formData.linked_category_id || ""}
-                                onValueChange={(value) => handleInputChange("linked_category_id", value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Choose a category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {categories.map((cat) => (
-                                        <SelectItem key={cat._id} value={cat._id}>
-                                            {cat.groupName ? `${cat.groupName} → ${cat.name}` : cat.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground">
-                                All past and future expenses in this category will count toward this goal automatically.
-                            </p>
-                        </div>
-                    )}
-
-
-                    <Separator className="my-8" />
-
-                    <div className="space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="total_amount">Total Amount *</Label>
-                            <Input
-                                id="total_amount"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="0.00"
-                                value={formData.total_amount}
-                                onChange={(e) => handleInputChange("total_amount", e.target.value)}
-                                required
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Calculation Method</Label>
-                            <RadioGroup
-                                value={formData.calculation_type}
-                                onValueChange={(value) => handleInputChange("calculation_type", value)}
-                            >
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="DUE_DATE" id="due_date" />
-                                    <Label htmlFor="due_date">Set due date (calculate monthly contribution)</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="MONTHLY_CONTRIBUTION" id="monthly_contribution" />
-                                    <Label htmlFor="monthly_contribution">Set monthly contribution (calculate due date)</Label>
-                                </div>
-                            </RadioGroup>
-                        </div>
-
-                        {formData.calculation_type === 'DUE_DATE' && (
-                            <div className="space-y-3">
+                                {/* Image */}
                                 <div className="space-y-2">
-                                    <Label>Quick Date Selection</Label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {quickDateOptions.map((option) => (
+                                    <Label htmlFor="image" className="flex items-center gap-1.5">
+                                        <ImageIcon className="h-3.5 w-3.5" />
+                                        {mode === "edit" ? 'Update Image' : 'Cover Image'}
+                                    </Label>
+
+                                    {imageState && imageState.type !== "removed" && (
+                                        <div className="flex items-center gap-2 p-2 border rounded">
+                                            <Image
+                                                src={imageState.url}
+                                                alt="Goal image preview"
+                                                className="w-12 h-12 object-cover rounded"
+                                                width={48}
+                                                height={48}
+                                            />
+                                            <div className="flex-1">
+                                                <span className="text-sm text-muted-foreground">
+                                                    {imageState.type === "new" ? "New image selected" : "Current image"}
+                                                </span>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <div
+                                                        className="w-3 h-3 rounded-full border"
+                                                        style={{ backgroundColor: formData.color }}
+                                                    />
+                                                    <span className="text-xs text-muted-foreground">
+                                                        Color extracted from image
+                                                    </span>
+                                                </div>
+                                            </div>
                                             <Button
-                                                key={option.months}
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handleQuickDateSelect(option.months)}
-                                                className="flex items-center gap-1"
+                                                onClick={handleImageRemove}
+                                                disabled={isUploading}
                                             >
-                                                <Calendar className="h-3 w-3" />
-                                                {option.label}
+                                                Remove
                                             </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="due_date">Due Date *</Label>
-                                    <Input
-                                        id="due_date"
-                                        type="date"
-                                        value={formData.due_date}
-                                        onChange={(e) => handleInputChange("due_date", e.target.value)}
-                                        required
-                                    />
-                                </div>
-                            </div>
-                        )}
+                                        </div>
+                                    )}
 
-                        {formData.calculation_type === 'MONTHLY_CONTRIBUTION' && (
-                            <div className="space-y-3">
-                                <div className="space-y-2">
-                                    <Label>Quick Amount Selection</Label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {quickContributionAmounts.map((amount) => {
-                                            const totalAmount = parseFloat(formData.total_amount)
-                                            const isDisabled = !formData.total_amount || isNaN(totalAmount) || amount > totalAmount
+                                    {imageState?.type === "removed" && (
+                                        <p className="text-sm text-muted-foreground">
+                                            Image will be removed
+                                        </p>
+                                    )}
 
-                                            return (
-                                                <Button
-                                                    key={amount}
-                                                    type="button"
-                                                    variant={isDisabled ? "secondary" : "outline"}
-                                                    size="sm"
-                                                    onClick={() => handleQuickContributionSelect(amount)}
-                                                    disabled={isDisabled}
-                                                    className="flex items-center gap-1"
-                                                >
-                                                    $ {amount}
-                                                    {isDisabled && <AlertCircle className="h-3 w-3 ml-1" />}
-                                                </Button>
-                                            )
-                                        })}
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            id="image"
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleFileChange}
+                                            disabled={isCompressing || isUploading}
+                                        />
+                                        {isCompressing && (
+                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                        )}
                                     </div>
-                                    {formData.total_amount && !isNaN(parseFloat(formData.total_amount)) && (
+
+                                    {isCompressing && (
                                         <p className="text-xs text-muted-foreground">
-                                            Maximum contribution: ${parseFloat(formData.total_amount).toFixed(2)}
+                                            Compressing image...
+                                        </p>
+                                    )}
+
+                                    {!imageState && (
+                                        <p className="text-xs text-muted-foreground">
+                                            A color will be automatically picked from the image. No image? A random color is assigned.
                                         </p>
                                     )}
                                 </div>
+
                                 <div className="space-y-2">
-                                    <Label htmlFor="monthly_contribution">Monthly Contribution *</Label>
-                                    <Input
-                                        id="monthly_contribution"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        max={formData.total_amount || undefined}
-                                        placeholder="0.00"
-                                        value={formData.monthly_contribution}
-                                        onChange={(e) => handleMonthlyContributionChange(e.target.value)}
-                                        required
+                                    <Label htmlFor="note">Note</Label>
+                                    <Textarea
+                                        ref={noteRef}
+                                        id="note"
+                                        placeholder="Optional note about the goal"
+                                        value={formData.note}
+                                        onChange={(e) => handleInputChange("note", e.target.value)}
+                                        rows={3}
                                     />
                                 </div>
                             </div>
                         )}
 
-                        {formData.calculation_type === 'DUE_DATE' && formData.monthly_contribution && (
-                            <div className="space-y-2">
-                                <Label htmlFor="calculated_contribution">Calculated Monthly Contribution</Label>
-                                <Input
-                                    id="calculated_contribution"
-                                    type="number"
-                                    value={formData.monthly_contribution}
-                                    readOnly
-                                    className="bg-muted"
-                                />
+                        {/* Step 2: Tracking */}
+                        {currentStep === "tracking" && (
+                            <div className="space-y-4">
+                                <div className="space-y-3">
+                                    <Label>How do you want to track progress?</Label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <Button
+                                            type="button"
+                                            variant={formData.tracking_type === 'MANUAL' ? 'default' : 'outline'}
+                                            className="h-auto p-3 flex flex-col items-center gap-2"
+                                            onClick={() => setFormData((prev) => ({
+                                                ...prev,
+                                                tracking_type: "MANUAL",
+                                                linked_account_id: null,
+                                                linked_category_id: null,
+                                            }))}
+                                        >
+                                            <HandCoins className="h-5 w-5" />
+                                            <span className="text-xs">Manual</span>
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={formData.tracking_type === 'LINKED_ACCOUNT' ? 'default' : 'outline'}
+                                            className="h-auto p-3 flex flex-col items-center gap-2"
+                                            onClick={() => setFormData((prev) => ({
+                                                ...prev,
+                                                tracking_type: "LINKED_ACCOUNT",
+                                                linked_category_id: null,
+                                            }))}
+                                        >
+                                            <CreditCard className="h-5 w-5" />
+                                            <span className="text-xs">From Account</span>
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={formData.tracking_type === 'EXPENSE_CATEGORY' ? 'default' : 'outline'}
+                                            className="h-auto p-3 flex flex-col items-center gap-2"
+                                            onClick={() => setFormData((prev) => ({
+                                                ...prev,
+                                                tracking_type: "EXPENSE_CATEGORY",
+                                                linked_account_id: null,
+                                            }))}
+                                        >
+                                            <Tag className="h-5 w-5" />
+                                            <span className="text-xs">Expense-Linked</span>
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {formData.tracking_type === "LINKED_ACCOUNT" && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="linked_account">Select Account *</Label>
+                                        <Select
+                                            value={formData.linked_account_id || ""}
+                                            onValueChange={(value) => handleInputChange("linked_account_id", value)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Choose an account" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {accounts.map((account, index) => (
+                                                    <SelectItem
+                                                        key={`account-${account._id}-${index}`}
+                                                        value={account._id}
+                                                    >
+                                                        {account.name} ({account.account_type})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            Goal progress will track the balance of this account
+                                        </p>
+                                        {selectedAccount && (
+                                            <div className="p-3 bg-muted rounded-lg">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="font-medium">{selectedAccount.name}</p>
+                                                        <p className="text-sm text-muted-foreground">{selectedAccount.account_type}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-sm text-muted-foreground">Current Balance</p>
+                                                        <p className="font-semibold text-lg">${formatBalance(selectedAccount.balance)}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {formData.tracking_type === "EXPENSE_CATEGORY" && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="linked_category">Select Category *</Label>
+                                        <Select
+                                            value={formData.linked_category_id || ""}
+                                            onValueChange={(value) => handleInputChange("linked_category_id", value)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Choose a category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {categories.map((cat) => (
+                                                    <SelectItem key={cat._id} value={cat._id}>
+                                                        {cat.groupName ? `${cat.groupName} → ${cat.name}` : cat.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            All past and future expenses in this category will count toward this goal automatically.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {formData.tracking_type === "MANUAL" && (
+                                    <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                                        <HandCoins className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                        You&apos;ll manually add contributions to track progress toward this goal.
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {formData.calculation_type === 'MONTHLY_CONTRIBUTION' && formData.due_date && (
-                            <div className="space-y-2">
-                                <Label htmlFor="calculated_date">Calculated Due Date</Label>
-                                <Input
-                                    id="calculated_date"
-                                    type="date"
-                                    value={formData.due_date}
-                                    readOnly
-                                    className="bg-muted"
-                                />
+                        {/* Step 3: Amount & Timeline */}
+                        {currentStep === "amount" && (
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="total_amount">Total Amount *</Label>
+                                    <Input
+                                        id="total_amount"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="0.00"
+                                        value={formData.total_amount}
+                                        onChange={(e) => handleInputChange("total_amount", e.target.value)}
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Calculation Method</Label>
+                                    <RadioGroup
+                                        value={formData.calculation_type}
+                                        onValueChange={(value) => handleInputChange("calculation_type", value)}
+                                    >
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="DUE_DATE" id="due_date" />
+                                            <Label htmlFor="due_date" className="font-normal">Set due date (calculate monthly contribution)</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="MONTHLY_CONTRIBUTION" id="monthly_contribution" />
+                                            <Label htmlFor="monthly_contribution" className="font-normal">Set monthly contribution (calculate due date)</Label>
+                                        </div>
+                                    </RadioGroup>
+                                </div>
+
+                                {formData.calculation_type === 'DUE_DATE' && (
+                                    <div className="space-y-3">
+                                        <div className="space-y-2">
+                                            <Label>Quick Date Selection</Label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {quickDateOptions.map((option) => (
+                                                    <Button
+                                                        key={option.months}
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleQuickDateSelect(option.months)}
+                                                        className="flex items-center gap-1"
+                                                    >
+                                                        <Calendar className="h-3 w-3" />
+                                                        {option.label}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="due_date">Due Date *</Label>
+                                            <Input
+                                                id="due_date"
+                                                type="date"
+                                                value={formData.due_date}
+                                                onChange={(e) => handleInputChange("due_date", e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {formData.calculation_type === 'MONTHLY_CONTRIBUTION' && (
+                                    <div className="space-y-3">
+                                        <div className="space-y-2">
+                                            <Label>Quick Amount Selection</Label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {quickContributionAmounts.map((amount) => {
+                                                    const totalAmount = parseFloat(formData.total_amount)
+                                                    const isDisabled = !formData.total_amount || isNaN(totalAmount) || amount > totalAmount
+
+                                                    return (
+                                                        <Button
+                                                            key={amount}
+                                                            type="button"
+                                                            variant={isDisabled ? "secondary" : "outline"}
+                                                            size="sm"
+                                                            onClick={() => handleQuickContributionSelect(amount)}
+                                                            disabled={isDisabled}
+                                                            className="flex items-center gap-1"
+                                                        >
+                                                            $ {amount}
+                                                            {isDisabled && <AlertCircle className="h-3 w-3 ml-1" />}
+                                                        </Button>
+                                                    )
+                                                })}
+                                            </div>
+                                            {formData.total_amount && !isNaN(parseFloat(formData.total_amount)) && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Maximum contribution: ${parseFloat(formData.total_amount).toFixed(2)}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="monthly_contribution">Monthly Contribution *</Label>
+                                            <Input
+                                                id="monthly_contribution"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                max={formData.total_amount || undefined}
+                                                placeholder="0.00"
+                                                value={formData.monthly_contribution}
+                                                onChange={(e) => handleMonthlyContributionChange(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {formData.calculation_type === 'DUE_DATE' && formData.monthly_contribution && (
+                                    <div className="p-3 bg-muted rounded-lg">
+                                        <p className="text-sm text-muted-foreground">Calculated Monthly Contribution</p>
+                                        <p className="text-lg font-semibold">${formData.monthly_contribution}</p>
+                                    </div>
+                                )}
+
+                                {formData.calculation_type === 'MONTHLY_CONTRIBUTION' && formData.due_date && (
+                                    <div className="p-3 bg-muted rounded-lg">
+                                        <p className="text-sm text-muted-foreground">Calculated Due Date</p>
+                                        <p className="text-lg font-semibold">
+                                            {new Date(formData.due_date + "T00:00:00").toLocaleDateString(undefined, {
+                                                year: "numeric",
+                                                month: "long",
+                                                day: "numeric",
+                                            })}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
 
-                    <DialogFooter className="mt-8 flex-shrink-0">
+                    <Separator className="my-4" />
+
+                    {/* Navigation footer */}
+                    <div className="flex items-center justify-between pt-2 flex-shrink-0">
                         <Button
                             type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
+                            variant="ghost"
+                            onClick={isFirstStep ? () => onOpenChange(false) : goBack}
                             disabled={isUploading}
+                            size="sm"
                         >
-                            Cancel
+                            {isFirstStep ? (
+                                "Cancel"
+                            ) : (
+                                <>
+                                    <ChevronLeft className="h-4 w-4 mr-1" />
+                                    Back
+                                </>
+                            )}
                         </Button>
-                        <Button
-                            type="submit"
-                            disabled={isUploading || isCompressing}
-                        >
-                            {isUploading
-                                ? (imageState?.type === "new" ? "Uploading..." : "Saving...")
-                                : (isEditing ? 'Update Goal' : 'Create Goal')
-                            }
-                        </Button>
-                    </DialogFooter>
+
+                        <div className="flex items-center gap-1.5">
+                            {STEPS.map((_, i) => (
+                                <div
+                                    key={i}
+                                    className={cn(
+                                        "h-1.5 rounded-full transition-all",
+                                        i === currentStepIndex
+                                            ? "w-6 bg-primary"
+                                            : i < currentStepIndex
+                                                ? "w-1.5 bg-primary/50"
+                                                : "w-1.5 bg-muted-foreground/30"
+                                    )}
+                                />
+                            ))}
+                        </div>
+
+                        {isLastStep ? (
+                            <Button
+                                type="submit"
+                                disabled={isUploading || isCompressing || !canSubmit}
+                                size="sm"
+                            >
+                                {isUploading
+                                    ? (imageState?.type === "new" ? "Uploading..." : "Saving...")
+                                    : (isEditing ? 'Update Goal' : 'Create Goal')
+                                }
+                            </Button>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={goNext}
+                                disabled={
+                                    (currentStep === "basics" && !canProceedFromBasics) ||
+                                    (currentStep === "tracking" && !canProceedFromTracking)
+                                }
+                                size="sm"
+                            >
+                                Next
+                                <ChevronRight className="h-4 w-4 ml-1" />
+                            </Button>
+                        )}
+                    </div>
                 </form>
             </DialogContent>
         </Dialog>

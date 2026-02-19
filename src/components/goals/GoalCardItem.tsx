@@ -27,9 +27,9 @@ interface GoalCardItemProps {
 }
 
 const priorityColors = {
-    1: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
-    2: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300",
-    3: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
+    1: "bg-red-100 text-red-700 dark:bg-red-950/85 dark:text-red-300",
+    2: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/85 dark:text-yellow-300",
+    3: "bg-green-100 text-green-700 dark:bg-green-950/85 dark:text-green-300",
 }
 
 export function GoalCardItem({
@@ -82,9 +82,9 @@ export function GoalCardItem({
                                 {goal.color && (
                                     <div
                                         className="absolute inset-0 rounded-t-xl pointer-events-none"
-                                        style={{
-                                            background: `linear-gradient(to top, ${goal.color}40 0%, transparent 40%)`,
-                                        }}
+                                        // style={{
+                                        //     background: `linear-gradient(to top, ${goal.color}40 0%, transparent 40%)`,
+                                        // }}
                                     />
                                 )}
                             </>
