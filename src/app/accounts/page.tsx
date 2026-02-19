@@ -249,7 +249,7 @@ export default function AccountsPage() {
                                                         <Icon className="h-5 w-5" />
                                                     </div>
                                                 </Link>
-                                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="absolute top-3 right-3 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                     <div className="flex gap-1 bg-background/90 backdrop-blur-sm rounded-lg p-1 shadow-sm">
                                                         <Button
                                                             variant="ghost"

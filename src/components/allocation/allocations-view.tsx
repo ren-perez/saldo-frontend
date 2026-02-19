@@ -36,7 +36,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 type AllocationCategory = "savings" | "investing" | "spending" | "debt"
 type RuleType = "percent" | "fixed"
 
-export function AllocationsView() {
+export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { externalShowAdd?: boolean; onExternalShowAddChange?: (v: boolean) => void } = {}) {
   const { convexUser } = useConvexUser()
 
   const rules = useQuery(
@@ -59,7 +59,9 @@ export function AllocationsView() {
   const deleteRuleMut = useMutation(api.allocationRules.deleteRule)
   const reorderRulesMut = useMutation(api.allocationRules.reorderRules)
 
-  const [showAdd, setShowAdd] = useState(false)
+  const [internalShowAdd, setInternalShowAdd] = useState(false)
+  const showAdd = externalShowAdd ?? internalShowAdd
+  const setShowAdd = onExternalShowAddChange ?? setInternalShowAdd
   const [deleteRuleId, setDeleteRuleId] = useState<Id<"allocation_rules"> | null>(null)
   const [form, setForm] = useState({
     accountId: "",
@@ -110,19 +112,6 @@ export function AllocationsView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">Allocation Rules</h2>
-          <p className="text-sm text-muted-foreground">
-            Define how each paycheck is distributed across your accounts.
-          </p>
-        </div>
-        <Button onClick={() => setShowAdd(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Rule
-        </Button>
-      </div>
-
       {/* Preview Card */}
       <Card>
         <CardHeader className="pb-2">

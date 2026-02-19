@@ -46,9 +46,50 @@ const statusIcons = {
   missed: AlertTriangle,
 } as const
 
-// ─── Editable Allocation Panel ────────────────────────────────────────────────
+// ─── Progress Bar (always visible) ───────────────────────────────────────────
 
-function AllocationPanel({
+function ProgressBarOnly({
+  allocations,
+  total,
+}: {
+  allocations: AllocationRecord[]
+  total: number
+}) {
+  const totalAllocated = allocations.reduce((s, a) => s + a.amount, 0)
+  const unallocated = Math.max(0, total - totalAllocated)
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+        {allocations.map((a, i) => (
+          <div
+            key={a._id}
+            className="h-full transition-all"
+            style={{
+              width: `${(a.amount / total) * 100}%`,
+              backgroundColor: allocColors[i % allocColors.length],
+              opacity: a.is_forecast ? 0.5 : 1,
+            }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>
+          {formatCurrency(totalAllocated)} of {formatCurrency(total)} allocated
+        </span>
+        {unallocated > 0 && (
+          <span className="text-amber-600">
+            {formatCurrency(unallocated)} unallocated
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Allocation Detail Rows (toggled) ────────────────────────────────────────
+
+function AllocationDetailRows({
   allocations,
   total,
   editable,
@@ -61,41 +102,11 @@ function AllocationPanel({
   userId: Id<"users">
   planId: Id<"income_plans">
 }) {
-  const totalAllocated = allocations.reduce((s, a) => s + a.amount, 0)
-  const unallocated = Math.max(0, total - totalAllocated)
   const updateAmount = useMutation(api.allocations.updateAllocationAmount)
   const runAllocations = useMutation(api.allocations.runAllocationsForPlan)
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Progress bar */}
-      <div className="flex flex-col gap-1.5">
-        <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-          {allocations.map((a, i) => (
-            <div
-              key={a._id}
-              className="h-full transition-all"
-              style={{
-                width: `${(a.amount / total) * 100}%`,
-                backgroundColor: allocColors[i % allocColors.length],
-                opacity: a.is_forecast ? 0.5 : 1,
-              }}
-            />
-          ))}
-        </div>
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>
-            {formatCurrency(totalAllocated)} of {formatCurrency(total)}{" "}
-            allocated
-          </span>
-          {unallocated > 0 && (
-            <span className="text-amber-600">
-              {formatCurrency(unallocated)} unallocated
-            </span>
-          )}
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-3 mt-3">
       {/* Allocation rows */}
       <div className="flex flex-col gap-1.5">
         {allocations.map((a, i) => (
@@ -191,7 +202,7 @@ export function IncomePlanCard({
 
   const allocations = useQuery(
     api.allocations.getAllocationsForPlan,
-    showAllocations ? { incomePlanId: plan._id } : "skip"
+    { incomePlanId: plan._id }
   ) as AllocationRecord[] | undefined
 
   const unmatch = useMutation(api.incomePlans.unmatchIncomePlan)
@@ -210,7 +221,7 @@ export function IncomePlanCard({
     <Card className={cn("border transition-colors", config.rowClass)}>
       <CardContent className="p-0">
         {/* Main row */}
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex items-center gap-3 px-4 pb-4">
           {/* Status dot */}
           <div
             className={cn(
@@ -392,44 +403,58 @@ export function IncomePlanCard({
           </div>
         </div>
 
-        {/* Allocations panel */}
-        {showAllocations && (
-          <div className="border-t border-border px-4 py-3 bg-muted/20">
-            {allocations === undefined ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" />
-                Loading allocations...
-              </div>
-            ) : allocations.length === 0 ? (
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  No allocation rules applied.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 text-xs gap-1"
-                  onClick={async () => {
-                    await runAllocations({
-                      userId,
-                      incomePlanId: plan._id,
-                    })
-                  }}
-                >
-                  Run allocations
-                </Button>
-              </div>
-            ) : (
-              <AllocationPanel
-                allocations={allocations}
-                total={displayAmount}
-                editable={canEditAllocations}
-                userId={userId}
-                planId={plan._id}
-              />
-            )}
+        {/* Progress bar (always visible) */}
+        {allocations && allocations.length > 0 && (
+          <div className="border-t border-border px-4 pt-6 pb-6">
+            <ProgressBarOnly allocations={allocations} total={displayAmount} />
           </div>
         )}
+
+        {/* Allocations detail panel (toggled) */}
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-300 ease-in-out",
+            showAllocations ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          )}
+        >
+          <div className="overflow-hidden">
+            <div className="border-t border-border px-4 pt-3">
+              {allocations === undefined ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="size-3 animate-spin" />
+                  Loading allocations...
+                </div>
+              ) : allocations.length === 0 ? (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    No allocation rules applied.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs gap-1"
+                    onClick={async () => {
+                      await runAllocations({
+                        userId,
+                        incomePlanId: plan._id,
+                      })
+                    }}
+                  >
+                    Run allocations
+                  </Button>
+                </div>
+              ) : (
+                <AllocationDetailRows
+                  allocations={allocations}
+                  total={displayAmount}
+                  editable={canEditAllocations}
+                  userId={userId}
+                  planId={plan._id}
+                />
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Notes */}
         {plan.notes && (

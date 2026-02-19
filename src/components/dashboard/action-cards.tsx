@@ -18,17 +18,17 @@ export function ActionCards({ unmatchedIncomeCount, pendingTransferCount, active
       accent: "bg-primary/10 text-primary",
     },
     {
-      title: `${pendingTransferCount} pending transactions`,
+      title: `${pendingTransferCount} pending transfers`,
       href: "/transfers-inbox",
       icon: ArrowLeftRight,
       accent: "bg-warning/10 text-warning-foreground",
     },
-    {
-      title: `${activeGoalCount} goals on track`,
-      href: "/goals",
-      icon: Target,
-      accent: "bg-success/10 text-success",
-    },
+    // {
+    //   title: `${activeGoalCount} goals on track`,
+    //   href: "/goals",
+    //   icon: Target,
+    //   accent: "bg-success/10 text-success",
+    // },
   ]
 
   return (

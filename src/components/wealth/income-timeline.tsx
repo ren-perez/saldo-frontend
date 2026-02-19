@@ -57,11 +57,13 @@ function MonthSummary({ plans }: { plans: IncomePlan[] }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function IncomeTimeline() {
+export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: { externalFormOpen?: boolean; onExternalFormOpenChange?: (v: boolean) => void } = {}) {
   const { convexUser } = useConvexUser()
   const userId = convexUser?._id
 
-  const [formOpen, setFormOpen] = useState(false)
+  const [internalFormOpen, setInternalFormOpen] = useState(false)
+  const formOpen = externalFormOpen ?? internalFormOpen
+  const setFormOpen = onExternalFormOpenChange ?? setInternalFormOpen
   const [editingPlan, setEditingPlan] = useState<IncomePlan | null>(null)
 
   // Plan → Transaction match (from plan card dropdown)
@@ -117,29 +119,6 @@ export function IncomeTimeline() {
     <div className="flex flex-col gap-8">
       {/* ── Income Plans Timeline ── */}
       <div className="flex flex-col gap-4">
-        {/* Section header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Income Plans
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Your planned and tracked income by month
-            </p>
-          </div>
-          <Button
-            size="sm"
-            className="gap-1.5 h-8 text-xs"
-            onClick={() => {
-              setEditingPlan(null)
-              setFormOpen(true)
-            }}
-          >
-            <Plus className="size-3.5" />
-            Add Income
-          </Button>
-        </div>
-
         {/* Loading */}
         {plans === undefined && (
           <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">

@@ -118,8 +118,8 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
               return (
                 <CarouselItem
                   key={goal._id}
-                  // 1 card on mobile, 2 on sm, 3 on lg
-                  className="pl-4 basis-full sm:basis-1/2 lg:basis-1/3"
+                  // ~85% on mobile so next card peeks, 2 on sm, 3 on lg
+                  className="pl-4 basis-[85%] sm:basis-1/2 lg:basis-1/3"
                 >
                   <Link href={`/goals/${goal._id}`} className="group block">
                     <div
@@ -200,7 +200,7 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                                 )}
                               </div>
                             </div>
-                            {goal.priority_label && (
+                            {/* {goal.priority_label && (
                               <Badge
                                 className={cn(
                                   "shrink-0 rounded-lg border-white/30 bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm",
@@ -209,12 +209,12 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                               >
                                 {goal.priority_label}
                               </Badge>
-                            )}
+                            )} */}
                           </div>
 
                           {/* Progress bar */}
-                          <div className="flex items-center gap-3">
-                            <div className="relative flex-1 h-2 overflow-hidden rounded-full bg-black/20 backdrop-blur-sm ring-1 ring-white/20">
+                          <div className="flex items-center gap-2.5">
+                            <div className="relative flex-1 h-1.5 overflow-hidden rounded-full bg-black/20 backdrop-blur-sm ring-1 ring-white/20">
                               <div
                                 className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
                                 style={{
@@ -228,9 +228,9 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                               <span className="text-sm font-bold tabular-nums text-white drop-shadow-md">
                                 {pct}%
                               </span>
-                              {pct >= 75 && (
+                              {/* {pct >= 75 && (
                                 <TrendingUp className="size-3.5 text-white drop-shadow" />
-                              )}
+                              )} */}
                             </div>
                           </div>
 
@@ -263,7 +263,7 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                               </div>
                             </div>
 
-                            {daysUntil !== null && (
+                            {/* {daysUntil !== null && (
                               <div
                                 className={cn(
                                   "flex items-center gap-1 rounded-lg bg-white/20 backdrop-blur-sm px-2 py-1 text-[10px] font-semibold text-white drop-shadow",
@@ -279,7 +279,7 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                                     month: "short",
                                   })}
                               </div>
-                            )}
+                            )} */}
                           </div>
                         </div>
                       </div>

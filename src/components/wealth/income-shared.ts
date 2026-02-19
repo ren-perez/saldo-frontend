@@ -27,14 +27,6 @@ export interface AllocationRecord {
   matched_transaction_id?: Id<"transactions">
 }
 
-export interface UnmatchedTransaction {
-  _id: Id<"transactions">
-  amount: number
-  date: number
-  description: string
-  account?: { _id: Id<"accounts">; name: string; type: string } | null
-}
-
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 export const statusConfig = {
@@ -86,6 +78,7 @@ export function formatCurrency(amount: number) {
 
 export function formatDate(dateStr: string) {
   try {
+    const { format, parseISO } = require("date-fns")
     return format(parseISO(dateStr), "MMM d, yyyy")
   } catch {
     return dateStr
