@@ -464,71 +464,6 @@ export const deleteTransaction = mutation({
     },
 });
 
-// Helper function to create/update expense-linked contributions for a transaction
-async function handleExpenseLinkedContributions(
-    ctx: any,
-    transactionId: any,
-    transaction: any,
-    oldCategoryId: any,
-    newCategoryId: any
-): Promise<void> {
-    const userId = transaction.userId;
-
-    // Only process negative transactions (expenses)
-    if (transaction.amount >= 0) {
-        return;
-    }
-
-    // If category was removed, delete any expense-linked contributions
-    if (oldCategoryId && !newCategoryId) {
-        const contributions = await ctx.db
-            .query("goal_contributions")
-            .withIndex("by_transaction", (q: any) => q.eq("transactionId", transactionId))
-            .filter((q: any) => q.eq(q.field("source"), "expense_linked"))
-            .collect();
-
-        for (const contrib of contributions) {
-            await ctx.db.delete(contrib._id);
-        }
-        return;
-    }
-
-    // If category changed, update contributions
-    if (newCategoryId && oldCategoryId !== newCategoryId) {
-        // Delete old contributions
-        const oldContributions = await ctx.db
-            .query("goal_contributions")
-            .withIndex("by_transaction", (q: any) => q.eq("transactionId", transactionId))
-            .filter((q: any) => q.eq(q.field("source"), "expense_linked"))
-            .collect();
-
-        for (const contrib of oldContributions) {
-            await ctx.db.delete(contrib._id);
-        }
-
-        // Find goals linked to this category
-        const goals = await ctx.db
-            .query("goals")
-            .withIndex("by_category", (q: any) => q.eq("linked_category_id", newCategoryId))
-            .filter((q: any) => q.eq(q.field("userId"), userId))
-            .collect();
-
-        // Create contributions for each matching goal
-        for (const goal of goals) {
-            if (goal.tracking_type === "EXPENSE_CATEGORY") {
-                await ctx.db.insert("goal_contributions", {
-                    userId,
-                    goalId: goal._id,
-                    transactionId,
-                    amount: Math.abs(transaction.amount),
-                    contribution_date: new Date(transaction.date).toISOString().split('T')[0],
-                    source: "expense_linked",
-                    createdAt: Date.now(),
-                });
-            }
-        }
-    }
-}
 
 export const updateTransaction = mutation({
     args: {
@@ -598,9 +533,6 @@ export const updateTransaction = mutation({
 
         await ctx.db.replace(transactionId, updatedTransaction);
 
-        // Handle expense-linked goal contributions
-        const newCategoryId = updates.clearCategoryId ? undefined : (updates.categoryId || transaction.categoryId);
-        await handleExpenseLinkedContributions(ctx, transactionId, updatedTransaction, oldCategoryId, newCategoryId);
 
         return { success: true };
     },
@@ -672,8 +604,6 @@ export const updateTransactionByGroup = mutation({
 
         await ctx.db.replace(transactionId, updatedTransaction);
 
-        // Handle expense-linked goal contributions
-        await handleExpenseLinkedContributions(ctx, transactionId, updatedTransaction, oldCategoryId, finalCategoryId);
 
         return { success: true };
     },

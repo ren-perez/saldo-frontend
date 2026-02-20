@@ -95,17 +95,16 @@ export default defineSchema({
         note: v.optional(v.string()),
         priority: v.optional(v.number()),
         priority_label: v.optional(v.string()),
-        tracking_type: v.string(), // "MANUAL" | "LINKED_ACCOUNT" | "EXPENSE_CATEGORY"
+        tracking_type: v.string(), // "MANUAL" | "LINKED_ACCOUNT"
         calculation_type: v.optional(v.string()),
         linked_account_id: v.optional(v.id("accounts")),
-        linked_category_id: v.optional(v.id("categories")), // For expense-linked goals
+        linked_category_id: v.optional(v.id("categories")), // keep for backward compat
         image_url: v.optional(v.string()),
         is_completed: v.optional(v.boolean()),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     }).index("by_user", ["userId"])
         .index("by_account", ["linked_account_id"])
-        .index("by_category", ["linked_category_id"])
         .index("by_completion", ["is_completed"]),
 
     goal_contributions: defineTable({
@@ -115,7 +114,7 @@ export default defineSchema({
         amount: v.number(),
         note: v.optional(v.string()),
         contribution_date: v.string(),
-        source: v.string(), // "manual_ui" | "manual_tx" | "import" | "auto" | "expense_linked"
+        source: v.string(), // "manual_ui" | "manual_tx" | "import" | "auto"
         transfer_pair_id: v.optional(v.string()), // For goal-to-goal transfers
         is_withdrawal: v.optional(v.boolean()), // Track negative contributions
         createdAt: v.number(),
@@ -263,10 +262,23 @@ export default defineSchema({
         amount: v.number(),
         category: v.string(),           // denormalized from rule
         is_forecast: v.boolean(),       // true = planned, false = matched/actual
+        status: v.optional(v.string()),           // "pending" | "partial" | "complete"
+        matched_amount: v.optional(v.number()),   // sum of matched transaction amounts
+        label: v.optional(v.string()),            // optional display name override
         createdAt: v.number(),
     }).index("by_user", ["userId"])
         .index("by_income_plan", ["income_plan_id"])
         .index("by_account", ["accountId"]),
+
+    allocation_transaction_matches: defineTable({
+        userId: v.id("users"),
+        allocation_record_id: v.id("allocation_records"),
+        transaction_id: v.id("transactions"),
+        amount: v.number(),
+        createdAt: v.number(),
+    }).index("by_allocation", ["allocation_record_id"])
+        .index("by_transaction", ["transaction_id"])
+        .index("by_user", ["userId"]),
 
     ignored_transfer_pairs: defineTable({
         userId: v.id("users"),

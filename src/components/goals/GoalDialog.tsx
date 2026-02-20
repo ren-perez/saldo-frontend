@@ -22,7 +22,7 @@ import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
 import {
     Calendar, AlertCircle,
-    Loader2, HandCoins, CreditCard, Tag,
+    Loader2, HandCoins, CreditCard,
     ChevronRight, ChevronLeft, Check,
     Sparkles, ImageIcon
 } from "lucide-react"
@@ -141,7 +141,6 @@ export function GoalDialog({
         calculation_type: "DUE_DATE",
         tracking_type: "MANUAL",
         linked_account_id: null as Id<"accounts"> | null,
-        linked_category_id: null as Id<"categories"> | null,
         color: "#3b82f6",
         emoji: "",
         priority: 3,
@@ -161,10 +160,6 @@ export function GoalDialog({
     // Load accounts, categories, and priority options using Convex
     const accounts = useQuery(
         convexUser ? api.goals.getGoalAccounts : ("skip" as never),
-        convexUser ? { userId: convexUser._id } : "skip"
-    ) || []
-    const categories = useQuery(
-        convexUser ? api.categories.getCategoriesWithGroups : ("skip" as never),
         convexUser ? { userId: convexUser._id } : "skip"
     ) || []
     const priorityOptions = useQuery(api.goals.getGoalPriorityOptions) || []
@@ -211,7 +206,6 @@ export function GoalDialog({
                 calculation_type: editingGoal.calculation_type || "DUE_DATE",
                 tracking_type: editingGoal.tracking_type || "MANUAL",
                 linked_account_id: editingGoal.linked_account?._id || null,
-                linked_category_id: editingGoal.linked_category?._id || null,
                 color: editingGoal.color || "#3b82f6",
                 emoji: editingGoal.emoji || "🎯",
                 priority: editingGoal.priority || 3,
@@ -236,7 +230,6 @@ export function GoalDialog({
                 calculation_type: "DUE_DATE",
                 tracking_type: "MANUAL",
                 linked_account_id: null,
-                linked_category_id: null,
                 color: getRandomColor(),
                 emoji: "🎯",
                 priority: 3,
@@ -363,7 +356,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
-                    linked_category_id: formData.linked_category_id,
+
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -406,7 +399,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
-                    linked_category_id: formData.linked_category_id,
+
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -432,7 +425,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
-                    linked_category_id: formData.linked_category_id,
+
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -454,7 +447,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
-                    linked_category_id: formData.linked_category_id,
+
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -474,7 +467,7 @@ export function GoalDialog({
                     calculation_type: formData.calculation_type,
                     tracking_type: formData.tracking_type,
                     linked_account_id: formData.linked_account_id,
-                    linked_category_id: formData.linked_category_id,
+
                     color: formData.color,
                     emoji: formData.emoji,
                     priority: formData.priority,
@@ -586,7 +579,6 @@ export function GoalDialog({
     const canProceedFromBasics = formData.name.trim().length > 0
     const canProceedFromTracking = formData.tracking_type === "MANUAL"
         || (formData.tracking_type === "LINKED_ACCOUNT" && formData.linked_account_id)
-        || (formData.tracking_type === "EXPENSE_CATEGORY" && formData.linked_category_id)
     const canSubmit = canProceedFromBasics && canProceedFromTracking && formData.total_amount
 
     return (
@@ -782,7 +774,7 @@ export function GoalDialog({
                             <div className="space-y-4">
                                 <div className="space-y-3">
                                     <Label>How do you want to track progress?</Label>
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-2 gap-2">
                                         <Button
                                             type="button"
                                             variant={formData.tracking_type === 'MANUAL' ? 'default' : 'outline'}
@@ -791,7 +783,6 @@ export function GoalDialog({
                                                 ...prev,
                                                 tracking_type: "MANUAL",
                                                 linked_account_id: null,
-                                                linked_category_id: null,
                                             }))}
                                         >
                                             <HandCoins className="h-5 w-5" />
@@ -804,24 +795,10 @@ export function GoalDialog({
                                             onClick={() => setFormData((prev) => ({
                                                 ...prev,
                                                 tracking_type: "LINKED_ACCOUNT",
-                                                linked_category_id: null,
                                             }))}
                                         >
                                             <CreditCard className="h-5 w-5" />
                                             <span className="text-xs">From Account</span>
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant={formData.tracking_type === 'EXPENSE_CATEGORY' ? 'default' : 'outline'}
-                                            className="h-auto p-3 flex flex-col items-center gap-2"
-                                            onClick={() => setFormData((prev) => ({
-                                                ...prev,
-                                                tracking_type: "EXPENSE_CATEGORY",
-                                                linked_account_id: null,
-                                            }))}
-                                        >
-                                            <Tag className="h-5 w-5" />
-                                            <span className="text-xs">Expense-Linked</span>
                                         </Button>
                                     </div>
                                 </div>
@@ -864,30 +841,6 @@ export function GoalDialog({
                                                 </div>
                                             </div>
                                         )}
-                                    </div>
-                                )}
-
-                                {formData.tracking_type === "EXPENSE_CATEGORY" && (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="linked_category">Select Category *</Label>
-                                        <Select
-                                            value={formData.linked_category_id || ""}
-                                            onValueChange={(value) => handleInputChange("linked_category_id", value)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Choose a category" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {categories.map((cat) => (
-                                                    <SelectItem key={cat._id} value={cat._id}>
-                                                        {cat.groupName ? `${cat.groupName} → ${cat.name}` : cat.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-xs text-muted-foreground">
-                                            All past and future expenses in this category will count toward this goal automatically.
-                                        </p>
                                     </div>
                                 )}
 

@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import {
-  Check,
   Clock,
   AlertTriangle,
   Settings2,
@@ -13,8 +12,10 @@ import {
   Calendar,
   Loader2,
   Link2,
-  Lock,
+  ChevronDown,
   ChevronUp,
+  PartyPopper,
+  CircleDashed,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -39,27 +40,36 @@ import {
   formatCurrency,
   formatDate,
 } from "./income-shared"
+import { DistributionChecklist } from "./distribution-checklist"
 
 const statusIcons = {
   planned: Clock,
-  matched: Check,
+  matched: CircleDashed,
+  distributed: PartyPopper,
   missed: AlertTriangle,
 } as const
 
-// ─── Progress Bar (always visible) ───────────────────────────────────────────
+// ─── Progress Bar (clickable to toggle) ─────────────────────────────────────
 
 function ProgressBarOnly({
   allocations,
   total,
+  onClick,
+  isOpen,
 }: {
   allocations: AllocationRecord[]
   total: number
+  onClick: () => void
+  isOpen: boolean
 }) {
   const totalAllocated = allocations.reduce((s, a) => s + a.amount, 0)
   const unallocated = Math.max(0, total - totalAllocated)
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <button
+      onClick={onClick}
+      className="w-full flex flex-col gap-1.5 text-left cursor-pointer group"
+    >
       <div className="flex h-2 rounded-full overflow-hidden bg-muted">
         {allocations.map((a, i) => (
           <div
@@ -77,28 +87,31 @@ function ProgressBarOnly({
         <span>
           {formatCurrency(totalAllocated)} of {formatCurrency(total)} allocated
         </span>
-        {unallocated > 0 && (
-          <span className="text-amber-600">
-            {formatCurrency(unallocated)} unallocated
-          </span>
-        )}
+        <div className="flex items-center gap-1">
+          {unallocated > 0 && (
+            <span className="text-amber-600">
+              {formatCurrency(unallocated)} unallocated
+            </span>
+          )}
+          {isOpen ? (
+            <ChevronUp className="size-4 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+          ) : (
+            <ChevronDown className="size-4 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+          )}
+        </div>
       </div>
-    </div>
+    </button>
   )
 }
 
-// ─── Allocation Detail Rows (toggled) ────────────────────────────────────────
+// ─── Editable Allocation Rows (for planned/forecast) ─────────────────────────
 
-function AllocationDetailRows({
+function EditableAllocationRows({
   allocations,
-  total,
-  editable,
   userId,
   planId,
 }: {
   allocations: AllocationRecord[]
-  total: number
-  editable: boolean
   userId: Id<"users">
   planId: Id<"income_plans">
 }) {
@@ -107,77 +120,56 @@ function AllocationDetailRows({
 
   return (
     <div className="flex flex-col gap-3 mt-3">
-      {/* Allocation rows */}
       <div className="flex flex-col gap-1.5">
         {allocations.map((a, i) => (
           <div
             key={a._id}
-            className="flex items-center gap-2.5 rounded-md bg-background px-2.5 py-1.5"
+            className="flex items-center gap-2.5 rounded-md bg-gray-100/70 dark:bg-zinc-800/60 px-2.5 py-2.5"
           >
             <div
-              className="size-2.5 rounded-full shrink-0"
+              className="size-2.5 rounded-full shrink-0 ml-2"
               style={{
                 backgroundColor: allocColors[i % allocColors.length],
-                opacity: a.is_forecast ? 0.5 : 1,
+                opacity: 0.5,
               }}
             />
             <div className="flex-1 min-w-0">
               <span className="text-xs font-medium text-foreground truncate block">
                 {a.accountName}
               </span>
-              <span className="text-[10px] text-muted-foreground capitalize">
+              <span className="text-xs text-muted-foreground capitalize">
                 {a.category}
               </span>
             </div>
-            {editable ? (
-              <Input
-                type="number"
-                className="w-24 h-7 text-xs text-right tabular-nums"
-                defaultValue={a.amount}
-                min={0}
-                step={50}
-                onBlur={(e) => {
-                  const val = parseFloat(e.target.value)
-                  if (!isNaN(val) && val !== a.amount) {
-                    updateAmount({ recordId: a._id, amount: val })
-                  }
-                }}
-              />
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-medium tabular-nums text-foreground">
-                  {formatCurrency(a.amount)}
-                </span>
-                <Lock className="size-3 text-muted-foreground/50" />
-              </div>
-            )}
+            <Input
+              type="number"
+              className="w-24 h-7 text-xs text-right tabular-nums"
+              defaultValue={a.amount}
+              min={0}
+              step={50}
+              onBlur={(e) => {
+                const val = parseFloat(e.target.value)
+                if (!isNaN(val) && val !== a.amount) {
+                  updateAmount({ recordId: a._id, amount: val })
+                }
+              }}
+            />
           </div>
         ))}
       </div>
-
-      {/* Actions */}
-      {editable && (
-        <div className="flex items-center justify-end pt-1">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 text-[10px] gap-1"
-            onClick={async () => {
-              await runAllocations({ userId, incomePlanId: planId })
-            }}
-          >
-            <RotateCcw className="size-2.5" />
-            Reset to rules
-          </Button>
-        </div>
-      )}
-
-      {!editable && (
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-          <Lock className="size-2.5" />
-          Allocations are locked after matching
-        </p>
-      )}
+      <div className="flex items-center justify-end pt-1">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 text-[10px] gap-1"
+          onClick={async () => {
+            await runAllocations({ userId, incomePlanId: planId })
+          }}
+        >
+          <RotateCcw className="size-2.5" />
+          Reset to rules
+        </Button>
+      </div>
     </div>
   )
 }
@@ -197,13 +189,21 @@ export function IncomePlanCard({
 }) {
   const [showAllocations, setShowAllocations] = useState(false)
 
-  const config = statusConfig[plan.status]
-  const StatusIcon = statusIcons[plan.status]
-
   const allocations = useQuery(
     api.allocations.getAllocationsForPlan,
     { incomePlanId: plan._id }
   ) as AllocationRecord[] | undefined
+
+  const checklist = useQuery(
+    api.allocations.getDistributionChecklist,
+    plan.status === "matched" ? { incomePlanId: plan._id } : "skip"
+  )
+
+  // Compute effective visual state: matched + all allocations complete = "distributed"
+  const isFullyDistributed = plan.status === "matched" && checklist?.isComplete === true
+  const effectiveStatus = isFullyDistributed ? "distributed" as const : plan.status as keyof typeof statusConfig
+  const config = statusConfig[effectiveStatus]
+  const StatusIcon = statusIcons[effectiveStatus]
 
   const unmatch = useMutation(api.incomePlans.unmatchIncomePlan)
   const markMissed = useMutation(api.incomePlans.markMissed)
@@ -215,7 +215,8 @@ export function IncomePlanCard({
   const hasDiff =
     plan.actual_amount !== undefined &&
     plan.actual_amount !== plan.expected_amount
-  const canEditAllocations = plan.status === "planned"
+  const isMatched = plan.status === "matched"
+  const isPlanned = plan.status === "planned"
 
   return (
     <Card className={cn("border transition-colors", config.rowClass)}>
@@ -226,7 +227,8 @@ export function IncomePlanCard({
           <div
             className={cn(
               "flex size-8 shrink-0 items-center justify-center rounded-full border-2",
-              config.dotClass
+              config.dotClass,
+              isFullyDistributed && "animate-check-bounce"
             )}
           >
             <StatusIcon className="size-3.5" />
@@ -241,7 +243,7 @@ export function IncomePlanCard({
               <Badge
                 className={cn("text-[10px] shrink-0 border", config.badgeClass)}
               >
-                {config.label}
+                {isFullyDistributed ? "Distributed" : config.label}
               </Badge>
               {plan.recurrence !== "once" && (
                 <Badge
@@ -291,24 +293,6 @@ export function IncomePlanCard({
                 </div>
               )}
             </div>
-
-            {/* Toggle allocations */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "size-7 text-muted-foreground",
-                showAllocations && "text-primary bg-primary/10"
-              )}
-              onClick={() => setShowAllocations((s) => !s)}
-              title={showAllocations ? "Hide allocations" : "View allocations"}
-            >
-              {showAllocations ? (
-                <ChevronUp className="size-3.5" />
-              ) : (
-                <Settings2 className="size-3.5" />
-              )}
-            </Button>
 
             {/* Actions menu */}
             <DropdownMenu>
@@ -403,10 +387,15 @@ export function IncomePlanCard({
           </div>
         </div>
 
-        {/* Progress bar (always visible) */}
+        {/* Progress bar (clickable to toggle allocations) */}
         {allocations && allocations.length > 0 && (
           <div className="border-t border-border px-4 pt-6 pb-6">
-            <ProgressBarOnly allocations={allocations} total={displayAmount} />
+            <ProgressBarOnly
+              allocations={allocations}
+              total={displayAmount}
+              onClick={() => setShowAllocations((s) => !s)}
+              isOpen={showAllocations}
+            />
           </div>
         )}
 
@@ -418,7 +407,7 @@ export function IncomePlanCard({
           )}
         >
           <div className="overflow-hidden">
-            <div className="border-t border-border px-4 pt-3">
+            <div className="border-t border-border px-4 pt-3 pb-3">
               {allocations === undefined ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="size-3 animate-spin" />
@@ -443,15 +432,18 @@ export function IncomePlanCard({
                     Run allocations
                   </Button>
                 </div>
-              ) : (
-                <AllocationDetailRows
+              ) : isPlanned ? (
+                <EditableAllocationRows
                   allocations={allocations}
-                  total={displayAmount}
-                  editable={canEditAllocations}
                   userId={userId}
                   planId={plan._id}
                 />
-              )}
+              ) : isMatched ? (
+                <DistributionChecklist
+                  incomePlanId={plan._id}
+                  userId={userId}
+                />
+              ) : null}
             </div>
           </div>
         </div>

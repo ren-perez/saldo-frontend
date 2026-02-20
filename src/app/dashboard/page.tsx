@@ -67,6 +67,11 @@ export default function DashboardPage() {
     convexUser ? { userId: convexUser._id } : "skip"
   )
 
+  const activeDistributions = useQuery(
+    convexUser ? api.allocations.getActiveDistributions : ("skip" as never),
+    convexUser ? { userId: convexUser._id } : "skip"
+  )
+
   // Only block on initial data – avoid full-page flash when month changes
   const isInitialLoad =
     accounts === undefined ||
@@ -78,6 +83,7 @@ export default function DashboardPage() {
   const unmatchedIncomeCount = incomeSummary?.thisMonth.plannedCount ?? 0
   const pendingTransferCount = potentialTransfers?.length ?? 0
   const activeGoalCount = goals?.filter((g: { is_completed: boolean }) => !g.is_completed).length ?? 0
+  const pendingDistributionCount = activeDistributions?.length ?? 0
 
   return (
     <AppLayout>
@@ -94,6 +100,7 @@ export default function DashboardPage() {
                 unmatchedIncomeCount={unmatchedIncomeCount}
                 pendingTransferCount={pendingTransferCount}
                 activeGoalCount={activeGoalCount}
+                pendingDistributionCount={pendingDistributionCount}
               />
 
               <GoalsProgress goals={goals ?? []} />

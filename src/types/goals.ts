@@ -13,10 +13,9 @@ export interface Goal {
   emoji: string;
   priority: number;
   priority_label?: string;
-  tracking_type: string; // "MANUAL" | "LINKED_ACCOUNT" | "EXPENSE_CATEGORY"
+  tracking_type: string; // "MANUAL" | "LINKED_ACCOUNT"
   calculation_type?: string;
   linked_account_id?: Id<"accounts">;
-  linked_category_id?: Id<"categories">; // For expense-linked goals
   image_url?: string;
   image?: string;
   is_completed?: boolean;
@@ -28,11 +27,6 @@ export interface Goal {
     name: string;
     account_type: string;
     balance?: number;
-  } | null;
-  linked_category?: {
-    _id: Id<"categories">;
-    name: string;
-    group_name?: string;
   } | null;
   monthly_plans?: MonthlyPlanData[];
 }

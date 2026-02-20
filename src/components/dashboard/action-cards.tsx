@@ -1,35 +1,46 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Wallet, ArrowLeftRight, Target } from "lucide-react"
+import { ArrowRight, Wallet, ArrowLeftRight, Target, ListChecks } from "lucide-react"
 
 interface ActionCardsProps {
   unmatchedIncomeCount: number
   pendingTransferCount: number
   activeGoalCount: number
+  pendingDistributionCount?: number
 }
 
-export function ActionCards({ unmatchedIncomeCount, pendingTransferCount, activeGoalCount }: ActionCardsProps) {
+export function ActionCards({ unmatchedIncomeCount, pendingTransferCount, activeGoalCount, pendingDistributionCount = 0 }: ActionCardsProps) {
   const actions = [
     {
       title: `${unmatchedIncomeCount} income to match`,
       href: "/income",
       icon: Wallet,
       accent: "bg-primary/10 text-primary",
+      show: true,
     },
     {
       title: `${pendingTransferCount} pending transfers`,
       href: "/transfers-inbox",
       icon: ArrowLeftRight,
       accent: "bg-warning/10 text-warning-foreground",
+      show: true,
+    },
+    {
+      title: `${pendingDistributionCount} to distribute`,
+      href: "/income",
+      icon: ListChecks,
+      accent: "bg-chart-4/10 text-chart-4",
+      show: pendingDistributionCount > 0,
     },
     // {
     //   title: `${activeGoalCount} goals on track`,
     //   href: "/goals",
     //   icon: Target,
     //   accent: "bg-success/10 text-success",
+    //   show: true,
     // },
-  ]
+  ].filter((a) => a.show)
 
   return (
     <div className="flex flex-wrap items-center gap-2">

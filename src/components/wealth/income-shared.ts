@@ -33,6 +33,9 @@ export interface AllocationRecord {
   amount: number
   is_forecast: boolean
   matched_transaction_id?: Id<"transactions">
+  status?: "pending" | "partial" | "complete"
+  matched_amount?: number
+  label?: string
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -46,6 +49,12 @@ export const statusConfig = {
   },
   matched: {
     label: "Matched",
+    badgeClass: "border-sky-400/30 text-sky-600 bg-sky-400/10",
+    rowClass: "border-sky-400/20 bg-sky-400/[0.02]",
+    dotClass: "border-sky-400 bg-sky-400/10",
+  },
+  distributed: {
+    label: "Distributed",
     badgeClass: "border-emerald-500/30 text-emerald-600 bg-emerald-500/10",
     rowClass: "border-emerald-500/20 bg-emerald-500/[0.02]",
     dotClass: "border-emerald-500 bg-emerald-500/10",
@@ -55,6 +64,21 @@ export const statusConfig = {
     badgeClass: "border-destructive/30 text-destructive bg-destructive/10",
     rowClass: "border-destructive/20",
     dotClass: "border-destructive bg-destructive/10",
+  },
+} as const
+
+export const distributionStatusConfig = {
+  pending: {
+    label: "Pending",
+    badgeClass: "border-border text-muted-foreground bg-muted",
+  },
+  partial: {
+    label: "In Progress",
+    badgeClass: "border-amber-500/30 text-amber-600 bg-amber-500/10",
+  },
+  complete: {
+    label: "Done",
+    badgeClass: "border-emerald-500/30 text-emerald-600 bg-emerald-500/10",
   },
 } as const
 

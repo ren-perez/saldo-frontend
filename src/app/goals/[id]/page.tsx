@@ -7,7 +7,7 @@ import { useConvexUser } from "@/hooks/useConvexUser"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, Calendar, TrendingUp, Target, HandCoins, CreditCard, Tag } from "lucide-react"
+import { ArrowLeft, Calendar, TrendingUp, Target, HandCoins, CreditCard } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { Id } from "../../../../convex/_generated/dataModel"
@@ -67,8 +67,6 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
             return { icon: <HandCoins className="h-3.5 w-3.5" />, label: "Manual", className: "" }
         } else if (goal.tracking_type === "LINKED_ACCOUNT") {
             return { icon: <CreditCard className="h-3.5 w-3.5" />, label: "From Account", className: "border-blue-200 bg-blue-50/50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" }
-        } else if (goal.tracking_type === "EXPENSE_CATEGORY") {
-            return { icon: <Tag className="h-3.5 w-3.5" />, label: "Expense-Linked", className: "border-purple-200 bg-purple-50/50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300" }
         }
         return { icon: null, label: "Unknown", className: "" }
     }
@@ -222,15 +220,13 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
                                             <div className="flex items-center gap-2">
                                                 <Badge
                                                     variant={
-                                                        contribution.source === "expense_linked" ? "secondary" :
-                                                            contribution.source === "manual_ui" ? "default" :
-                                                                "outline"
+                                                        contribution.source === "manual_ui" ? "default" :
+                                                            "outline"
                                                     }
                                                     className="text-[10px]"
                                                 >
-                                                    {contribution.source === "expense_linked" ? "Auto" :
-                                                        contribution.source === "manual_ui" ? "Manual" :
-                                                            contribution.source}
+                                                    {contribution.source === "manual_ui" ? "Manual" :
+                                                        contribution.source}
                                                 </Badge>
                                                 {contribution.transaction?.account && (
                                                     <span className="text-xs text-muted-foreground">

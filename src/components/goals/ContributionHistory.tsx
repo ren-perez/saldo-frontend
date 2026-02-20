@@ -30,7 +30,6 @@ const SOURCE_LABELS = {
     'manual_tx': 'Transaction',
     'import': 'Import',
     'auto': 'Auto',
-    'expense_linked': 'Auto (Expense)'
 }
 
 const SOURCE_COLORS = {
@@ -38,7 +37,6 @@ const SOURCE_COLORS = {
     'manual_tx': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
     'import': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100',
     'auto': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100',
-    'expense_linked': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100'
 }
 
 export function ContributionHistory({ goalId, formatCurrency }: ContributionHistoryProps) {
@@ -289,14 +287,6 @@ export function ContributionHistory({ goalId, formatCurrency }: ContributionHist
                                                     </div>
                                                 )}
 
-                                                {/* Expense-Linked Info */}
-                                                {contribution.source === 'expense_linked' && contribution.goal && (
-                                                    <div className="mt-2 p-2 bg-pink-50 dark:bg-pink-950 rounded border-l-2 border-pink-400">
-                                                        <p className="text-xs text-pink-900 dark:text-pink-100">
-                                                            ✨ Automatically tracked from category spending
-                                                        </p>
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
 

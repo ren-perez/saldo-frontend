@@ -1,5 +1,5 @@
 // components/goals/GoalCardItem.tsx
-import { Calendar, DollarSign, MoreVertical, Edit, Trash2, Eye, Target, Pencil, ArrowRightLeft, TrendingDown, ArrowRight } from "lucide-react"
+import { Calendar, DollarSign, MoreVertical, Edit, Trash2, Eye, Target, Pencil, ArrowRightLeft, TrendingDown } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -270,20 +270,6 @@ export function GoalCardItem({
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <div className="h-2 w-2 bg-green-500 rounded-full mx-1" />
                                 <span>Linked to {goal.linked_account.name}</span>
-                            </div>
-                        )}
-
-                        {/* Category Tracking */}
-                        {goal.linked_category && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <div className="h-2 w-2 bg-pink-500 rounded-full mx-1" />
-                                <span>
-                                    {/* Linked to {goal.linked_category.group_name ? `${goal.linked_category.group_name} → ` : ""} */}
-                                    Linked to {goal.linked_category.group_name ? `${goal.linked_category.group_name}` : ""}
-                                    {/* {goal.linked_category.name} */}
-                                </span>
-                                <ArrowRight className="h-3 w-3" />
-                                <span>{goal.linked_category.name}</span>
                             </div>
                         )}
 

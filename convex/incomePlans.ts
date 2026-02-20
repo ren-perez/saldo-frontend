@@ -52,12 +52,19 @@ export const updateIncomePlan = mutation({
 export const deleteIncomePlan = mutation({
     args: { planId: v.id("income_plans") },
     handler: async (ctx, { planId }) => {
-        // Delete associated allocation records
+        // Delete associated allocation records and their transaction matches
         const records = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
             .collect();
         for (const record of records) {
+            const matches = await ctx.db
+                .query("allocation_transaction_matches")
+                .withIndex("by_allocation", (q) => q.eq("allocation_record_id", record._id))
+                .collect();
+            for (const match of matches) {
+                await ctx.db.delete(match._id);
+            }
             await ctx.db.delete(record._id);
         }
         await ctx.db.delete(planId);
@@ -101,13 +108,25 @@ export const unmatchIncomePlan = mutation({
             date_received: undefined,
         });
 
-        // Revert allocation records to forecast
+        // Revert allocation records to forecast and clean up distribution matches
         const records = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
             .collect();
         for (const record of records) {
-            await ctx.db.patch(record._id, { is_forecast: true });
+            // Delete allocation transaction matches
+            const matches = await ctx.db
+                .query("allocation_transaction_matches")
+                .withIndex("by_allocation", (q) => q.eq("allocation_record_id", record._id))
+                .collect();
+            for (const match of matches) {
+                await ctx.db.delete(match._id);
+            }
+            await ctx.db.patch(record._id, {
+                is_forecast: true,
+                status: "pending",
+                matched_amount: 0,
+            });
         }
     },
 });
@@ -257,6 +276,16 @@ export const getIncomeSummary = query({
             .sort((a, b) => a.expected_date.localeCompare(b.expected_date))
             .slice(0, 5);
 
+        // Average monthly income from matched plans in the last 6 months
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        const sixMonthsAgoStr = `${sixMonthsAgo.getFullYear()}-${String(sixMonthsAgo.getMonth() + 1).padStart(2, "0")}`;
+        const recentMatched = plans.filter(
+            (p) => p.status === "matched" && p.expected_date >= sixMonthsAgoStr && p.expected_date < currentMonth
+        );
+        const avgMonthlyIncome = recentMatched.length > 0
+            ? Math.round(recentMatched.reduce((s, p) => s + (p.actual_amount ?? p.expected_amount), 0) / recentMatched.length)
+            : 0;
+
         return {
             thisMonth: {
                 plannedCount: planned.length,
@@ -267,6 +296,7 @@ export const getIncomeSummary = query({
                 totalMissed,
             },
             upcoming,
+            avgMonthlyIncome,
         };
     },
 });
