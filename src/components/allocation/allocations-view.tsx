@@ -1,83 +1,131 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { currencyExact } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { Trash2, ArrowUp, ArrowDown, Target, Dot } from "lucide-react"
+import { Trash2, ArrowUp, ArrowDown, Dot, MoreHorizontal, Power } from "lucide-react"
 
 type AllocationCategory = "savings" | "investing" | "spending" | "debt"
 type RuleType = "percent" | "fixed"
 
-export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { externalShowAdd?: boolean; onExternalShowAddChange?: (v: boolean) => void } = {}) {
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const CATEGORY_DOT: Record<string, string> = {
+  savings: "bg-primary",
+  investing: "bg-chart-4",
+  spending: "bg-chart-2",
+  debt: "bg-destructive",
+}
+
+function CategoryDot({ category }: { category: string }) {
+  return <div className={cn("h-2 w-2 rounded-full shrink-0", CATEGORY_DOT[category])} />
+}
+
+function SpinnerIcon() {
+  return (
+    <svg className="h-4 w-4 animate-spin text-muted-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  )
+}
+
+function ValueInput({ value, ruleType, onChange }: {
+  value: number
+  ruleType: string
+  onChange: (v: number) => void
+}) {
+  const isPercent = ruleType === "percent"
+  return (
+    <div className="relative">
+      <Input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={cn("h-7 text-xs w-full sm:w-20 bg-background/60 border-0", isPercent ? "pr-5" : "pl-4")}
+      />
+      <span
+        className="absolute top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none"
+        style={{ [isPercent ? "right" : "left"]: "0.5rem" }}
+      >
+        {isPercent ? "%" : "$"}
+      </span>
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
+export function AllocationsView({
+  externalShowAdd,
+  onExternalShowAddChange,
+}: { externalShowAdd?: boolean; onExternalShowAddChange?: (v: boolean) => void } = {}) {
   const { convexUser } = useConvexUser()
 
-  const rules = useQuery(
-    convexUser ? api.allocationRules.listRules : ("skip" as never),
-    convexUser ? { userId: convexUser._id } : "skip"
-  )
-  const accounts = useQuery(
-    convexUser ? api.accounts.listAccounts : ("skip" as never),
-    convexUser ? { userId: convexUser._id } : "skip"
-  )
-  const goals = useQuery(
-    convexUser ? api.goals.getGoals : ("skip" as never),
-    convexUser ? { userId: convexUser._id } : "skip"
-  )
+  const rules = useQuery(convexUser ? api.allocationRules.listRules : ("skip" as never), convexUser ? { userId: convexUser._id } : "skip")
+  const accounts = useQuery(convexUser ? api.accounts.listAccounts : ("skip" as never), convexUser ? { userId: convexUser._id } : "skip")
+  const goals = useQuery(convexUser ? api.goals.getGoals : ("skip" as never), convexUser ? { userId: convexUser._id } : "skip")
+  const incomeSummary = useQuery(convexUser ? api.incomePlans.getIncomeSummary : ("skip" as never), convexUser ? { userId: convexUser._id } : "skip")
+  const savedPreviewIncome = useQuery(convexUser ? api.allocationRules.getPreviewIncome : ("skip" as never), convexUser ? { userId: convexUser._id } : "skip")
+  const previewIncomeLoading = savedPreviewIncome === undefined
 
-  const incomeSummary = useQuery(
-    convexUser ? api.incomePlans.getIncomeSummary : ("skip" as never),
-    convexUser ? { userId: convexUser._id } : "skip"
-  )
+  const setPreviewIncomeMut = useMutation(api.allocationRules.setPreviewIncome)
+  const createRule = useMutation(api.allocationRules.createRule)
+  const updateRuleMut = useMutation(api.allocationRules.updateRule)
+  const deleteRuleMut = useMutation(api.allocationRules.deleteRule)
+  const reorderRulesMut = useMutation(api.allocationRules.reorderRules)
 
   const [previewAmount, setPreviewAmount] = useState("")
   const [previewInitialized, setPreviewInitialized] = useState(false)
 
   useEffect(() => {
-    if (!previewInitialized && incomeSummary?.avgMonthlyIncome) {
+    if (previewInitialized) return
+    if (savedPreviewIncome != null) {
+      setPreviewAmount(String(savedPreviewIncome))
+      setPreviewInitialized(true)
+    } else if (incomeSummary?.avgMonthlyIncome) {
       setPreviewAmount(String(incomeSummary.avgMonthlyIncome))
       setPreviewInitialized(true)
     }
-  }, [incomeSummary, previewInitialized])
+  }, [savedPreviewIncome, incomeSummary, previewInitialized])
+
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handlePreviewAmountChange = useCallback((val: string) => {
+    setPreviewAmount(val)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      const num = Number(val)
+      if (convexUser && num > 0) setPreviewIncomeMut({ userId: convexUser._id, amount: num })
+    }, 800)
+  }, [convexUser, setPreviewIncomeMut])
 
   const effectivePreviewAmount = previewAmount || "4200"
-
   const preview = useQuery(
     convexUser ? api.allocations.previewAllocation : ("skip" as never),
     convexUser ? { userId: convexUser._id, amount: Number(effectivePreviewAmount) || 0 } : "skip"
   )
-
-  const createRule = useMutation(api.allocationRules.createRule)
-  const updateRuleMut = useMutation(api.allocationRules.updateRule)
-  const deleteRuleMut = useMutation(api.allocationRules.deleteRule)
-  const reorderRulesMut = useMutation(api.allocationRules.reorderRules)
 
   const [internalShowAdd, setInternalShowAdd] = useState(false)
   const showAdd = externalShowAdd ?? internalShowAdd
@@ -85,26 +133,30 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
   const [deleteRuleId, setDeleteRuleId] = useState<Id<"allocation_rules"> | null>(null)
   const [attempted, setAttempted] = useState(false)
   const [form, setForm] = useState({
-    accountId: "",
-    category: "savings" as AllocationCategory,
-    ruleType: "fixed" as RuleType,
-    value: "",
+    accountId: "", category: "savings" as AllocationCategory, ruleType: "fixed" as RuleType, value: "",
   })
 
-  if (!convexUser) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    )
-  }
+  if (!convexUser) return (
+    <div className="flex items-center justify-center h-64">
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  )
 
   const sortedRules = rules ?? []
   const totalAllocated = preview?.allocations.reduce((sum, a) => sum + a.amount, 0) ?? 0
+  const isDuplicateAccount = form.accountId ? sortedRules.some((r) => r.accountId === form.accountId) : false
 
-  const isDuplicateAccount = form.accountId
-    ? sortedRules.some((r) => r.accountId === form.accountId)
-    : false
+  function getLinkedGoal(accountId: string) {
+    return goals?.find(
+      (g: { linked_account?: { _id: string } | null; is_completed?: boolean }) =>
+        g.linked_account?._id === accountId && !g.is_completed
+    )
+  }
+
+  function resetForm() {
+    setAttempted(false)
+    setForm({ accountId: "", category: "savings", ruleType: "fixed", value: "" })
+  }
 
   async function handleAdd() {
     setAttempted(true)
@@ -115,87 +167,177 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
       accountId: form.accountId as Id<"accounts">,
       category: form.category,
       ruleType: form.ruleType,
-      value: Number(form.value),
+      value: numValue,
       priority: sortedRules.length,
       active: true,
     })
-    setForm({ accountId: "", category: "savings", ruleType: "fixed", value: "" })
-    setAttempted(false)
+    resetForm()
     setShowAdd(false)
   }
 
   async function moveUp(idx: number) {
-    if (idx === 0 || !sortedRules.length) return
+    if (idx === 0) return
     const ids = sortedRules.map((r) => r._id)
-      ;[ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]]
+    ;[ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]]
     await reorderRulesMut({ ruleIds: ids })
   }
 
   async function moveDown(idx: number) {
     if (idx >= sortedRules.length - 1) return
     const ids = sortedRules.map((r) => r._id)
-      ;[ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]]
+    ;[ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]]
     await reorderRulesMut({ ruleIds: ids })
   }
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Preview Card */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-foreground">Distribute Your Income</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Sample income input */}
           <div className="flex items-center gap-4 mb-4">
-            <Label htmlFor="previewIncome" className="whitespace-nowrap text-sm text-muted-foreground">Sample income:</Label>
-            <Input
-              id="previewIncome"
-              type="number"
-              value={previewAmount}
-              placeholder={incomeSummary?.avgMonthlyIncome ? String(incomeSummary.avgMonthlyIncome) : "4200"}
-              onChange={(e) => setPreviewAmount(e.target.value)}
-              className="w-40"
-            />
+            <Label htmlFor="previewIncome" className="whitespace-nowrap text-sm text-muted-foreground">
+              Sample income:
+            </Label>
+            <div className="relative w-40">
+              <Input
+                id="previewIncome"
+                type="number"
+                value={previewAmount}
+                placeholder={incomeSummary?.avgMonthlyIncome ? String(incomeSummary.avgMonthlyIncome) : "4200"}
+                onChange={(e) => handlePreviewAmountChange(e.target.value)}
+                disabled={previewIncomeLoading}
+                className="w-40 pr-8"
+              />
+              {previewIncomeLoading && (
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2"><SpinnerIcon /></div>
+              )}
+            </div>
           </div>
+
+          {/* Rules list */}
           <div className="flex flex-col gap-2">
-            {preview?.allocations.map((alloc, idx) => (
-              <div key={idx} className="flex items-center justify-between rounded-lg bg-secondary px-4 py-2.5">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={cn(
-                    "h-2 w-2 rounded-full shrink-0",
-                    alloc.category === "savings" && "bg-primary",
-                    alloc.category === "investing" && "bg-chart-4",
-                    alloc.category === "spending" && "bg-chart-2",
-                    alloc.category === "debt" && "bg-destructive"
-                  )} />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-medium text-foreground truncate">
-                      {alloc.goalName
-                        ? `${alloc.goalEmoji ?? ""} ${alloc.goalName}`.trim()
-                        : alloc.accountName}
-                    </span>
-                    {alloc.goalName && (
-                      <span className="text-xs text-muted-foreground truncate">{alloc.accountName}</span>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    ({alloc.ruleType === "percent" ? `${alloc.ruleValue}%` : `$${alloc.ruleValue.toLocaleString()}`})
-                  </span>
-                </div>
-                <span className="tabular-nums font-semibold text-foreground shrink-0 ml-3">{currencyExact(alloc.amount)}</span>
+            {sortedRules.length === 0 && (
+              <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                No allocation rules yet. Click &quot;Add Rule&quot; to create one.
               </div>
-            ))}
+            )}
+
+            {sortedRules.map((rule, idx) => {
+              const account = accounts?.find((a) => a._id === rule.accountId)
+              const ruleGoal = getLinkedGoal(rule.accountId)
+              const alloc = preview?.allocations.find((a) => a.accountId === rule.accountId)
+
+              return (
+                <div
+                  key={rule._id}
+                  className={cn(
+                    "rounded-lg bg-secondary px-4 py-3 flex items-start gap-3 transition-opacity",
+                    !rule.active && "opacity-50"
+                  )}
+                >
+                  {/* Reorder - pins left */}
+                  <div className="flex flex-col gap-0.5 shrink-0 pt-0.5">
+                    <button onClick={() => moveUp(idx)} className="rounded p-0.5 hover:bg-background/60 text-muted-foreground" aria-label="Move rule up">
+                      <ArrowUp className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => moveDown(idx)} className="rounded p-0.5 hover:bg-background/60 text-muted-foreground" aria-label="Move rule down">
+                      <ArrowDown className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  {/* Middle content - three stacked rows, full width */}
+                  <div className="flex flex-col gap-2 flex-1 min-w-0">
+                    {/* Row 1: color dot + name */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CategoryDot category={rule.category} />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {ruleGoal
+                            ? `${(ruleGoal as { emoji?: string }).emoji ?? ""} ${(ruleGoal as { name: string }).name}`.trim()
+                            : account?.name ?? "Unknown"}
+                        </span>
+                        {ruleGoal && (
+                          <span className="text-xs text-muted-foreground truncate">{account?.name ?? "Unknown"}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Row 2: controls - each on its own line on mobile, row on sm+ */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
+                      <Select value={rule.category} onValueChange={(v) => updateRuleMut({ ruleId: rule._id, category: v })}>
+                        <SelectTrigger className="h-7 text-xs w-full sm:w-28 bg-background/60 border-0">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="savings">Savings</SelectItem>
+                          <SelectItem value="investing">Investing</SelectItem>
+                          <SelectItem value="spending">Spending</SelectItem>
+                          <SelectItem value="debt">Debt</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={rule.ruleType} onValueChange={(v) => updateRuleMut({ ruleId: rule._id, ruleType: v })}>
+                        <SelectTrigger className="h-7 text-xs w-full sm:w-24 bg-background/60 border-0">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percent">Percent</SelectItem>
+                          <SelectItem value="fixed">Fixed</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <ValueInput
+                        value={rule.value}
+                        ruleType={rule.ruleType}
+                        onChange={(v) => updateRuleMut({ ruleId: rule._id, value: v })}
+                      />
+                    </div>
+
+                    {/* Row 3: allocated amount */}
+                    <span className="tabular-nums font-semibold text-foreground text-sm">
+                      {alloc ? currencyExact(alloc.amount) : "—"}
+                    </span>
+                  </div>
+
+                  {/* 3-dots menu - pins right */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Rule options</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => updateRuleMut({ ruleId: rule._id, active: !rule.active })}>
+                        <Power className="h-4 w-4 mr-2" />
+                        {rule.active ? "Disable rule" : "Enable rule"}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setDeleteRuleId(rule._id)} className="text-destructive focus:text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete rule
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )
+            })}
+
+            {/* Unallocated row */}
             {preview && preview.unallocated > 0 && (
               <div className="flex items-center justify-between rounded-lg border border-dashed px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Unallocated</span>
                 <span className="tabular-nums font-semibold text-warning">{currencyExact(preview.unallocated)}</span>
               </div>
             )}
-            {preview && preview.allocations.some((a) => {
-              const expectedAmount = a.ruleType === "percent"
-                ? (Number(effectivePreviewAmount) * a.ruleValue) / 100
-                : a.ruleValue
-              return a.amount < expectedAmount - 0.01
+
+            {/* Over-allocation warning */}
+            {preview?.allocations.some((a) => {
+              const expected = a.ruleType === "percent" ? (Number(effectivePreviewAmount) * a.ruleValue) / 100 : a.ruleValue
+              return a.amount < expected - 0.01
             }) && (
               <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-2.5">
                 <span className="text-xs text-amber-600">
@@ -213,218 +355,50 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-muted-foreground">Unallocated</span>
-              <span className={cn(
-                "tabular-nums font-bold",
-                preview && preview.unallocated > 0 ? "text-warning" : "text-primary"
-              )}>{currencyExact(preview?.unallocated ?? 0)}</span>
+              <span className={cn("tabular-nums font-bold", preview && preview.unallocated > 0 ? "text-warning" : "text-primary")}>
+                {currencyExact(preview?.unallocated ?? 0)}
+              </span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Rules Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10"></TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Rule</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-                <TableHead className="text-center">Active</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedRules.map((rule, idx) => {
-                const account = accounts?.find((a) => a._id === rule.accountId)
-                const ruleGoal = goals?.find(
-                  (g: { linked_account?: { _id: string } | null; is_completed?: boolean }) =>
-                    g.linked_account?._id === rule.accountId && !g.is_completed
-                )
-                return (
-                  <TableRow
-                    key={rule._id}
-                    className={cn(
-                      "hover:bg-muted/50 transition-colors",
-                      !rule.active && "opacity-50"
-                    )}
-                  >
-                    <TableCell>
-                      <div className="flex flex-col gap-0.5 ml-2">
-                        <button
-                          onClick={() => moveUp(idx)}
-                          className="rounded p-0.5 hover:bg-secondary text-muted-foreground"
-                          aria-label="Move rule up"
-                        >
-                          <ArrowUp className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => moveDown(idx)}
-                          className="rounded p-0.5 hover:bg-secondary text-muted-foreground"
-                          aria-label="Move rule down"
-                        >
-                          <ArrowDown className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className={cn(
-                          "h-2 w-2 rounded-full shrink-0",
-                          rule.category === "savings" && "bg-primary",
-                          rule.category === "investing" && "bg-chart-4",
-                          rule.category === "spending" && "bg-chart-2",
-                          rule.category === "debt" && "bg-destructive"
-                        )} />
-                        <div className="flex flex-col">
-                          <span className="font-medium text-foreground">
-                            {ruleGoal
-                              ? `${(ruleGoal as { emoji?: string }).emoji ?? ""} ${(ruleGoal as { name: string }).name}`.trim()
-                              : account?.name ?? "Unknown"}
-                          </span>
-                          {ruleGoal && (
-                            <span className="text-xs text-muted-foreground">
-                              {account?.name ?? "Unknown"}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={rule.category}
-                        onValueChange={(v) => updateRuleMut({ ruleId: rule._id, category: v })}
-                      >
-                        <SelectTrigger className="w-28 h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="savings">Savings</SelectItem>
-                          <SelectItem value="investing">Investing</SelectItem>
-                          <SelectItem value="spending">Spending</SelectItem>
-                          <SelectItem value="debt">Debt</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={rule.ruleType}
-                        onValueChange={(v) => updateRuleMut({ ruleId: rule._id, ruleType: v })}
-                      >
-                        <SelectTrigger className="w-24 h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="percent">Percent</SelectItem>
-                          <SelectItem value="fixed">Fixed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Input
-                        type="number"
-                        value={rule.value}
-                        onChange={(e) => updateRuleMut({ ruleId: rule._id, value: Number(e.target.value) })}
-                        className="w-24 h-8 text-xs text-right ml-auto"
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Switch
-                        checked={rule.active}
-                        onCheckedChange={(checked) => updateRuleMut({ ruleId: rule._id, active: checked })}
-                        aria-label={`Toggle rule for ${account?.name || "unknown"}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 mr-2"
-                        onClick={() => setDeleteRuleId(rule._id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="sr-only">Delete rule</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-              {sortedRules.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    No allocation rules yet. Click &quot;Add Rule&quot; to create one.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
       {/* Add rule dialog */}
-      <Dialog open={showAdd} onOpenChange={(v) => {
-        setShowAdd(v)
-        if (!v) {
-          setAttempted(false)
-          setForm({ accountId: "", category: "savings", ruleType: "fixed", value: "" })
-        }
-      }}>
+      <Dialog open={showAdd} onOpenChange={(v) => { setShowAdd(v); if (!v) resetForm() }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Allocation Rule</DialogTitle>
-            <DialogDescription>
-              Choose an account and define how income should be allocated.
-            </DialogDescription>
+            <DialogDescription>Choose an account and define how income should be allocated.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label className="flex items-center gap-1">
                 Account
-                {attempted && !form.accountId && (
-                  <span className="text-[10px] text-destructive font-normal">required</span>
-                )}
+                {attempted && !form.accountId && <span className="text-[10px] text-destructive font-normal">required</span>}
               </Label>
               <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v })}>
                 <SelectTrigger className={cn(attempted && !form.accountId && "border-destructive/50")}>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Accounts with linked goals first */}
                   {accounts
                     ?.slice()
                     .sort((a, b) => {
-                      const aGoal = goals?.find(
-                        (g: { linked_account?: { _id: string } | null; is_completed?: boolean }) =>
-                          g.linked_account?._id === a._id && !g.is_completed
-                      )
-                      const bGoal = goals?.find(
-                        (g: { linked_account?: { _id: string } | null; is_completed?: boolean }) =>
-                          g.linked_account?._id === b._id && !g.is_completed
-                      )
-                      if (aGoal && !bGoal) return -1
-                      if (!aGoal && bGoal) return 1
-                      return 0
+                      const aHasGoal = !!getLinkedGoal(a._id)
+                      const bHasGoal = !!getLinkedGoal(b._id)
+                      return aHasGoal === bHasGoal ? 0 : aHasGoal ? -1 : 1
                     })
                     .map((acc) => {
-                      const linkedGoal = goals?.find(
-                        (g: { linked_account?: { _id: string } | null; is_completed?: boolean }) =>
-                          g.linked_account?._id === acc._id && !g.is_completed
-                      )
+                      const linkedGoal = getLinkedGoal(acc._id)
                       return (
                         <SelectItem key={acc._id} value={acc._id}>
                           <span className="flex items-center gap-2">
                             <span>{acc.name}</span>
-                            {/* <span className="mx-2 text-3xl">·</span> */}
                             {linkedGoal && (
                               <div className="flex items-center gap-2 text-lg text-muted-foreground">
                                 <Dot className="size-6" />
                                 <span>{(linkedGoal as { emoji?: string }).emoji ?? "🎯"}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {(linkedGoal as { name: string }).name}
-                                </span>
+                                <span className="text-xs text-muted-foreground">{(linkedGoal as { name: string }).name}</span>
                               </div>
                             )}
                           </span>
@@ -433,37 +407,16 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
                     })}
                 </SelectContent>
               </Select>
-              {/* {form.accountId && (() => {
-                const linkedGoal = goals?.find(
-                  (g: { linked_account?: { _id: string } | null; is_completed?: boolean }) =>
-                    g.linked_account?._id === form.accountId && !g.is_completed
-                )
-                if (!linkedGoal) return null
-                return (
-                  <div className="flex items-center gap-1.5 rounded-md bg-primary/5 border border-primary/10 px-2.5 py-1.5 mt-0.5">
-                    <Target className="size-3 text-primary shrink-0" />
-                    <span className="text-xs text-muted-foreground">
-                      Linked to goal:{" "}
-                      <span className="font-medium text-foreground">
-                        {(linkedGoal as { emoji?: string }).emoji ?? ""} {(linkedGoal as { name: string }).name}
-                      </span>
-                    </span>
-                  </div>
-                )
-              })()} */}
               {isDuplicateAccount && (
-                <span className="text-[11px] text-amber-600">
-                  This account already has a rule. Each account can only have one allocation rule.
-                </span>
+                <span className="text-[11px] text-amber-600">This account already has a rule. Each account can only have one allocation rule.</span>
               )}
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label>Category</Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v as AllocationCategory })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="savings">Savings</SelectItem>
                     <SelectItem value="investing">Investing</SelectItem>
@@ -475,9 +428,7 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
               <div className="flex flex-col gap-1.5">
                 <Label>Rule Type</Label>
                 <Select value={form.ruleType} onValueChange={(v) => setForm({ ...form, ruleType: v as RuleType })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="percent">Percent</SelectItem>
                     <SelectItem value="fixed">Fixed</SelectItem>
@@ -485,6 +436,7 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
                 </Select>
               </div>
             </div>
+
             <div className="flex flex-col gap-1.5">
               <Label className="flex items-center gap-1">
                 {form.ruleType === "percent" ? "Percentage" : "Amount"}
@@ -506,27 +458,20 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
                     attempted && (!form.value || Number(form.value) <= 0) && "border-destructive/50"
                   )}
                 />
-                {form.ruleType === "percent" ? (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
-                ) : (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
-                )}
+                <span
+                  className="absolute top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none"
+                  style={{ [form.ruleType === "percent" ? "right" : "left"]: "0.75rem" }}
+                >
+                  {form.ruleType === "percent" ? "%" : "$"}
+                </span>
               </div>
               {form.ruleType === "percent" && form.value && (
-                <span className="text-[11px] text-muted-foreground">
-                  {Number(form.value)}% of each paycheck
-                </span>
+                <span className="text-[11px] text-muted-foreground">{Number(form.value)}% of each paycheck</span>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowAdd(false)
-              setAttempted(false)
-              setForm({ accountId: "", category: "savings", ruleType: "fixed", value: "" })
-            }}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => { setShowAdd(false); resetForm() }}>Cancel</Button>
             <Button onClick={handleAdd} disabled={isDuplicateAccount || (attempted && (!form.accountId || !form.value || Number(form.value) <= 0))}>
               Add Rule
             </Button>
@@ -534,7 +479,7 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation dialog */}
+      {/* Delete confirmation */}
       <AlertDialog open={!!deleteRuleId} onOpenChange={() => setDeleteRuleId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -546,10 +491,7 @@ export function AllocationsView({ externalShowAdd, onExternalShowAddChange }: { 
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (deleteRuleId) deleteRuleMut({ ruleId: deleteRuleId })
-                setDeleteRuleId(null)
-              }}
+              onClick={() => { if (deleteRuleId) deleteRuleMut({ ruleId: deleteRuleId }); setDeleteRuleId(null) }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Rule

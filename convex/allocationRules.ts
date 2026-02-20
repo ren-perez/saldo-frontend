@@ -73,3 +73,18 @@ export const reorderRules = mutation({
         }
     },
 });
+
+export const getPreviewIncome = query({
+    args: { userId: v.id("users") },
+    handler: async (ctx, { userId }) => {
+        const user = await ctx.db.get(userId);
+        return user?.previewIncome ?? null;
+    },
+});
+
+export const setPreviewIncome = mutation({
+    args: { userId: v.id("users"), amount: v.number() },
+    handler: async (ctx, { userId, amount }) => {
+        await ctx.db.patch(userId, { previewIncome: amount });
+    },
+});

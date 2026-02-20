@@ -117,6 +117,7 @@ export default function AccountsPage() {
         name: "",
         number: "",
         type: "checking" as AccountType,
+        balance: "",
     });
 
     const groupedAccounts = useMemo(() => {
@@ -145,7 +146,7 @@ export default function AccountsPage() {
     }
 
     function resetForm() {
-        setForm({ bank: "", name: "", number: "", type: "checking" });
+        setForm({ bank: "", name: "", number: "", type: "checking", balance: "" });
     }
 
     async function handleAdd() {
@@ -156,6 +157,7 @@ export default function AccountsPage() {
             bank: form.bank,
             number: form.number,
             type: form.type,
+            balance: form.balance !== "" ? parseFloat(form.balance) : 0,
         });
         resetForm();
         setShowAdd(false);
@@ -169,6 +171,7 @@ export default function AccountsPage() {
             bank: form.bank,
             number: form.number,
             type: form.type,
+            balance: form.balance !== "" ? parseFloat(form.balance) : undefined,
         });
         setEditing(null);
     }
@@ -179,12 +182,14 @@ export default function AccountsPage() {
         bank: string;
         number?: string;
         type: string;
+        balance?: number;  // ← number, not string
     }) {
         setForm({
             bank: account.bank,
             name: account.name,
             number: account.number || "",
             type: account.type as AccountType,
+            balance: account.balance != null ? String(account.balance) : "",  // ← convert number to string
         });
         setEditing(account);
     }
@@ -340,7 +345,7 @@ export default function AccountsPage() {
                                                             {account.recentImports.length > 1 && (
                                                                 <button
                                                                     className="text-[11px] text-primary hover:underline"
-                                                                    onClick={() => {/* TODO: show imports dialog */}}
+                                                                    onClick={() => {/* TODO: show imports dialog */ }}
                                                                 >
                                                                     See all ({account.recentImports.length})
                                                                 </button>
@@ -485,13 +490,13 @@ export default function AccountsPage() {
                             <DialogTitle>
                                 {editing ? "Edit Account" : "Add Account"}
                             </DialogTitle>
-                            <DialogDescription>
+                            {/* <DialogDescription>
                                 {editing
                                     ? "Update your account details."
                                     : "Add a new financial account to track."}
-                            </DialogDescription>
+                            </DialogDescription> */}
                         </DialogHeader>
-                        <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-4 mt-6">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="flex flex-col gap-1.5">
                                     <Label>Bank</Label>
@@ -544,6 +549,15 @@ export default function AccountsPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
+                            </div>
+                            <div className="flex flex-col gap-1.5 mb-6">
+                                <Label>Balance</Label>
+                                <Input
+                                    type="number"
+                                    placeholder="e.g. 1500.00"
+                                    value={form.balance}
+                                    onChange={(e) => setForm({ ...form, balance: e.target.value })}
+                                />
                             </div>
                         </div>
                         <DialogFooter>
