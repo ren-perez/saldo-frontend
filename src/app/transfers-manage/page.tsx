@@ -1,19 +1,13 @@
-// app/transfers-manage/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
-import { Id } from "../../../convex/_generated/dataModel"; // adjust path if needed
+import { Id } from "../../../convex/_generated/dataModel";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import {
-  Card, CardContent,
-  // CardDescription, 
-  // CardTitle,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,10 +15,10 @@ import {
   ArrowRightLeft,
   Unlink,
   RotateCcw,
-  // Trash2,
   CheckCircle,
   XCircle,
-  Calendar
+  ArrowRight,
+  BringToFront,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -58,38 +52,18 @@ function TransfersManagePage() {
 
   const handleUnpairTransfers = async (transferPairId: string) => {
     if (!convexUser) return;
-
     try {
-      await unpairTransfers({
-        userId: convexUser._id,
-        transferPairId,
-      });
+      await unpairTransfers({ userId: convexUser._id, transferPairId });
     } catch (error) {
-      console.error('Failed to unpair transfers:', error);
+      console.error("Failed to unpair transfers:", error);
     }
   };
-
-  // const handleUnpairTransfers = async (transferPairId: Id<"transfer_pairs">) => {
-  //   if (!convexUser) return;
-
-  //   try {
-  //     await unpairTransfers({
-  //       userId: convexUser._id,
-  //       transferPairId,
-  //     });
-  //   } catch (error) {
-  //     console.error("Failed to unpair transfers:", error);
-  //   }
-  // };
-
-
 
   const handleUnignoreTransfer = async (
     outgoingTxId: Id<"transactions">,
     incomingTxId: Id<"transactions">
   ) => {
     if (!convexUser) return;
-
     try {
       await unignoreTransferSuggestion({
         userId: convexUser._id,
@@ -101,28 +75,11 @@ function TransfersManagePage() {
     }
   };
 
-
-  // const handleUnignoreTransfer = async (outgoingTxId: string, incomingTxId: string) => {
-  //   if (!convexUser) return;
-
-  //   try {
-  //     await unignoreTransferSuggestion({
-  //       userId: convexUser._id,
-  //       outgoingTransactionId: outgoingTxId,
-  //       incomingTransactionId: incomingTxId,
-  //     });
-  //   } catch (error) {
-  //     console.error('Failed to restore transfer suggestion:', error);
-  //   }
-  // };
-
   if (!convexUser) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64 px-4">
-          <div className="text-lg text-foreground text-center">
-            Please sign in to manage transfers.
-          </div>
+          <div className="text-lg text-foreground text-center">Please sign in to manage transfers.</div>
         </div>
       </AppLayout>
     );
@@ -131,166 +88,86 @@ function TransfersManagePage() {
   return (
     <AppLayout>
       <InitUser />
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2">
-                <ArrowRightLeft className="h-6 w-6 sm:h-8 sm:w-8 text-primary flex-shrink-0" />
-                <span className="truncate">Manage Transfers</span>
-              </h1>
-              <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-base">
-                View and manage your paired and ignored transfer suggestions
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
-                <Link href="/transfers-inbox">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Review New
-                </Link>
-              </Button>
-            </div>
-          </div>
+      <div className="container mx-auto py-6 px-6">
+
+        {/* ── Row 1: Title ── */}
+        <div className="flex items-center gap-2 mb-4">
+          <BringToFront className="h-7 w-7 text-primary flex-shrink-0" />
+          <h1 className="text-2xl font-bold tracking-tight">Manage Transfers</h1>
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 h-auto">
-            <TabsTrigger value="paired" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 p-2 sm:p-3 text-xs sm:text-sm">
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-center">
-                <span className="block sm:inline">Paired Transfers</span>
-                <span className="block sm:inline sm:ml-1">({pairedTransfers?.length || 0})</span>
-              </span>
+        {/* ── Row 2: CTAs ── */}
+        <div className="flex items-center gap-2 mb-6">
+          <Button variant="outline" asChild className="ml-auto">
+            <Link href="/transfers-inbox">
+              <CheckCircle className="h-4 w-4 mr-1.5" />
+              Review Inbox
+            </Link>
+          </Button>
+        </div>
+
+        {/* ── Tabs ── */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="paired" className="flex items-center gap-1.5 text-sm">
+              <CheckCircle className="h-3.5 w-3.5" />
+              Paired
+              <span className="text-xs text-muted-foreground">({pairedTransfers?.length || 0})</span>
             </TabsTrigger>
-            <TabsTrigger value="ignored" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 p-2 sm:p-3 text-xs sm:text-sm">
-              <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-center">
-                <span className="block sm:inline">Ignored Suggestions</span>
-                <span className="block sm:inline sm:ml-1">({ignoredTransfers?.length || 0})</span>
-              </span>
+            <TabsTrigger value="ignored" className="flex items-center gap-1.5 text-sm">
+              <XCircle className="h-3.5 w-3.5" />
+              Ignored
+              <span className="text-xs text-muted-foreground">({ignoredTransfers?.length || 0})</span>
             </TabsTrigger>
           </TabsList>
 
-          {/* Paired Transfers Tab */}
-          <TabsContent value="paired" className="space-y-4 sm:space-y-6">
+          {/* ── Paired Transfers ── */}
+          <TabsContent value="paired" className="space-y-4">
             {!pairedTransfers || pairedTransfers.length === 0 ? (
               <Card>
-                <CardContent className="p-6 sm:p-8 text-center">
-                  <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-                  <h3 className="text-base sm:text-lg font-medium mb-2">No Paired Transfers</h3>
-                  <p className="text-sm sm:text-base text-muted-foreground mb-4">
+                <CardContent className="p-8 text-center">
+                  <CheckCircle className="h-14 w-14 text-muted-foreground mx-auto mb-3" />
+                  <h3 className="text-base font-medium mb-1">No Paired Transfers</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
                     You haven&#39;t paired any transfers yet. Review pending suggestions to get started.
                   </p>
                   <Button asChild size="sm">
-                    <Link href="/transfers-inbox">
-                      Review Pending Transfers
-                    </Link>
+                    <Link href="/transfers-inbox">Review Pending Transfers</Link>
                   </Button>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {pairedTransfers.map((pair) => (
-                  <Card key={pair.transferPairId} className="border-2 border-green-200 dark:border-green-800">
-                    <CardHeader className="pb-3 sm:pb-6">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Paired Transfer
-                          </Badge>
-                        </div>
-                        <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
-                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          {new Date(pair.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </CardHeader>
+              pairedTransfers.map((pair) => (
+                <Card key={pair.transferPairId} className="border transition-colors">
+                  <CardContent className="px-4">
+                    {/* Top row */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Paired
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(pair.createdAt).toLocaleDateString()}
+                      </span>
 
-                    <CardContent className="pt-0">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        {/* Outgoing Transaction */}
-                        {pair.outgoingTransaction && (
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400">
-                              <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" />
-                              <span className="truncate">OUTGOING (-${Math.abs(pair.outgoingTransaction.amount).toFixed(2)})</span>
-                            </div>
-
-                            <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 sm:p-4 border border-red-200 dark:border-red-800">
-                              <div className="space-y-2">
-                                <div className="text-xs sm:text-sm text-muted-foreground">
-                                  {new Date(pair.outgoingTransaction.date).toLocaleDateString()}
-                                </div>
-                                <div className="font-medium text-foreground text-sm sm:text-base break-words">
-                                  {pair.outgoingTransaction.description}
-                                </div>
-                                <div className="flex justify-between items-center text-xs sm:text-sm gap-2">
-                                  <span className="text-muted-foreground truncate flex-1 min-w-0">
-                                    Account (ID: {pair.outgoingTransaction.accountId})
-                                  </span>
-                                  <span className="font-semibold text-red-600 flex-shrink-0">
-                                    -${Math.abs(pair.outgoingTransaction.amount).toFixed(2)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Incoming Transaction */}
-                        {pair.incomingTransaction && (
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">
-                              <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
-                              <span className="truncate">INCOMING (+${pair.incomingTransaction.amount.toFixed(2)})</span>
-                            </div>
-
-                            <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 sm:p-4 border border-green-200 dark:border-green-800">
-                              <div className="space-y-2">
-                                <div className="text-xs sm:text-sm text-muted-foreground">
-                                  {new Date(pair.incomingTransaction.date).toLocaleDateString()}
-                                </div>
-                                <div className="font-medium text-foreground text-sm sm:text-base break-words">
-                                  {pair.incomingTransaction.description}
-                                </div>
-                                <div className="flex justify-between items-center text-xs sm:text-sm gap-2">
-                                  <span className="text-muted-foreground truncate flex-1 min-w-0">
-                                    Account (ID: {pair.incomingTransaction.accountId})
-                                  </span>
-                                  <span className="font-semibold text-green-600 flex-shrink-0">
-                                    +${pair.incomingTransaction.amount.toFixed(2)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-3 mt-4 sm:mt-6 pt-4 border-t border-border">
+                      {/* Unpair action inline */}
+                      <div className="ml-auto">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm" className="flex-1 text-xs sm:text-sm">
-                              <Unlink className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                              Unpair Transfer
+                            <Button variant="outline" className="hover:border-destructive/20 hover:text-destructive hover:bg-destructive/10">
+                              <Unlink className="h-4 w-4 mr-1" />
+                              Unpair
                             </Button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="mx-4 max-w-md sm:max-w-lg">
+                          <AlertDialogContent className="max-w-md">
                             <AlertDialogHeader>
-                              <AlertDialogTitle className="text-base sm:text-lg">Unpair Transfer?</AlertDialogTitle>
-                              <AlertDialogDescription className="text-sm sm:text-base">
-                                {"This will unlink these transactions and remove their \"transfer\" status."}
-                                The transactions will remain in your account but will no longer be
-                                treated as a transfer pair.
+                              <AlertDialogTitle>Unpair Transfer?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will unlink these transactions and remove their transfer status. The transactions will remain in your account.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
-                            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                              <AlertDialogCancel className="mt-0">Cancel</AlertDialogCancel>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => handleUnpairTransfers(pair.transferPairId)}
                                 className="bg-destructive hover:bg-destructive/90"
@@ -301,120 +178,149 @@ function TransfersManagePage() {
                           </AlertDialogContent>
                         </AlertDialog>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                    </div>
+
+                    {/* Transaction row */}
+                    <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
+                      {/* Outgoing */}
+                      {pair.outgoingTransaction && (
+                        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 rounded-lg p-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                            <span className="text-xs font-medium text-red-600/90 dark:text-red-400/90 uppercase tracking-wide">Out</span>
+                            <span className="ml-auto font-semibold text-red-600/90 dark:text-red-400/90 text-sm">
+                              −${Math.abs(pair.outgoingTransaction.amount).toFixed(2)}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium text-foreground/90 leading-tight line-clamp-1">
+                            {pair.outgoingTransaction.description}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            Account {pair.outgoingTransaction.accountId}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(pair.outgoingTransaction.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+
+                      <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+
+                      {/* Incoming */}
+                      {pair.incomingTransaction && (
+                        <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-lg p-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                            <span className="text-xs font-medium text-green-600/90 dark:text-green-400/90 uppercase tracking-wide">In</span>
+                            <span className="ml-auto font-semibold text-green-600/90 dark:text-green-400/90 text-sm">
+                              +${pair.incomingTransaction.amount.toFixed(2)}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium text-foreground/90 leading-tight line-clamp-1">
+                            {pair.incomingTransaction.description}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            Account {pair.incomingTransaction.accountId}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(pair.incomingTransaction.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
             )}
           </TabsContent>
 
-          {/* Ignored Transfers Tab */}
-          <TabsContent value="ignored" className="space-y-4 sm:space-y-6">
+          {/* ── Ignored Transfers ── */}
+          <TabsContent value="ignored" className="space-y-4">
             {!ignoredTransfers || ignoredTransfers.length === 0 ? (
               <Card>
-                <CardContent className="p-6 sm:p-8 text-center">
-                  <XCircle className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-                  <h3 className="text-base sm:text-lg font-medium mb-2">No Ignored Suggestions</h3>
-                  <p className="text-sm sm:text-base text-muted-foreground">
+                <CardContent className="p-8 text-center">
+                  <XCircle className="h-14 w-14 text-muted-foreground mx-auto mb-3" />
+                  <h3 className="text-base font-medium mb-1">No Ignored Suggestions</h3>
+                  <p className="text-sm text-muted-foreground">
                     You haven&#39;t ignored any transfer suggestions yet.
                   </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {ignoredTransfers.map((ignored) => (
-                  <Card key={ignored.id} className="border-2 border-orange-200 dark:border-orange-800">
-                    <CardHeader className="pb-3 sm:pb-6">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-xs">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Ignored Suggestion
-                          </Badge>
-                        </div>
-                        <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
-                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          Ignored {new Date(ignored.ignoredAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </CardHeader>
+              ignoredTransfers.map((ignored) => (
+                <Card key={ignored.id} className="border hover:border-orange-400 dark:hover:border-orange-700 transition-colors">
+                  <CardContent className="px-4">
+                    {/* Top row */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-xs">
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Ignored
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(ignored.ignoredAt).toLocaleDateString()}
+                      </span>
 
-                    <CardContent className="pt-0">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        {/* Outgoing Transaction */}
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400">
-                            <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" />
-                            <span className="truncate">OUTGOING (-${Math.abs(ignored.outgoingTransaction.amount).toFixed(2)})</span>
-                          </div>
+                      {/* Restore action inline */}
+                      <Button
+                        variant="outline"
+                        className="ml-auto"
+                        onClick={() => handleUnignoreTransfer(
+                          ignored.outgoingTransaction._id,
+                          ignored.incomingTransaction._id
+                        )}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Restore
+                      </Button>
+                    </div>
 
-                          <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 sm:p-4 border border-red-200 dark:border-red-800 opacity-75">
-                            <div className="space-y-2">
-                              <div className="text-xs sm:text-sm text-muted-foreground">
-                                {new Date(ignored.outgoingTransaction.date).toLocaleDateString()}
-                              </div>
-                              <div className="font-medium text-foreground text-sm sm:text-base break-words">
-                                {ignored.outgoingTransaction.description}
-                              </div>
-                              <div className="flex justify-between items-center text-xs sm:text-sm gap-2">
-                                <span className="text-muted-foreground truncate flex-1 min-w-0">
-                                  {ignored.outgoingAccount?.name || "Unknown Account"}
-                                </span>
-                                <span className="font-semibold text-red-600 flex-shrink-0">
-                                  -${Math.abs(ignored.outgoingTransaction.amount).toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                    {/* Transaction row */}
+                    <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center opacity-75">
+                      {/* Outgoing */}
+                      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 rounded-lg p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                          <span className="text-xs font-medium text-red-600/90 dark:text-red-400/90 uppercase tracking-wide">Out</span>
+                          <span className="ml-auto font-semibold text-red-600/90 dark:text-red-400/90 text-sm">
+                            −${Math.abs(ignored.outgoingTransaction.amount).toFixed(2)}
+                          </span>
                         </div>
-
-                        {/* Incoming Transaction */}
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">
-                            <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
-                            <span className="truncate">INCOMING (+${ignored.incomingTransaction.amount.toFixed(2)})</span>
-                          </div>
-
-                          <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 sm:p-4 border border-green-200 dark:border-green-800 opacity-75">
-                            <div className="space-y-2">
-                              <div className="text-xs sm:text-sm text-muted-foreground">
-                                {new Date(ignored.incomingTransaction.date).toLocaleDateString()}
-                              </div>
-                              <div className="font-medium text-foreground text-sm sm:text-base break-words">
-                                {ignored.incomingTransaction.description}
-                              </div>
-                              <div className="flex justify-between items-center text-xs sm:text-sm gap-2">
-                                <span className="text-muted-foreground truncate flex-1 min-w-0">
-                                  {ignored.incomingAccount?.name || "Unknown Account"}
-                                </span>
-                                <span className="font-semibold text-green-600 flex-shrink-0">
-                                  +${ignored.incomingTransaction.amount.toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <p className="text-sm font-medium text-foreground/90 leading-tight line-clamp-1">
+                          {ignored.outgoingTransaction.description}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {ignored.outgoingAccount?.name || "Unknown Account"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(ignored.outgoingTransaction.date).toLocaleDateString()}
+                        </p>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex gap-3 mt-4 sm:mt-6 pt-4 border-t border-border">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 text-xs sm:text-sm"
-                          onClick={() => handleUnignoreTransfer(
-                            ignored.outgoingTransaction._id,
-                            ignored.incomingTransaction._id
-                          )}
-                        >
-                          <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                          Restore Suggestion
-                        </Button>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+
+                      {/* Incoming */}
+                      <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-lg p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                          <span className="text-xs font-medium text-green-600/90 dark:text-green-400/90 uppercase tracking-wide">In</span>
+                          <span className="ml-auto font-semibold text-green-600/90 dark:text-green-400/90 text-sm">
+                            +${ignored.incomingTransaction.amount.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-foreground/90 leading-tight line-clamp-1">
+                          {ignored.incomingTransaction.description}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {ignored.incomingAccount?.name || "Unknown Account"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(ignored.incomingTransaction.date).toLocaleDateString()}
+                        </p>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
             )}
           </TabsContent>
         </Tabs>

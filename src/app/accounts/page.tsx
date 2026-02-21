@@ -197,9 +197,9 @@ export default function AccountsPage() {
     return (
         <AppLayout>
             <InitUser />
-            <div className="flex flex-col gap-6 p-6">
+            <div className="flex flex-col gap-6 py-6 px-6">
                 <div>
-                    <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 mb-6">
                         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
                             <Landmark className="h-8 w-8 text-primary" />
                             Accounts

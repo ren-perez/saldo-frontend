@@ -50,13 +50,13 @@ export const statusConfig = {
   matched: {
     label: "Matched",
     badgeClass: "border-sky-400/30 text-sky-600 bg-sky-400/10",
-    rowClass: "border-sky-400/20 bg-sky-400/[0.02]",
+    rowClass: "border-sky-400/20 bg-sky-400/[0.05]",
     dotClass: "border-sky-400 bg-sky-400/10",
   },
   distributed: {
     label: "Distributed",
     badgeClass: "border-emerald-500/30 text-emerald-600 bg-emerald-500/10",
-    rowClass: "border-emerald-500/20 bg-emerald-500/[0.02]",
+    rowClass: "border-emerald-500/20 bg-emerald-500/[0.05]",
     dotClass: "border-emerald-500 bg-emerald-500/10",
   },
   missed: {

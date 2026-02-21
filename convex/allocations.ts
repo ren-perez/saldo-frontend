@@ -172,8 +172,16 @@ export const updateAllocationAmount = mutation({
     handler: async (ctx, { recordId, amount }) => {
         const record = await ctx.db.get(recordId);
         if (!record) throw new Error("Allocation record not found");
-        // Only allow editing forecast (planned) allocations
-        if (!record.is_forecast) throw new Error("Cannot edit matched allocations");
+
+        // Lock edits only when the entire plan is fully distributed
+        const allRecords = await ctx.db
+            .query("allocation_records")
+            .withIndex("by_income_plan", (q) => q.eq("income_plan_id", record.income_plan_id))
+            .collect();
+        const isFullyDistributed =
+            allRecords.length > 0 && allRecords.every((r) => r.status === "complete");
+        if (isFullyDistributed) throw new Error("Cannot edit a fully distributed income plan");
+
         await ctx.db.patch(recordId, { amount: Math.max(0, amount) });
     },
 });

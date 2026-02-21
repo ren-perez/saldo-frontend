@@ -156,9 +156,9 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
         )}
 
         {/* Month groups */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-10">
           {grouped.map((group) => (
-            <div key={group.key} className="flex flex-col gap-2">
+            <div key={group.key} className="flex flex-col gap-4">
               {/* Month header */}
               <div className="flex items-center gap-3 py-1 sticky top-0 bg-background z-10">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
@@ -174,7 +174,7 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
               </div>
 
               {/* Plan cards */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-4">
                 {group.items.map((plan) => (
                   <IncomePlanCard
                     key={plan._id}

@@ -53,7 +53,10 @@ export default function IncomePage() {
       <InitUser />
       <div className="flex flex-col gap-6 p-6">
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold text-foreground">Income</h1>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <DollarSign className="h-8 w-8 text-primary" />
+            Income
+            </h1>
           <Tooltip>
             <TooltipTrigger asChild>
               <Info className="size-4 text-muted-foreground cursor-help" />
@@ -61,6 +64,7 @@ export default function IncomePage() {
             <TooltipContent>Track and allocate your income across accounts.</TooltipContent>
           </Tooltip>
         </div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center justify-between gap-3">
             <TabsList>
@@ -71,12 +75,11 @@ export default function IncomePage() {
             <div className="flex items-center gap-2">
               {count > 0 && (
                 <Button
-                  size="sm"
                   variant="outline"
                   onClick={() => setUnmatchedOpen((o) => !o)}
-                  className="gap-1.5 border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 text-amber-700 hover:from-amber-500/20 hover:to-amber-500/10 hover:text-amber-800 dark:text-amber-500 dark:hover:text-amber-400"
+                  className="gap-2 border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 text-amber-700 hover:from-amber-500/20 hover:to-amber-500/10 hover:text-amber-800 dark:text-amber-500 dark:hover:text-amber-400"
                 >
-                  <Inbox className="size-3.5" />
+                  <Inbox className="size-4" />
                   <span className="hidden sm:inline">Match Your Income</span>
                   <span className="inline sm:hidden">Match</span>
                 </Button>
@@ -84,11 +87,10 @@ export default function IncomePage() {
 
               {activeTab === "timeline" && (
                 <Button
-                  size="sm"
-                  className="gap-1.5 h-8 text-xs"
+                  className="gap-2"
                   onClick={() => setIncomeFormOpen(true)}
                 >
-                  <Plus className="size-3.5" />
+                  <Plus className="size-4" />
                   <span className="hidden sm:inline">Add Income</span>
                   <span className="inline sm:hidden">Add</span>
                 </Button>
@@ -108,13 +110,13 @@ export default function IncomePage() {
             </div>
           </div>
 
-          <TabsContent value="timeline" className="mt-4">
+          <TabsContent value="timeline" className="my-6">
             <IncomeTimeline
               externalFormOpen={incomeFormOpen}
               onExternalFormOpenChange={setIncomeFormOpen}
             />
           </TabsContent>
-          <TabsContent value="allocations" className="mt-4">
+          <TabsContent value="allocations" className="mt-6">
             <AllocationsView
               externalShowAdd={allocationFormOpen}
               onExternalShowAddChange={setAllocationFormOpen}

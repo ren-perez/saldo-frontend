@@ -181,7 +181,7 @@ export function AccountsSnapshot({ accounts, incomeSummary }: AccountsSnapshotPr
                         <Link
                           key={account._id}
                           href={`/transactions?accountId=${account._id}`}
-                          className="flex items-center justify-between py-2 px-1 -mx-1 rounded-md hover:bg-muted/50 transition-colors"
+                          className="flex items-center justify-between py-2 px-6 -mx-1 rounded-md hover:bg-muted/50 transition-colors"
                         >
                           <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-2">

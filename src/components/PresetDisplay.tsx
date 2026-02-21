@@ -201,27 +201,33 @@ interface PresetNotFoundProps {
     onCreatePreset?: () => void;
 }
 
-export function PresetNotFound({ accountName, className = "", onCreatePreset }: PresetNotFoundProps) {
+export function PresetNotFound({
+    accountName,
+    className = "",
+    onCreatePreset,
+}: PresetNotFoundProps) {
+    const description = accountName
+        ? `"${accountName}" doesn't have an import preset linked to it.`
+        : "This account doesn't have an import preset linked to it.";
+
     return (
-        <Card className={`border-yellow-200 dark:border-yellow-800 ${className}`}>
+        <Card className={className}>
             <CardHeader>
-                <div className="flex items-center gap-2">
-                    <div>
-                        <CardTitle className="text-lg text-yellow-700 dark:text-yellow-300">
-                            No Preset Configured
-                        </CardTitle>
-                        <CardDescription className="text-yellow-600 dark:text-yellow-400">
-                            {accountName ? `"${accountName}" doesn't have` : "This account doesn't have"} an import preset linked to it
-                        </CardDescription>
-                    </div>
-                </div>
+                <CardTitle className="text-lg">
+                    No Import Preset
+                </CardTitle>
+                <CardDescription>
+                    {description}
+                </CardDescription>
             </CardHeader>
-            <CardContent>
-                <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-3">
-                    You need to create and link a CSV import preset to this account before you can import transactions.
+
+            <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    Create and link a CSV import preset before importing transactions.
                 </p>
+
                 <Button
-                    variant="outline"
+                    variant="default"
                     size="sm"
                     onClick={onCreatePreset}
                     asChild={!onCreatePreset}

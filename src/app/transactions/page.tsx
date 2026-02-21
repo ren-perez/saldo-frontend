@@ -7,8 +7,8 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus, Info } from "lucide-react";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus, Info, CreditCard } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -582,26 +582,31 @@ function TransactionsContent() {
     return (
         <AppLayout>
             <InitUser />
-            <div className="container mx-auto py-6 px-4">
+            <div className="container mx-auto py-6 px-6">
+
                 {/* Header */}
-                <div className="flex flex-col gap-4 mb-8">
+                <div className="flex flex-col gap-4 mb-6">
+
                     {/* Title */}
                     <div className="flex items-center gap-1.5">
-                        <h2 className="text-lg font-semibold text-foreground">
+                        <h1 className="flex items-center gap-3 text-3xl font-bold text-foreground">
+                            <CreditCard className="h-8 w-8 text-primary" />
                             Transactions
-                        </h2>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                View and manage your imported transactions
-                            </TooltipContent>
-                        </Tooltip>
+                        </h1>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    View and manage your imported transactions
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
 
                     {/* CTAs */}
-                    <div className="flex items-center gap-2 justify-end">
+                    <div className="flex items-center gap-2 justify-end mb-6">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button size="sm" className="gap-1.5">
@@ -637,25 +642,26 @@ function TransactionsContent() {
                     </div>
 
                     {/* Divider with Clear All */}
-                    <div className="flex items-center gap-3">
-                        <div className="flex-1 border-t border-border" />
+                    <div className="relative mb-3">
+                        <div className="border-t border-border" />
                         {activeFiltersCount > 0 && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={clearAllFilters}
-                                className="h-6 gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2"
-                            >
-                                Clear all
-                                <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
-                                    {activeFiltersCount}
-                                </Badge>
-                            </Button>
+                            <div className="absolute right-0 -top-3 bg-background">
+                                <Button
+                                    variant="ghost"
+                                    onClick={clearAllFilters}
+                                    className="h-6 gap-2 text-muted-foreground hover:text-foreground text-xs px-2 py-3"
+                                >
+                                    Clear all
+                                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[11px]">
+                                        {activeFiltersCount}
+                                    </Badge>
+                                </Button>
+                            </div>
                         )}
                     </div>
 
                     {/* Filters */}
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-3 mb-3">
                         {/* Row 1: Transaction Types | Search */}
                         <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-3">
                             {/* Transaction Types */}
@@ -944,7 +950,7 @@ function TransactionsContent() {
 
                                             return (
                                                 <TableRow key={transaction._id}>
-                                                    <TableCell className="pl-6 text-[11px] tabular-nums text-muted-foreground">
+                                                    <TableCell className="pl-6 text-xs tabular-nums text-muted-foreground">
                                                         {formatDate(transaction.date)}
                                                     </TableCell>
                                                     <TableCell className="max-w-[180px] truncate">
@@ -962,7 +968,7 @@ function TransactionsContent() {
                                                             </PopoverContent>
                                                         </Popover>
                                                     </TableCell>
-                                                    <TableCell className="text-[11px] text-muted-foreground">
+                                                    <TableCell className="text-xs text-muted-foreground">
                                                         {account?.name || "None"}
                                                     </TableCell>
                                                     <TableCell>

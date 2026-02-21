@@ -23,7 +23,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Upload, Settings2, Trash2, FileText, Calendar, CheckCircle, XCircle, Clock, AlertCircle, Info } from "lucide-react";
+import { Plus, Upload, Settings2, Trash2, FileText, Calendar, CheckCircle, XCircle, Clock, AlertCircle, Info, FileSpreadsheet } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 
@@ -315,9 +315,12 @@ export default function PresetsPage() {
     return (
         <AppLayout>
             <InitUser />
-            <div className="container mx-auto py-6 px-4">
-                <div className="flex items-center gap-3 mb-4">
-                    <h1 className="text-3xl font-bold text-foreground">Presets</h1>
+            <div className="container mx-auto py-6 px-6">
+                <div className="flex items-center gap-3 mb-6">
+                    <h1 className="flex items-center gap-3 text-3xl font-bold text-foreground">
+                        <FileSpreadsheet className="h-8 w-8 text-primary" />
+                        Presets
+                        </h1>
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -331,22 +334,22 @@ export default function PresetsPage() {
                 </div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-6">
                         <TabsList>
                             <TabsTrigger value="presets">Presets</TabsTrigger>
                             <TabsTrigger value="history">Import History</TabsTrigger>
                         </TabsList>
                         <div className="flex items-center gap-2">
-                            <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs" asChild>
+                            <Button className="gap-2" asChild>
                                 <Link href="/import-csv">
-                                    <Upload className="size-3" />
+                                    <Upload className="size-4" />
                                     Import CSV
                                 </Link>
                             </Button>
                             {activeTab === "presets" && (
-                                <Button size="sm" className="gap-1.5 h-7 text-xs" onClick={() => setShowCreateDialog(true)}>
-                                    <Plus className="size-3" />
-                                    New Preset
+                                <Button variant="outline" className="gap-2" onClick={() => setShowCreateDialog(true)}>
+                                    <Plus className="size-4" />
+                                    Add Preset
                                 </Button>
                             )}
                         </div>

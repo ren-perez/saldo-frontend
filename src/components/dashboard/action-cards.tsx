@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Wallet, ArrowLeftRight, Target, ListChecks } from "lucide-react"
+import { ArrowRight, Wallet, ArrowLeftRight, Target } from "lucide-react"
 
 interface ActionCardsProps {
   unmatchedIncomeCount: number
@@ -10,51 +10,59 @@ interface ActionCardsProps {
   pendingDistributionCount?: number
 }
 
-export function ActionCards({ unmatchedIncomeCount, pendingTransferCount, activeGoalCount, pendingDistributionCount = 0 }: ActionCardsProps) {
+export function ActionCards({
+  unmatchedIncomeCount,
+  pendingTransferCount,
+  activeGoalCount,
+  pendingDistributionCount = 0,
+}: ActionCardsProps) {
   const actions = [
     {
+      id: "income-match",
       title: `${unmatchedIncomeCount} income to match`,
       href: "/income",
       icon: Wallet,
-      accent: "bg-primary/10 text-primary",
+      accent: "bg-blue-500/15 text-blue-500",
       show: true,
     },
     {
+      id: "pending-transfers",
       title: `${pendingTransferCount} pending transfers`,
       href: "/transfers-inbox",
       icon: ArrowLeftRight,
-      accent: "bg-warning/10 text-warning-foreground",
+      accent: "bg-blue-500/15 text-blue-500",
       show: true,
     },
-    {
-      title: `${pendingDistributionCount} to distribute`,
-      href: "/income",
-      icon: ListChecks,
-      accent: "bg-chart-4/10 text-chart-4",
-      show: pendingDistributionCount > 0,
-    },
-    // {
-    //   title: `${activeGoalCount} goals on track`,
-    //   href: "/goals",
-    //   icon: Target,
-    //   accent: "bg-success/10 text-success",
-    //   show: true,
-    // },
   ].filter((a) => a.show)
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       {actions.map((action) => (
         <Link
-          key={action.href}
+          key={action.id}
           href={action.href}
-          className="group flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2 transition-colors hover:border-primary/30 hover:bg-accent"
+          className="group flex items-center gap-2.5 rounded-lg border border-blue-600/30 bg-blue-600/10 px-3.5 py-2 transition-colors hover:border-foreground/40 hover:bg-foreground/20 sm:w-auto"
         >
-          <div className={`flex size-7 shrink-0 items-center justify-center rounded-md ${action.accent}`}>
+          {/* Icon wrapper */}
+          <div
+            className={`
+              flex size-7 shrink-0 items-center justify-center rounded-md
+              ${action.accent}
+              transition-colors
+              group-hover:bg-foreground/60
+              group-hover:text-background
+            `}
+          >
             <action.icon className="size-3.5" />
           </div>
-          <span className="text-sm font-medium text-foreground">{action.title}</span>
-          <ArrowRight className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+
+          {/* Title */}
+          <span className="text-sm font-medium text-foreground/85">
+            {action.title}
+          </span>
+
+          {/* Arrow */}
+          <ArrowRight className="ml-auto size-4 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:text-foreground sm:ml-0" />
         </Link>
       ))}
     </div>

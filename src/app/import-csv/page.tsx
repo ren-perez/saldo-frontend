@@ -32,7 +32,7 @@ import {
     type NormalizedTransaction,
 } from "@/utils/etl";
 import { PresetDisplay, PresetNotFound } from "@/components/PresetDisplay";
-import { Info, ChevronDown, FileText, RotateCcw, Upload, CheckCircle, Check } from "lucide-react";
+import { Info, ChevronDown, FileText, RotateCcw, Upload, CheckCircle, Check, Import, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
@@ -455,10 +455,14 @@ export default function CsvImporterPage() {
     return (
         <AppLayout>
             <InitUser />
-            <div className="container mx-auto py-6 px-4">
+            <div className="container mx-auto py-6 px-6">
+
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">Import Transactions</h1>
+                    <h1 className="flex items-center gap-3 text-3xl font-bold text-foreground">
+                        <Import className="h-8 w-8 text-primary" />
+                        Import Transactions
+                    </h1>
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -475,10 +479,18 @@ export default function CsvImporterPage() {
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
+                </div>
+
+                {/* ── CTAs ── */}
+                <div className="mb-8 flex items-center gap-2 justify-end">
                     {importPhase !== "upload" && importPhase !== "completed" && (
-                        <Button onClick={resetImportState} variant="outline" size="sm" className="ml-auto gap-1.5 h-7 text-xs">
-                            <RotateCcw className="size-3" />
-                            Start New Import
+                        <Button
+                            onClick={resetImportState}
+                            variant="outline"
+                            className="ml-auto gap-2"
+                        >
+                            <RotateCcw className="size-4" />
+                            Start Over
                         </Button>
                     )}
                 </div>
@@ -598,43 +610,50 @@ export default function CsvImporterPage() {
 
                 {/* Preview Phase - Step 2: Preview Table + Confirm */}
                 {importPhase === "preview" && (
-                    <div className="space-y-5">
+                    <div className="space-y-6">
                         {/* Context bar: account + file info */}
-                        <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
-                            <div className="flex items-center gap-4 text-sm">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between py-3 px-4 rounded-lg border bg-muted/50">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:gap-8 text-sm">
                                 <div className="flex items-center gap-1.5">
+                                    <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
                                     <span className="text-muted-foreground">Account:</span>
                                     <span className="font-medium">{selectedAccountName}</span>
                                     {selectedAccountBank && (
-                                        <Badge variant="outline" className="text-[10px]">{selectedAccountBank}</Badge>
+                                        <Badge variant="outline" className="text-[10px]">
+                                            {selectedAccountBank}
+                                        </Badge>
                                     )}
                                 </div>
+
                                 <div className="flex items-center gap-1.5">
                                     <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                                     <span className="text-muted-foreground">File:</span>
                                     <span className="font-medium">{file?.name}</span>
                                 </div>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-1.5 h-7 text-xs text-muted-foreground"
-                                onClick={resetImportState}
-                            >
-                                <RotateCcw className="size-3" />
-                                Reset
-                            </Button>
+
+                            {/* <div className="text-right">
+                                <Button
+                                    variant="outline"
+                                    className="gap-2 text-muted-foreground self-start lg:self-auto"
+                                    onClick={resetImportState}
+                                >
+                                    <RotateCcw className="size-3" />
+                                    Reset
+                                </Button>
+                            </div> */}
                         </div>
 
                         {/* Processing Stats */}
                         {processingStats && (
-                            <div className="p-4 rounded-md border bg-muted">
+                            // <div className="p-4 rounded-md border bg-muted">
+                            <div>
                                 <h3 className="text-sm font-medium">Processing Summary</h3>
                                 <div className="mt-1.5 flex items-center gap-4 text-sm text-muted-foreground">
                                     <span>Total rows: <span className="font-medium text-foreground">{processingStats.totalRows || 0}</span></span>
-                                    <span>Valid: <span className="font-medium text-green-600">{processingStats.validRows || 0}</span></span>
+                                    <span>Valid: <span className="font-medium text-green-600/90">{processingStats.validRows || 0}</span></span>
                                     {(processingStats.errorRows || 0) > 0 && (
-                                        <span>Errors: <span className="font-medium text-red-600">{processingStats.errorRows || 0}</span></span>
+                                        <span>Errors: <span className="font-medium text-red-600/90">{processingStats.errorRows || 0}</span></span>
                                     )}
                                 </div>
                             </div>
