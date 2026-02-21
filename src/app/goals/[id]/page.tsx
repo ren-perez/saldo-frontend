@@ -78,7 +78,7 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
         <AppLayout>
             <InitUser />
             {/* Goal Detail Card */}
-            <div className="max-w-4xl mx-auto w-full rounded-xl border overflow-hidden bg-card">
+            <div className="mx-auto w-full overflow-hidden ">
             {/* Header Image */}
             <div className="relative w-full h-[280px] lg:h-[320px] bg-gradient-to-br from-muted/60 via-muted/30 to-background overflow-hidden">
                 {headerImage ? (

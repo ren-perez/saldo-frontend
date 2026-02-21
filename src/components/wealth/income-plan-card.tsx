@@ -43,6 +43,7 @@ import {
   formatCurrency,
   formatDate,
 } from "./income-shared"
+import { Goal } from "@/types/goals"
 import { DistributionChecklist } from "./distribution-checklist"
 
 const statusIcons = {
@@ -124,7 +125,7 @@ function EditableAllocationRows({
   const deleteRecord = useMutation(api.allocations.deleteAllocationRecord)
 
   const accounts = useQuery(api.accounts.listAccounts, { userId })
-  const goals = useQuery(api.goals.getGoals, { userId })
+  const goals = useQuery(api.goals.getGoals, { userId }) as Goal[] | undefined
 
   const availableAccounts =
     accounts?.filter(
@@ -136,10 +137,10 @@ function EditableAllocationRows({
       <div className="flex flex-col gap-1.5">
         {allocations.map((a, i) => {
           const linkedGoal = goals?.find(
-            (g: any) => g.linked_account?._id === a.accountId && !g.is_completed
+            (g) => g.linked_account?._id === a.accountId && !g.is_completed
           )
           const goalPart = linkedGoal
-            ? `${(linkedGoal as any).emoji ?? ""} ${(linkedGoal as any).name}`.trim()
+            ? `${linkedGoal.emoji ?? ""} ${linkedGoal.name}`.trim()
             : null
           const displayName = goalPart
             ? `${goalPart} · ${a.accountName}`
@@ -213,7 +214,7 @@ function EditableAllocationRows({
             ) : (
               availableAccounts.map((acc) => {
                 const linkedGoal = goals?.find(
-                  (g: any) => g.linked_account?._id === acc._id && !g.is_completed
+                  (g) => g.linked_account?._id === acc._id && !g.is_completed
                 )
                 return (
                   <DropdownMenuItem
@@ -231,8 +232,8 @@ function EditableAllocationRows({
                     {linkedGoal ? (
                       <span className="flex flex-col gap-0">
                         <span>
-                          {(linkedGoal as any).emoji ?? "🎯"}{" "}
-                          {(linkedGoal as any).name}
+                          {linkedGoal.emoji ?? "🎯"}{" "}
+                          {linkedGoal.name}
                         </span>
                         <span className="text-muted-foreground text-[10px]">
                           {acc.name}

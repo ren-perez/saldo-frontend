@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import {
   Check,
   Circle,
@@ -28,6 +28,7 @@ import {
   allocColors,
   categoryLabels,
 } from "./income-shared"
+import { Goal } from "@/types/goals"
 import { AllocationMatchDialog } from "./allocation-match-dialog"
 import { Separator } from "../ui/separator"
 
@@ -102,7 +103,7 @@ export function DistributionChecklist({
     incomePlanId,
   })
   const accounts = useQuery(api.accounts.listAccounts, { userId })
-  const goals = useQuery(api.goals.getGoals, { userId })
+  const goals = useQuery(api.goals.getGoals, { userId }) as Goal[] | undefined
 
   const unmatchTx = useMutation(api.allocations.unmatchAllocationTransaction)
   const addRecord = useMutation(api.allocations.addAllocationRecord)
@@ -166,8 +167,7 @@ export function DistributionChecklist({
               ) : (
                 availableAccounts.map((acc) => {
                   const linkedGoal = goals?.find(
-                    (g: any) =>
-                      g.linked_account?._id === acc._id && !g.is_completed
+                    (g) => g.linked_account?._id === acc._id && !g.is_completed
                   )
                   return (
                     <DropdownMenuItem
@@ -185,8 +185,8 @@ export function DistributionChecklist({
                       {linkedGoal ? (
                         <span className="flex flex-col gap-0">
                           <span>
-                            {(linkedGoal as any).emoji ?? "🎯"}{" "}
-                            {(linkedGoal as any).name}
+                            {linkedGoal.emoji ?? "🎯"}{" "}
+                            {linkedGoal.name}
                           </span>
                           <span className="text-muted-foreground text-[10px]">
                             {acc.name}
@@ -220,16 +220,12 @@ export function DistributionChecklist({
           const isComplete = item.status === "complete"
           const isPartial = item.status === "partial"
 
-          // Goal label + always show account name
           const goalPart = item.goalName
             ? `${item.goalEmoji ?? ""} ${item.goalName}`.trim()
             : null
           const displayName = goalPart
             ? `${goalPart} · ${item.accountName}`
             : item.accountName
-          const subLabel = goalPart
-            ? categoryLabels[item.category] ?? item.category
-            : null
 
           return (
             <div
@@ -296,7 +292,6 @@ export function DistributionChecklist({
                   </span>
                 )}
 
-                {/* Editable amount — works for matched plans too since we removed the is_forecast guard */}
                 <EditableAmount
                   value={item.amount}
                   onCommit={(v) =>
