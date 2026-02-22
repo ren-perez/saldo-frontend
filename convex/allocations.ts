@@ -395,12 +395,43 @@ export const matchAllocationTransaction = mutation({
         });
 
         const currentMatched = (record.matched_amount ?? 0) + amount;
-        const newStatus = currentMatched >= record.amount ? "complete" : "partial";
 
+        // Update the allocation's target amount to the actual matched total,
+        // so that differing transaction amounts are reflected automatically.
         await ctx.db.patch(allocationRecordId, {
+            amount: currentMatched,
             matched_amount: currentMatched,
-            status: newStatus,
+            status: "complete",
         });
+
+        // If this account is linked to an active goal, create a contribution
+        const linkedGoal = await ctx.db
+            .query("goals")
+            .withIndex("by_account", (q) => q.eq("linked_account_id", record.accountId))
+            .first();
+
+        if (linkedGoal && !linkedGoal.is_completed) {
+            const existingContributions = await ctx.db
+                .query("goal_contributions")
+                .withIndex("by_goal", (q) => q.eq("goalId", linkedGoal._id))
+                .collect();
+            const currentTotal = existingContributions.reduce((s, c) => s + c.amount, 0);
+            const remaining = linkedGoal.total_amount - currentTotal;
+            const contributionAmount = Math.min(amount, Math.max(0, remaining));
+
+            if (contributionAmount > 0) {
+                await ctx.db.insert("goal_contributions", {
+                    userId: record.userId,
+                    goalId: linkedGoal._id,
+                    transactionId,
+                    amount: contributionAmount,
+                    contribution_date: new Date(tx.date).toISOString().split("T")[0],
+                    source: "auto",
+                    note: "From allocation match",
+                    createdAt: Date.now(),
+                });
+            }
+        }
     },
 });
 
@@ -425,11 +456,21 @@ export const unmatchAllocationTransaction = mutation({
         const record = await ctx.db.get(match.allocation_record_id);
         if (!record) return;
 
-        const newStatus = actualMatched >= record.amount ? "complete" : actualMatched > 0 ? "partial" : "pending";
+        const newStatus = actualMatched > 0 ? "complete" : "pending";
         await ctx.db.patch(match.allocation_record_id, {
+            amount: actualMatched,
             matched_amount: actualMatched,
             status: newStatus,
         });
+
+        // Remove any goal contributions linked to this transaction
+        const goalContributions = await ctx.db
+            .query("goal_contributions")
+            .withIndex("by_transaction", (q) => q.eq("transactionId", match.transaction_id))
+            .collect();
+        for (const contrib of goalContributions) {
+            await ctx.db.delete(contrib._id);
+        }
     },
 });
 

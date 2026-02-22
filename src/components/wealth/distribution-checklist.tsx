@@ -28,6 +28,7 @@ import {
   allocColors,
   categoryLabels,
 } from "./income-shared"
+import { formatDate } from "@/lib/format"
 import { Goal } from "@/types/goals"
 import { AllocationMatchDialog } from "./allocation-match-dialog"
 import { Separator } from "../ui/separator"
@@ -352,12 +353,17 @@ export function DistributionChecklist({
               item.matches.map((m) => (
                 <div
                   key={m._id}
-                  className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-2.5 py-0.5 group/match"
+                  className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-2.5 py-1 group/match"
                 >
                   <Link2 className="size-2.5 shrink-0 text-emerald-500" />
-                  <span className="truncate flex-1">
-                    {m.transaction?.description ?? "Transaction"}
-                  </span>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="truncate text-foreground/80">
+                      {m.transaction?.description ?? "Transaction"}
+                    </span>
+                    <span className="text-muted-foreground/70">
+                      {item.accountName}{m.transaction?.date ? ` · ${formatDate(m.transaction.date)}` : ""}
+                    </span>
+                  </div>
                   <span className="tabular-nums shrink-0 text-emerald-600">
                     {formatCurrency(m.amount)}
                   </span>
