@@ -296,6 +296,13 @@ export function DistributionChecklist({
                   </span>
                 )}
 
+                {/* When complete and matched ≠ planned, show actual in green + planned struck */}
+                {isComplete && Math.abs(item.matchedAmount - item.amount) > 0.01 && (
+                  <span className="text-xs text-emerald-600 tabular-nums font-medium">
+                    {formatCurrency(item.matchedAmount)}&nbsp;
+                  </span>
+                )}
+
                 <EditableAmount
                   value={item.amount}
                   onCommit={(v) =>

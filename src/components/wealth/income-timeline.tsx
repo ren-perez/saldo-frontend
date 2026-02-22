@@ -160,7 +160,7 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
           {grouped.map((group) => (
             <div key={group.key} className="flex flex-col gap-4">
               {/* Month header */}
-              <div className="flex items-center gap-3 py-1 sticky top-0 bg-background z-10">
+              <div className="flex items-center gap-3 x-2 py-2 sticky top-16 bg-background/60 backdrop-blur-xl z-10">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
                   {group.label}
                 </h3>

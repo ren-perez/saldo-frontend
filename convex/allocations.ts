@@ -395,13 +395,11 @@ export const matchAllocationTransaction = mutation({
         });
 
         const currentMatched = (record.matched_amount ?? 0) + amount;
+        const newStatus = currentMatched >= record.amount ? "complete" : "partial";
 
-        // Update the allocation's target amount to the actual matched total,
-        // so that differing transaction amounts are reflected automatically.
         await ctx.db.patch(allocationRecordId, {
-            amount: currentMatched,
             matched_amount: currentMatched,
-            status: "complete",
+            status: newStatus,
         });
 
         // If this account is linked to an active goal, create a contribution
@@ -456,9 +454,8 @@ export const unmatchAllocationTransaction = mutation({
         const record = await ctx.db.get(match.allocation_record_id);
         if (!record) return;
 
-        const newStatus = actualMatched > 0 ? "complete" : "pending";
+        const newStatus = actualMatched >= record.amount ? "complete" : actualMatched > 0 ? "partial" : "pending";
         await ctx.db.patch(match.allocation_record_id, {
-            amount: actualMatched,
             matched_amount: actualMatched,
             status: newStatus,
         });
