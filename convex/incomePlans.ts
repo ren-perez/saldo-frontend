@@ -80,6 +80,16 @@ export const matchIncomePlan = mutation({
         const transaction = await ctx.db.get(transactionId);
         if (!transaction) throw new Error("Transaction not found");
 
+        // Prevent double-matching: check if this transaction is already matched to another plan
+        const allPlans = await ctx.db
+            .query("income_plans")
+            .withIndex("by_user", (q) => q.eq("userId", transaction.userId))
+            .collect();
+        const alreadyMatched = allPlans.find(
+            (p) => p._id !== planId && p.matched_transaction_id === transactionId
+        );
+        if (alreadyMatched) throw new Error("Transaction is already matched to another income plan");
+
         await ctx.db.patch(planId, {
             status: "matched",
             matched_transaction_id: transactionId,

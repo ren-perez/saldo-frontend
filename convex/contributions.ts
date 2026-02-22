@@ -360,10 +360,23 @@ export const getUnallocatedTransactions = query({
             transactions = transactions.filter(t => t.amount > 0);
         }
 
-        // Filter out transactions that already have contributions
+        // Build set of transaction IDs already matched to an income plan
+        const incomePlans = await ctx.db
+            .query("income_plans")
+            .withIndex("by_user", (q) => q.eq("userId", args.userId))
+            .collect();
+        const matchedByIncomePlan = new Set(
+            incomePlans
+                .filter((p) => p.matched_transaction_id)
+                .map((p) => p.matched_transaction_id!.toString())
+        );
+
+        // Filter out transactions that already have contributions or are matched to an income plan
         const unallocatedTransactions = [];
         for (const transaction of transactions) {
             if (unallocatedTransactions.length >= desiredLimit) break;
+
+            if (matchedByIncomePlan.has(transaction._id.toString())) continue;
 
             const existingContributions = await ctx.db
                 .query("goal_contributions")

@@ -241,11 +241,14 @@ export function DistributionChecklist({
               <button
                 className="shrink-0 size-4 ml-2"
                 title={isComplete ? "Mark pending" : "Mark complete"}
-                onClick={() =>
-                  isComplete
-                    ? unmarkComplete({ allocationRecordId: item._id })
-                    : markComplete({ allocationRecordId: item._id })
-                }
+                onClick={async () => {
+                  if (isComplete) {
+                    await Promise.all(item.matches.map((m) => unmatchTx({ matchId: m._id })))
+                    unmarkComplete({ allocationRecordId: item._id })
+                  } else {
+                    markComplete({ allocationRecordId: item._id })
+                  }
+                }}
               >
                 {isComplete ? (
                   <div className="size-4 rounded-full bg-emerald-500 flex items-center justify-center animate-check-bounce">
@@ -360,7 +363,7 @@ export function DistributionChecklist({
                   </span>
                   <button
                     onClick={() => unmatchTx({ matchId: m._id })}
-                    className="shrink-0 opacity-0 group-hover/match:opacity-100 hover:text-destructive transition-all"
+                    className="shrink-0 hover:text-destructive transition-colors"
                     title="Remove match"
                   >
                     <X className="size-2.5" />
