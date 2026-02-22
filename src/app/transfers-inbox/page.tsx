@@ -6,7 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,15 +19,17 @@ import {
   Filter,
   Info,
   ArrowRight,
-  BringToFront,
+  History,
 } from "lucide-react";
 import { PotentialTransfer } from "@/types/transfers";
 import Link from "next/link";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ManualMatchDialog } from "@/components/ManualMatchDialog";
 
 function TransferInboxPage() {
   const { convexUser } = useConvexUser();
   const [showFilters, setShowFilters] = useState(false);
+  const [showManualMatch, setShowManualMatch] = useState(false);
 
   const potentialTransfers = useQuery(
     api.transfers.getPotentialTransfers,
@@ -90,6 +92,7 @@ function TransferInboxPage() {
   }
 
   return (
+    <>
     <AppLayout>
       <InitUser />
       <div className="container mx-auto py-6 px-6">
@@ -116,14 +119,14 @@ function TransferInboxPage() {
             <Filter className="h-4 w-4 mr-1.5" />
             Filters
           </Button>
-          <Button variant="outline" onClick={() => console.log("Opening manual match dialog")}>
+          <Button variant="outline" onClick={() => setShowManualMatch(true)}>
             <Search className="h-4 w-4 mr-1.5" />
             Manual Match
           </Button>
           <Button variant="outline" asChild className="ml-auto">
             <Link href="/transfers-manage">
-              <BringToFront className="h-4 w-4 mr-1.5" />
-              Manage Transfers
+              <History className="h-4 w-4 mr-1.5" />
+              Transfers History
             </Link>
           </Button>
         </div>
@@ -242,6 +245,9 @@ function TransferInboxPage() {
         )}
       </div>
     </AppLayout>
+
+    <ManualMatchDialog open={showManualMatch} onOpenChange={setShowManualMatch} />
+    </>
   );
 }
 

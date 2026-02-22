@@ -848,6 +848,39 @@ export const resolveImportSession = mutation({
     },
 });
 
+export const createManualTransaction = mutation({
+    args: {
+        userId: v.id("users"),
+        accountId: v.id("accounts"),
+        date: v.number(),
+        amount: v.number(),
+        description: v.string(),
+        transactionType: v.optional(v.string()),
+        categoryId: v.optional(v.id("categories")),
+    },
+    handler: async (ctx, args) => {
+        const { userId, accountId, date, amount, description, transactionType, categoryId } = args;
+
+        const account = await ctx.db.get(accountId);
+        if (!account || account.userId !== userId) {
+            throw new Error("Account not found or not owned by user");
+        }
+
+        const insertedId = await ctx.db.insert("transactions", {
+            userId,
+            accountId,
+            date,
+            amount,
+            description,
+            transactionType,
+            categoryId,
+            createdAt: Date.now(),
+        });
+
+        return { success: true, transactionId: insertedId };
+    },
+});
+
 export const getDashboardStats = query({
     args: {
         userId: v.id("users"),

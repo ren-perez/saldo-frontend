@@ -8,6 +8,7 @@ import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import { Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus, Info, CreditCard } from "lucide-react";
+import { CreateTransactionDialog } from "@/components/CreateTransactionDialog";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
     DropdownMenu,
@@ -429,6 +430,8 @@ function TransactionsContent() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
 
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
+
     const updateTransaction = useMutation(api.transactions.updateTransaction);
     const updateTransactionByGroup = useMutation(api.transactions.updateTransactionByGroup);
     const deleteTransaction = useMutation(api.transactions.deleteTransaction);
@@ -580,6 +583,7 @@ function TransactionsContent() {
     }
 
     return (
+        <>
         <AppLayout>
             <InitUser />
             <div className="container mx-auto py-6 px-6">
@@ -622,7 +626,10 @@ function TransactionsContent() {
                                         Import CSV
                                     </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="flex items-center gap-2">
+                                <DropdownMenuItem
+                                    className="flex items-center gap-2"
+                                    onClick={() => setShowCreateDialog(true)}
+                                >
                                     <Plus className="h-4 w-4" />
                                     Add Transaction
                                 </DropdownMenuItem>
@@ -1167,5 +1174,8 @@ function TransactionsContent() {
                 )}
             </div>
         </AppLayout>
+
+        <CreateTransactionDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
+        </>
     );
 }

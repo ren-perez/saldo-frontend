@@ -461,6 +461,38 @@ export const unignoreTransferSuggestion = mutation({
     },
 });
 
+export const listUnpairedTransactions = query({
+    args: {
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        const { userId } = args;
+
+        const transactions = await ctx.db
+            .query("transactions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .filter((q) => q.eq(q.field("transfer_pair_id"), undefined))
+            .collect();
+
+        const accounts = await ctx.db
+            .query("accounts")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+
+        const accountMap = new Map(accounts.map(acc => [acc._id, acc]));
+
+        const result = transactions
+            .filter(t => typeof t.amount === "number" && accountMap.has(t.accountId))
+            .map(t => ({
+                transaction: t,
+                account: accountMap.get(t.accountId)!,
+            }))
+            .sort((a, b) => b.transaction.date - a.transaction.date);
+
+        return result;
+    },
+});
+
 export const listIgnoredTransferPairs = query({
     args: {
         userId: v.id("users"),
