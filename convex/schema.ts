@@ -46,6 +46,15 @@ export default defineSchema({
     }).index("by_preset", ["presetId"])
         .index("by_account", ["accountId"]),
 
+    category_rules: defineTable({
+        userId: v.id("users"),
+        pattern: v.string(),       // keyword to match (e.g. "netflix", "uber")
+        categoryId: v.id("categories"),
+        priority: v.number(),      // higher = checked first
+        isActive: v.boolean(),
+        createdAt: v.number(),
+    }).index("by_user", ["userId"]),
+
     transactions: defineTable({
         userId: v.id("users"),
         accountId: v.id("accounts"),
@@ -54,6 +63,7 @@ export default defineSchema({
         description: v.string(),
         transactionType: v.optional(v.string()),
         categoryId: v.optional(v.id("categories")),
+        isAutoCategorized: v.optional(v.boolean()), // true = applied by rules engine
         transfer_pair_id: v.optional(v.string()),
         importId: v.optional(v.id("imports")), // ✅ Track which import created this
         createdAt: v.optional(v.number()),
@@ -289,4 +299,104 @@ export default defineSchema({
     }).index("by_user", ["userId"])
         .index("by_outgoing", ["outgoingTransactionId"])
         .index("by_incoming", ["incomingTransactionId"]),
+
+    // ─── Telegram Integration ──────────────────────────────
+
+    telegram_pairing_codes: defineTable({
+        userId: v.id("users"),
+        code: v.string(),
+        expiresAt: v.number(),
+        usedAt: v.optional(v.number()),
+        createdAt: v.number(),
+    }).index("by_user", ["userId"])
+        .index("by_code", ["code"]),
+
+    telegram_connections: defineTable({
+        userId: v.id("users"),
+        telegramUserId: v.string(),
+        telegramChatId: v.string(),
+        telegramUsername: v.optional(v.string()),
+        telegramFirstName: v.optional(v.string()),
+        telegramLastName: v.optional(v.string()),
+        linkedAt: v.number(),
+        isActive: v.boolean(),
+    }).index("by_user", ["userId"])
+        .index("by_telegram_user", ["telegramUserId"]),
+
+    // ─── Conversation History ──────────────────────────────
+    // Storage assumptions: keep all messages, raw payload retained for debugging,
+    // no deletion logic. userId is nullable to support unpaired user traffic.
+
+    messages: defineTable({
+        userId: v.optional(v.id("users")),
+        telegramConnectionId: v.optional(v.id("telegram_connections")),
+        channel: v.string(),                  // "telegram"
+        direction: v.string(),                // "inbound" | "outbound"
+        messageType: v.string(),              // "text"
+        text: v.string(),
+        rawPayload: v.optional(v.any()),      // original Telegram webhook JSON (inbound) or API response (outbound)
+        telegramMessageId: v.optional(v.string()),
+        telegramChatId: v.string(),
+        createdAt: v.number(),
+    }).index("by_user", ["userId"])
+        .index("by_chat", ["telegramChatId"])
+        .index("by_chat_and_created", ["telegramChatId", "createdAt"])  // rate limiting
+        .index("by_telegram_message", ["telegramMessageId", "direction"]),
+
+    actions: defineTable({
+        userId: v.optional(v.id("users")),
+        messageId: v.optional(v.id("messages")),
+        channel: v.string(),                  // "telegram"
+        actionType: v.string(),               // "pair_account" | "unlinked_user_message" | "help_command" | "echo_reply" | "unsupported_message_type"
+        status: v.string(),                   // "pending" | "completed" | "failed" | "ignored"
+        inputJson: v.optional(v.any()),
+        resultJson: v.optional(v.any()),
+        errorText: v.optional(v.string()),
+        createdAt: v.number(),
+        completedAt: v.optional(v.number()),
+    }).index("by_user", ["userId"])
+        .index("by_message", ["messageId"])
+        .index("by_status", ["status"]),
+
+    // ─── User Preferences — per-user bot settings ─────────
+    // Persists smart defaults learned from usage (e.g. last-used account).
+    // Epic 8 — Story 5
+
+    user_preferences: defineTable({
+        userId: v.id("users"),
+        lastAccountId: v.optional(v.id("accounts")), // silently re-used for next transaction
+        updatedAt: v.number(),
+    }).index("by_user", ["userId"]),
+
+    // ─── Chat Context — per-chat session state ─────────────
+    // Stores ephemeral context that enables multi-turn UX:
+    //   - last created transaction (for correction flow, Story 13)
+    // Epic 8 — Stories 13 + 14
+
+    chat_context: defineTable({
+        telegramChatId: v.string(),
+        userId: v.id("users"),
+        lastTransactionId: v.optional(v.id("transactions")),
+        lastTransactionAmount: v.optional(v.number()),
+        lastTransactionDescription: v.optional(v.string()),
+        updatedAt: v.number(),
+    }).index("by_chat", ["telegramChatId"])
+        .index("by_user", ["userId"]),
+
+    // ─── Pending Confirmations — high-risk action gate ─────
+    // Stores actions awaiting explicit user confirmation (yes/no).
+    // Expire after CONFIRMATION_TTL_MS. Unconfirmed actions are never executed.
+    // Epic 7 — Story 2
+
+    pending_confirmations: defineTable({
+        userId: v.id("users"),
+        telegramChatId: v.string(),
+        actionType: v.string(),               // "delete_transaction"
+        payload: v.any(),                     // action-specific data (e.g. { transactionId })
+        confirmationText: v.string(),         // human-readable summary shown to user before confirming
+        status: v.string(),                   // "awaiting" | "confirmed" | "cancelled" | "expired"
+        expiresAt: v.number(),                // unix ms — auto-expire after TTL
+        createdAt: v.number(),
+    }).index("by_chat_and_status", ["telegramChatId", "status"])
+        .index("by_user", ["userId"]),
 });

@@ -31,6 +31,8 @@ import {
     Tag,
     DollarSign,
     FileSpreadsheet,
+    Settings,
+    History,
 } from "lucide-react"
 
 const planningItems = [
@@ -156,6 +158,37 @@ export function AppSidebar() {
                                     </SidebarMenuItem>
                                 )
                             })}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+
+                <SidebarGroup>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton
+                                    asChild
+                                    isActive={pathname === "/history"}
+                                    tooltip="Chat History"
+                                >
+                                    <Link href="/history">
+                                        <History className="w-4 h-4" />
+                                        <span>Chat History</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton
+                                    asChild
+                                    isActive={pathname === "/settings"}
+                                    tooltip="Settings"
+                                >
+                                    <Link href="/settings">
+                                        <Settings className="w-4 h-4" />
+                                        <span>Settings</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>

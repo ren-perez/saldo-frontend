@@ -2,6 +2,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { matchDescription, CategoryRule } from "./rulesEngine";
 
 const normalizeDescription = (description: string): string => {
     return description.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -34,6 +35,12 @@ export const importTransactions = mutation({
         if (!account || account.userId !== userId) {
             throw new Error("Account not found or not owned by user");
         }
+
+        // Fetch rules once for the whole import batch
+        const rules = await ctx.db
+            .query("category_rules")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect() as CategoryRule[];
 
         // Get all existing transactions for this account to check for duplicates
         const existingTransactions = await ctx.db
@@ -96,7 +103,9 @@ export const importTransactions = mutation({
                         },
                     });
                 } else {
-                    // No duplicate, insert new transaction
+                    // No duplicate — apply rules engine for auto-categorization
+                    const autoCategoryId = matchDescription(transaction.description, rules) ?? undefined;
+
                     const insertedId = await ctx.db.insert("transactions", {
                         userId,
                         accountId,
@@ -105,7 +114,8 @@ export const importTransactions = mutation({
                         description: transaction.description,
                         importId: importId,
                         transactionType: transaction.transactionType,
-                        categoryId: undefined,
+                        categoryId: autoCategoryId,
+                        isAutoCategorized: autoCategoryId ? true : undefined,
                         createdAt: Date.now(),
                     });
                     inserted.push(insertedId);
@@ -859,12 +869,22 @@ export const createManualTransaction = mutation({
         categoryId: v.optional(v.id("categories")),
     },
     handler: async (ctx, args) => {
-        const { userId, accountId, date, amount, description, transactionType, categoryId } = args;
+        const { userId, accountId, date, amount, description, transactionType } = args;
 
         const account = await ctx.db.get(accountId);
         if (!account || account.userId !== userId) {
             throw new Error("Account not found or not owned by user");
         }
+
+        // Run rules engine — manual categoryId always wins over auto
+        const rules = await ctx.db
+            .query("category_rules")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect() as CategoryRule[];
+
+        const autoCategoryId = matchDescription(description, rules);
+        const resolvedCategoryId = args.categoryId ?? autoCategoryId ?? undefined;
+        const isAutoCategorized = !args.categoryId && !!autoCategoryId;
 
         const insertedId = await ctx.db.insert("transactions", {
             userId,
@@ -873,11 +893,68 @@ export const createManualTransaction = mutation({
             amount,
             description,
             transactionType,
-            categoryId,
+            categoryId: resolvedCategoryId,
+            isAutoCategorized: isAutoCategorized || undefined,
             createdAt: Date.now(),
         });
 
         return { success: true, transactionId: insertedId };
+    },
+});
+
+// Update a transaction's category and optionally save a new rule for that pattern.
+// Called when the user manually changes a category and opts to "remember this".
+export const updateTransactionAndCreateRule = mutation({
+    args: {
+        transactionId: v.id("transactions"),
+        categoryId: v.id("categories"),
+        saveRule: v.optional(v.boolean()), // if true, create a category_rule
+        rulePattern: v.optional(v.string()), // keyword to save; defaults to description
+    },
+    handler: async (ctx, args) => {
+        const { transactionId, categoryId, saveRule, rulePattern } = args;
+
+        const transaction = await ctx.db.get(transactionId);
+        if (!transaction) throw new Error("Transaction not found");
+
+        // Inherit transaction type from the category when possible
+        const category = await ctx.db.get(categoryId);
+        const updatedTransaction = {
+            ...transaction,
+            categoryId,
+            isAutoCategorized: undefined, // user took manual control
+            transactionType: category?.transactionType ?? transaction.transactionType,
+            updatedAt: Date.now(),
+        };
+        await ctx.db.replace(transactionId, updatedTransaction);
+
+        if (saveRule) {
+            const pattern = (rulePattern ?? transaction.description).toLowerCase().trim();
+            const userId = transaction.userId;
+
+            // Only insert if this pattern doesn't exist yet for the user
+            const existing = await ctx.db
+                .query("category_rules")
+                .withIndex("by_user", (q) => q.eq("userId", userId))
+                .collect();
+
+            const alreadyExists = existing.some(
+                (r) => r.pattern.toLowerCase() === pattern
+            );
+
+            if (!alreadyExists) {
+                await ctx.db.insert("category_rules", {
+                    userId,
+                    pattern,
+                    categoryId,
+                    priority: 0,
+                    isActive: true,
+                    createdAt: Date.now(),
+                });
+            }
+        }
+
+        return { success: true };
     },
 });
 
