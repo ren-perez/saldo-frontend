@@ -41,7 +41,7 @@ export function ActionCards({
         <Link
           key={action.id}
           href={action.href}
-          className="group flex items-center gap-2.5 rounded-lg border border-blue-600/30 bg-blue-600/10 px-3.5 py-2 transition-colors hover:border-foreground/40 hover:bg-foreground/20 sm:w-auto"
+          className="group flex items-center gap-2.5 rounded-lg border border-blue-800/30 bg-blue-600/10 px-3.5 py-2 transition-colors hover:border-foreground/40 hover:bg-foreground/20 sm:w-auto"
         >
           {/* Icon wrapper */}
           <div
@@ -49,7 +49,7 @@ export function ActionCards({
               flex size-7 shrink-0 items-center justify-center rounded-md
               ${action.accent}
               transition-colors
-              group-hover:bg-foreground/60
+              group-hover:bg-foreground/70
               group-hover:text-background
             `}
           >

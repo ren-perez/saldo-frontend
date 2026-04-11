@@ -66,6 +66,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { currencyExact, formatDate } from "@/lib/format";
+import { toast } from "sonner";
 
 function formatTimestampToDate(timestamp: number): string {
     return new Date(timestamp).toLocaleDateString();
@@ -435,6 +436,7 @@ function TransactionsContent() {
     const updateTransaction = useMutation(api.transactions.updateTransaction);
     const updateTransactionByGroup = useMutation(api.transactions.updateTransactionByGroup);
     const deleteTransaction = useMutation(api.transactions.deleteTransaction);
+    const updateTransactionAndCreateRule = useMutation(api.transactions.updateTransactionAndCreateRule);
 
     const accounts = useQuery(
         api.accounts.listAccounts,
@@ -1026,14 +1028,38 @@ function TransactionsContent() {
                                                     <TableCell>
                                                         <CategoryCombobox
                                                             value={transaction.categoryId || "NONE"}
-                                                            onValueChange={(value) =>
-                                                                updateTransaction({
+                                                            onValueChange={async (value) => {
+                                                                if (value === "NONE") {
+                                                                    await updateTransaction({
+                                                                        transactionId: transaction._id,
+                                                                        updates: { clearCategoryId: true },
+                                                                    });
+                                                                    return;
+                                                                }
+                                                                await updateTransaction({
                                                                     transactionId: transaction._id,
-                                                                    updates: value === "NONE"
-                                                                        ? { clearCategoryId: true }
-                                                                        : { categoryId: value as Id<"categories"> },
-                                                                })
-                                                            }
+                                                                    updates: { categoryId: value as Id<"categories"> },
+                                                                });
+                                                                const catName = categories?.find((c) => c._id === value)?.name ?? value;
+                                                                const desc = transaction.description;
+                                                                // Suggest a pattern only if description is long enough to be meaningful
+                                                                if (desc && desc.trim().length >= 3) {
+                                                                    toast(`Updated to ${catName}.`, {
+                                                                        action: {
+                                                                            label: `Always → ${catName}`,
+                                                                            onClick: () => {
+                                                                                updateTransactionAndCreateRule({
+                                                                                    transactionId: transaction._id,
+                                                                                    categoryId: value as Id<"categories">,
+                                                                                    saveRule: true,
+                                                                                    rulePattern: desc.trim(),
+                                                                                }).catch(() => {});
+                                                                            },
+                                                                        },
+                                                                        duration: 6000,
+                                                                    });
+                                                                }
+                                                            }}
                                                             options={getFilteredCategoryOptions(transaction.transactionType, group?._id)}
                                                             placeholder="Select..."
                                                         />

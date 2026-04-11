@@ -7,38 +7,25 @@ import { useState, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import { Id } from "../../../convex/_generated/dataModel";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { RulePreviewDialog, RuleDialogMode } from "@/components/RulePreviewDialog";
 
-import {
-  Card,
-} from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Tabs,
   TabsContent,
@@ -51,334 +38,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import {
   Plus,
-  ChevronDown,
   Tag,
   FolderOpen,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
   Info,
   ChevronsUpDown,
   Zap,
-  ToggleLeft,
-  ToggleRight,
+  Lightbulb,
+  ChevronRight,
 } from "lucide-react";
 
-// ─── colour palette ────────────────────────────────────────────────────────────
-const GROUP_COLORS = [
-  {
-    bg: "bg-slate-100 dark:bg-slate-800/40",
-    border: "border-slate-200 dark:border-slate-700/50",
-    trigger: "hover:bg-slate-200/70 dark:hover:bg-slate-800/80",
-    badge: "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300",
-    dot: "bg-slate-400",
-  },
-  {
-    bg: "bg-blue-50 dark:bg-blue-950/40",
-    border: "border-blue-100 dark:border-blue-900/50",
-    trigger: "hover:bg-blue-100/70 dark:hover:bg-blue-900/50",
-    badge: "bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300",
-    dot: "bg-blue-400",
-  },
-  {
-    bg: "bg-emerald-50 dark:bg-emerald-950/40",
-    border: "border-emerald-100 dark:border-emerald-900/50",
-    trigger: "hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50",
-    badge: "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300",
-    dot: "bg-emerald-400",
-  },
-  {
-    bg: "bg-violet-50 dark:bg-violet-950/40",
-    border: "border-violet-100 dark:border-violet-900/50",
-    trigger: "hover:bg-violet-100/70 dark:hover:bg-violet-900/50",
-    badge: "bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300",
-    dot: "bg-violet-400",
-  },
-  {
-    bg: "bg-amber-50 dark:bg-amber-950/40",
-    border: "border-amber-100 dark:border-amber-900/50",
-    trigger: "hover:bg-amber-100/70 dark:hover:bg-amber-900/50",
-    badge: "bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300",
-    dot: "bg-amber-400",
-  },
-  {
-    bg: "bg-rose-50 dark:bg-rose-950/40",
-    border: "border-rose-100 dark:border-rose-900/50",
-    trigger: "hover:bg-rose-100/70 dark:hover:bg-rose-900/50",
-    badge: "bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300",
-    dot: "bg-rose-400",
-  },
-];
-
-const ungroupedColor = {
-  bg: "bg-muted/40",
-  border: "border-muted",
-  trigger: "hover:bg-muted/60",
-  badge: "bg-muted text-muted-foreground",
-  dot: "bg-muted-foreground/40",
-};
-
-const getGroupColor = (index: number) =>
-  GROUP_COLORS[index % GROUP_COLORS.length];
-
-// ─── type helpers ──────────────────────────────────────────────────────────────
-type Category = {
-  _id: Id<"categories">;
-  name: string;
-  groupId?: Id<"category_groups">;
-  transactionType?: string;
-};
-
-type CategoryGroup = {
-  _id: Id<"category_groups">;
-  name: string;
-};
-
-const TRANSACTION_TYPE_LABELS: Record<string, string> = {
-  income: "Income",
-  expense: "Expense",
-  transfer: "Transfer",
-};
-
-const TRANSACTION_TYPE_PILL: Record<string, string> = {
-  income:
-    "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
-  expense:
-    "bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300",
-  transfer:
-    "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
-};
-
-// ─── sub-components ────────────────────────────────────────────────────────────
-
-function TransactionTypeBadge({ type }: { type?: string }) {
-  if (!type) return null;
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TRANSACTION_TYPE_PILL[type] ?? "bg-muted text-muted-foreground"
-        }`}
-    >
-      {TRANSACTION_TYPE_LABELS[type] ?? type}
-    </span>
-  );
-}
-
-function CategoryRow({
-  cat,
-  onEdit,
-  onDelete,
-}: {
-  cat: Category;
-  onEdit: (cat: Category) => void;
-  onDelete: (id: Id<"categories">) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between px-4 py-2.5 rounded-lg hover:bg-accent/90 transition-colors group">
-      <div className="flex items-center gap-3 min-w-0">
-        <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-        <span className="text-sm font-medium truncate">{cat.name}</span>
-        <TransactionTypeBadge type={cat.transactionType} />
-      </div>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-36">
-          <DropdownMenuItem onClick={() => onEdit(cat)} className="gap-2">
-            <Pencil className="h-3.5 w-3.5" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => onDelete(cat._id)}
-            className="gap-2 text-destructive focus:text-destructive"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-
-function GroupSection({
-  group,
-  colorIndex,
-  categories,
-  onEditCategory,
-  onDeleteCategory,
-  onEditGroup,
-  onDeleteGroup,
-  open,
-  onOpenChange,
-}: {
-  group: CategoryGroup | null;
-  colorIndex: number;
-  categories: Category[];
-  onEditCategory: (cat: Category) => void;
-  onDeleteCategory: (id: Id<"categories">) => void;
-  onEditGroup: (g: CategoryGroup) => void;
-  onDeleteGroup: (id: Id<"category_groups">) => void;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const color = group ? getGroupColor(colorIndex) : ungroupedColor;
-
-  return (
-    <Collapsible open={open} onOpenChange={onOpenChange}>
-      <div className={`rounded-xl border ${color.border} overflow-hidden`}>
-        {/* Group header */}
-        <CollapsibleTrigger asChild>
-          <button
-            className={`w-full flex items-center justify-between px-4 py-3 ${color.bg} ${color.trigger} transition-colors`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`h-2 w-2 rounded-full ${color.dot}`} />
-              <span className="text-sm font-semibold">
-                {group?.name ?? "Ungrouped"}
-              </span>
-              <span
-                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${color.badge}`}
-              >
-                {categories.length}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              {group && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <div
-                      role="button"
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                    >
-                      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-36">
-                    <DropdownMenuItem
-                      onClick={() => onEditGroup(group)}
-                      className="gap-2"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Rename
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onDeleteGroup(group._id)}
-                      className="gap-2 text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              <div className="h-7 w-7 flex items-center justify-center">
-                <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""
-                    }`}
-                />
-              </div>
-            </div>
-          </button>
-        </CollapsibleTrigger>
-
-        {/* Category list */}
-        <CollapsibleContent>
-          <div className="bg-background/70 divide-y divide-border/50">
-            {categories.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-4 py-4 text-center bg-gray-50/50 dark:bg-card">
-                No categories in this group yet.
-              </p>
-            ) : (
-              <div className="p-2 space-y-0.5 bg-gray-50/50 dark:bg-card">
-                {categories.map((cat) => (
-                  <CategoryRow
-                    key={cat._id}
-                    cat={cat}
-                    onEdit={onEditCategory}
-                    onDelete={onDeleteCategory}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
-  );
-}
-
-// ─── Rule types ───────────────────────────────────────────────────────────────
-
-type CategoryRule = {
-  _id: Id<"category_rules">;
-  pattern: string;
-  categoryId: Id<"categories">;
-  priority: number;
-  isActive: boolean;
-};
-
-// ─── RuleRow sub-component ─────────────────────────────────────────────────────
-
-function RuleRow({
-  rule,
-  categoryName,
-  onDelete,
-  onToggle,
-}: {
-  rule: CategoryRule;
-  categoryName: string;
-  onDelete: (id: Id<"category_rules">) => void;
-  onToggle: (id: Id<"category_rules">, isActive: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between px-4 py-2.5 rounded-lg hover:bg-accent/90 transition-colors group">
-      <div className="flex items-center gap-3 min-w-0">
-        <Zap className={`h-3.5 w-3.5 shrink-0 ${rule.isActive ? "text-amber-500" : "text-muted-foreground/40"}`} />
-        <code className="text-sm font-mono bg-muted px-1.5 py-0.5 rounded text-foreground/80">
-          {rule.pattern}
-        </code>
-        <span className="text-xs text-muted-foreground">→</span>
-        <span className="text-sm font-medium truncate">{categoryName}</span>
-        <span className="text-[11px] text-muted-foreground/60 shrink-0">
-          p{rule.priority}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => onToggle(rule._id, !rule.isActive)}
-        >
-          {rule.isActive
-            ? <ToggleRight className="h-4 w-4 text-emerald-500" />
-            : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-destructive hover:text-destructive"
-          onClick={() => onDelete(rule._id)}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
+import { Category, CategoryGroup, CategoryRule } from "./types";
+import { GroupSection } from "./_components/GroupSection";
+import { RuleRow } from "./_components/RuleRow";
+import { CategoryDialogs } from "./_components/CategoryDialogs";
+import { GroupDialogs } from "./_components/GroupDialogs";
 
 // ─── main page ─────────────────────────────────────────────────────────────────
 
@@ -400,24 +76,35 @@ export default function CategoriesPage() {
     convexUser ? { userId: convexUser._id } : "skip"
   ) as CategoryRule[] | undefined;
 
+  const matchCounts = useQuery(
+    convexUser ? api.categoryRules.getMatchCountForRules : ("skip" as never),
+    convexUser ? { userId: convexUser._id } : "skip"
+  ) as Record<string, number> | undefined;
+
+  const suggestions = useQuery(
+    convexUser ? api.categoryRules.getRuleSuggestions : ("skip" as never),
+    convexUser ? { userId: convexUser._id } : "skip"
+  ) as Array<{ description: string; normalizedDescription: string; categoryId: string; count: number }> | undefined;
+
   const createCategory = useMutation(api.categories.createCategory);
   const updateCategory = useMutation(api.categories.updateCategory);
   const deleteCategory = useMutation(api.categories.deleteCategory);
   const createCategoryGroup = useMutation(api.categoryGroups.createCategoryGroup);
   const updateCategoryGroup = useMutation(api.categoryGroups.updateCategoryGroup);
   const deleteCategoryGroup = useMutation(api.categoryGroups.deleteCategoryGroup);
-  const createRule = useMutation(api.categoryRules.createRule);
   const updateRule = useMutation(api.categoryRules.updateRule);
   const deleteRule = useMutation(api.categoryRules.deleteRule);
+  const updateRulePriorities = useMutation(api.categoryRules.updateRulePriorities);
 
   // ── dialog states ──
   const [activeTab, setActiveTab] = useState("categories");
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
-  const [showRuleDialog, setShowRuleDialog] = useState(false);
+  // RulePreviewDialog state — null = closed
+  const [ruleDialogState, setRuleDialogState] = useState<RuleDialogMode | null>(null);
+
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingGroup, setEditingGroup] = useState<CategoryGroup | null>(null);
-  const [ruleError, setRuleError] = useState<string | null>(null);
 
   const [categoryForm, setCategoryForm] = useState({
     name: "",
@@ -427,11 +114,14 @@ export default function CategoriesPage() {
 
   const [groupForm, setGroupForm] = useState({ name: "" });
 
-  const [ruleForm, setRuleForm] = useState({
-    pattern: "",
-    categoryId: "",
-    priority: "0",
-  });
+  // Collapsed state for suggestions inbox
+  const [suggestionsOpen, setSuggestionsOpen] = useState(true);
+
+  // dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   // ── accordion open state ──
   // Keyed by group._id or "ungrouped". All closed by default.
@@ -529,28 +219,45 @@ export default function CategoriesPage() {
     }
   };
 
-  const handleCreateRule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setRuleError(null);
-    if (!ruleForm.pattern.trim() || !ruleForm.categoryId) return;
-    try {
-      await createRule({
-        userId: convexUser._id,
-        pattern: ruleForm.pattern.trim(),
-        categoryId: ruleForm.categoryId as Id<"categories">,
-        priority: parseInt(ruleForm.priority, 10) || 0,
-      });
-      setRuleForm({ pattern: "", categoryId: "", priority: "0" });
-      setShowRuleDialog(false);
-    } catch (err) {
-      setRuleError(err instanceof Error ? err.message : "Failed to create rule");
-    }
-  };
-
   const handleDeleteRule = async (ruleId: Id<"category_rules">) => {
     if (confirm("Delete this rule?")) {
       await deleteRule({ ruleId });
     }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !rules) return;
+
+    const activeRulesList = rules.filter((r) => r.isActive);
+    const inactiveRulesList = rules.filter((r) => !r.isActive);
+
+    // Determine which list the drag happened in
+    const activeIds = activeRulesList.map((r) => r._id);
+    const inactiveIds = inactiveRulesList.map((r) => r._id);
+
+    let reorderedList: CategoryRule[] | null = null;
+    if (activeIds.includes(active.id as Id<"category_rules">)) {
+      const oldIdx = activeIds.indexOf(active.id as Id<"category_rules">);
+      const newIdx = activeIds.indexOf(over.id as Id<"category_rules">);
+      if (oldIdx === -1 || newIdx === -1) return;
+      reorderedList = arrayMove(activeRulesList, oldIdx, newIdx);
+    } else if (inactiveIds.includes(active.id as Id<"category_rules">)) {
+      const oldIdx = inactiveIds.indexOf(active.id as Id<"category_rules">);
+      const newIdx = inactiveIds.indexOf(over.id as Id<"category_rules">);
+      if (oldIdx === -1 || newIdx === -1) return;
+      reorderedList = arrayMove(inactiveRulesList, oldIdx, newIdx);
+    }
+
+    if (!reorderedList) return;
+
+    // Assign descending priority integers based on new order
+    const updates = reorderedList.map((rule, idx) => ({
+      ruleId: rule._id,
+      priority: reorderedList!.length - 1 - idx,
+    }));
+
+    await updateRulePriorities({ updates });
   };
 
   const handleToggleRule = async (ruleId: Id<"category_rules">, isActive: boolean) => {
@@ -659,7 +366,7 @@ export default function CategoriesPage() {
                 </>
               ) : (
                 <Button
-                  onClick={() => { setRuleError(null); setShowRuleDialog(true); }}
+                  onClick={() => setRuleDialogState({ type: "new" })}
                   className="gap-2"
                 >
                   <Plus className="h-4 w-4" />
@@ -734,8 +441,8 @@ export default function CategoriesPage() {
                       categories={ungrouped}
                       onEditCategory={openEditCategory}
                       onDeleteCategory={handleDeleteCategory}
-                      onEditGroup={() => { }}
-                      onDeleteGroup={() => { }}
+                      onEditGroup={() => {}}
+                      onDeleteGroup={() => {}}
                       open={openSections["ungrouped"] ?? false}
                       onOpenChange={(val) => setSectionOpen("ungrouped", val)}
                     />
@@ -753,7 +460,7 @@ export default function CategoriesPage() {
                   <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />
                 ))}
               </div>
-            ) : rules.length === 0 ? (
+            ) : rules.length === 0 && (!suggestions || suggestions.length === 0) ? (
               <Card className="p-12 text-center">
                 <div className="mx-auto w-20 h-20 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mb-5">
                   <Zap className="h-10 w-10 text-amber-400" />
@@ -764,7 +471,7 @@ export default function CategoriesPage() {
                   contains a keyword you define.
                 </p>
                 <Button
-                  onClick={() => { setRuleError(null); setShowRuleDialog(true); }}
+                  onClick={() => setRuleDialogState({ type: "new" })}
                   className="gap-2"
                 >
                   <Plus className="h-4 w-4" />
@@ -773,439 +480,164 @@ export default function CategoriesPage() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {/* Active rules */}
-                {activeRules.length > 0 && (
-                  <div className="rounded-xl border border-amber-100 dark:border-amber-900/50 overflow-hidden">
-                    <div className="px-4 py-3 bg-amber-50 dark:bg-amber-950/40 flex items-center gap-3">
-                      <Zap className="h-3.5 w-3.5 text-amber-500" />
-                      <span className="text-sm font-semibold">Active Rules</span>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
-                        {activeRules.length}
+
+                {/* ── Suggested Rules Inbox ── */}
+                {suggestions && suggestions.length > 0 && (
+                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                    <button
+                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-900 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/70 transition-colors"
+                      onClick={() => setSuggestionsOpen((p) => !p)}
+                    >
+                      <Lightbulb className="h-3.5 w-3.5 text-yellow-500" />
+                      <span className="text-sm font-semibold flex-1 text-left">Suggested Rules</span>
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                        {suggestions.length}
                       </span>
-                    </div>
-                    <div className="bg-gray-50/50 dark:bg-card p-2 space-y-0.5">
-                      {activeRules.map((rule) => (
-                        <RuleRow
-                          key={rule._id}
-                          rule={rule}
-                          categoryName={categoryNameMap.get(rule.categoryId as string) ?? "Unknown"}
-                          onDelete={handleDeleteRule}
-                          onToggle={handleToggleRule}
-                        />
-                      ))}
-                    </div>
+                      <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${suggestionsOpen ? "rotate-90" : ""}`} />
+                    </button>
+                    {suggestionsOpen && (
+                      <div className="bg-zinc-50 dark:bg-zinc-900 p-2 space-y-1">
+                        {suggestions.map((s, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-background border border-zinc-100 dark:border-zinc-800"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Lightbulb className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
+                              <p className="text-sm">
+                                You often categorize{" "}
+                                <code className="font-mono bg-muted px-1 py-0.5 rounded text-xs">
+                                  {s.normalizedDescription.length > 30
+                                    ? s.normalizedDescription.slice(0, 30) + "…"
+                                    : s.normalizedDescription}
+                                </code>{" "}
+                                as{" "}
+                                <span className="font-medium">
+                                  {categoryNameMap.get(s.categoryId) ?? "Unknown"}
+                                </span>
+                                <span className="text-muted-foreground ml-1 text-xs">({s.count}×)</span>
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="shrink-0 ml-3 text-xs h-7"
+                              onClick={() => setRuleDialogState({
+                                type: "new",
+                                prefill: { pattern: s.normalizedDescription, categoryId: s.categoryId },
+                              })}
+                            >
+                              Create Rule
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Inactive rules */}
-                {inactiveRules.length > 0 && (
-                  <div className="rounded-xl border border-muted overflow-hidden">
-                    <div className="px-4 py-3 bg-muted/40 flex items-center gap-3">
-                      <Zap className="h-3.5 w-3.5 text-muted-foreground/40" />
-                      <span className="text-sm font-semibold text-muted-foreground">Paused Rules</span>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                        {inactiveRules.length}
-                      </span>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  {/* Active rules */}
+                  {activeRules.length > 0 && (
+                    <div className="rounded-xl border border-amber-100 dark:border-amber-900/50 overflow-hidden">
+                      <div className="px-4 py-3 bg-amber-50 dark:bg-amber-950/40 flex items-center gap-3">
+                        <Zap className="h-3.5 w-3.5 text-amber-500" />
+                        <span className="text-sm font-semibold">Active Rules</span>
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
+                          {activeRules.length}
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-auto">drag to reorder</span>
+                      </div>
+                      <div className="bg-gray-50/50 dark:bg-card p-2 space-y-0.5">
+                        <SortableContext items={activeRules.map((r) => r._id)} strategy={verticalListSortingStrategy}>
+                          {activeRules.map((rule) => (
+                            <RuleRow
+                              key={rule._id}
+                              rule={rule}
+                              categoryName={categoryNameMap.get(rule.categoryId as string) ?? "Unknown"}
+                              matchCount={matchCounts?.[rule._id as string] ?? 0}
+                              onEdit={(r) => setRuleDialogState({ type: "edit", rule: r })}
+                              onDelete={handleDeleteRule}
+                              onToggle={handleToggleRule}
+                            />
+                          ))}
+                        </SortableContext>
+                      </div>
                     </div>
-                    <div className="bg-gray-50/50 dark:bg-card p-2 space-y-0.5">
-                      {inactiveRules.map((rule) => (
-                        <RuleRow
-                          key={rule._id}
-                          rule={rule}
-                          categoryName={categoryNameMap.get(rule.categoryId as string) ?? "Unknown"}
-                          onDelete={handleDeleteRule}
-                          onToggle={handleToggleRule}
-                        />
-                      ))}
+                  )}
+
+                  {/* Inactive rules */}
+                  {inactiveRules.length > 0 && (
+                    <div className="rounded-xl border border-muted overflow-hidden">
+                      <div className="px-4 py-3 bg-muted/40 flex items-center gap-3">
+                        <Zap className="h-3.5 w-3.5 text-muted-foreground/40" />
+                        <span className="text-sm font-semibold text-muted-foreground">Paused Rules</span>
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {inactiveRules.length}
+                        </span>
+                      </div>
+                      <div className="bg-gray-50/50 dark:bg-card p-2 space-y-0.5">
+                        <SortableContext items={inactiveRules.map((r) => r._id)} strategy={verticalListSortingStrategy}>
+                          {inactiveRules.map((rule) => (
+                            <RuleRow
+                              key={rule._id}
+                              rule={rule}
+                              categoryName={categoryNameMap.get(rule.categoryId as string) ?? "Unknown"}
+                              matchCount={matchCounts?.[rule._id as string] ?? 0}
+                              onEdit={(r) => setRuleDialogState({ type: "edit", rule: r })}
+                              onDelete={handleDeleteRule}
+                              onToggle={handleToggleRule}
+                            />
+                          ))}
+                        </SortableContext>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </DndContext>
 
                 <p className="text-xs text-muted-foreground px-1">
-                  Rules are checked in priority order (highest first). The first matching
-                  keyword wins. Manual overrides always take precedence.
+                  Rules are checked in priority order (top first). Drag rows to reorder.
+                  Manual overrides always take precedence.
                 </p>
               </div>
             )}
           </TabsContent>
         </Tabs>
 
-        {/* ── Create Rule Dialog ── */}
-        <Dialog open={showRuleDialog} onOpenChange={(open) => { setShowRuleDialog(open); if (!open) setRuleError(null); }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-amber-500" />
-                New Auto-Rule
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>When a transaction description contains this keyword, the category is applied automatically.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateRule} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Keyword</label>
-                <Input
-                  value={ruleForm.pattern}
-                  onChange={(e) => setRuleForm((p) => ({ ...p, pattern: e.target.value }))}
-                  placeholder="e.g. netflix, uber, starbucks"
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Case-insensitive. Matches anywhere in the transaction description.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Category</label>
-                  <Select
-                    value={ruleForm.categoryId || "none"}
-                    onValueChange={(val) =>
-                      setRuleForm((p) => ({ ...p, categoryId: val === "none" ? "" : val }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Select category</SelectItem>
-                      {allCategories.map((c) => (
-                        <SelectItem key={c._id} value={c._id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Priority</label>
-                  <Input
-                    type="number"
-                    value={ruleForm.priority}
-                    onChange={(e) => setRuleForm((p) => ({ ...p, priority: e.target.value }))}
-                    placeholder="0"
-                    min="0"
-                  />
-                  <p className="text-xs text-muted-foreground">Higher = checked first</p>
-                </div>
-              </div>
-              {ruleError && (
-                <p className="text-sm text-destructive">{ruleError}</p>
-              )}
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowRuleDialog(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={!ruleForm.pattern.trim() || !ruleForm.categoryId}>
-                  Create Rule
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {/* ── Rule Preview / Edit Dialog ── */}
+        {ruleDialogState && convexUser && (
+          <RulePreviewDialog
+            mode={ruleDialogState}
+            userId={convexUser._id}
+            categories={allCategories}
+            onClose={() => setRuleDialogState(null)}
+          />
+        )}
 
-        {/* ── Create Category Dialog ── */}
-        <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                New Category
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Create a new category to organise your transactions.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateCategory} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Name</label>
-                <Input
-                  value={categoryForm.name}
-                  onChange={(e) =>
-                    setCategoryForm((p) => ({ ...p, name: e.target.value }))
-                  }
-                  placeholder="e.g., Groceries, Gas"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Transaction Type</label>
-                  <Select
-                    value={categoryForm.transactionType || "none"}
-                    onValueChange={(val) =>
-                      setCategoryForm((p) => ({
-                        ...p,
-                        transactionType: val === "none" ? "" : val,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="No Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Type</SelectItem>
-                      <SelectItem value="income">Income</SelectItem>
-                      <SelectItem value="expense">Expense</SelectItem>
-                      <SelectItem value="transfer">Transfer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Group</label>
-                  <Select
-                    value={categoryForm.groupId || "none"}
-                    onValueChange={(val) =>
-                      setCategoryForm((p) => ({
-                        ...p,
-                        groupId: val === "none" ? "" : val,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="No Group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Group</SelectItem>
-                      {allGroups.map((g) => (
-                        <SelectItem key={g._id} value={g._id}>
-                          {g.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowCategoryDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">Create Category</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {/* ── Category Dialogs ── */}
+        <CategoryDialogs
+          showCategoryDialog={showCategoryDialog}
+          setShowCategoryDialog={setShowCategoryDialog}
+          editingCategory={editingCategory}
+          setEditingCategory={setEditingCategory}
+          categoryForm={categoryForm}
+          setCategoryForm={setCategoryForm}
+          allGroups={allGroups}
+          handleCreateCategory={handleCreateCategory}
+          handleUpdateCategory={handleUpdateCategory}
+        />
 
-        {/* ── Edit Category Dialog ── */}
-        <Dialog
-          open={!!editingCategory}
-          onOpenChange={(open) => { if (!open) setEditingCategory(null); }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                Edit Category
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Update the details for this category.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </DialogTitle>
-            </DialogHeader>
-            {editingCategory && (
-              <form onSubmit={handleUpdateCategory} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Name</label>
-                  <Input
-                    value={editingCategory.name}
-                    onChange={(e) =>
-                      setEditingCategory((p) =>
-                        p ? { ...p, name: e.target.value } : null
-                      )
-                    }
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium">Transaction Type</label>
-                    <Select
-                      value={editingCategory.transactionType || "none"}
-                      onValueChange={(val) =>
-                        setEditingCategory((p) =>
-                          p
-                            ? {
-                              ...p,
-                              transactionType:
-                                val === "none" ? undefined : val,
-                            }
-                            : null
-                        )
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="No Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Type</SelectItem>
-                        <SelectItem value="income">Income</SelectItem>
-                        <SelectItem value="expense">Expense</SelectItem>
-                        <SelectItem value="transfer">Transfer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium">Group</label>
-                    <Select
-                      value={editingCategory.groupId || "none"}
-                      onValueChange={(val) =>
-                        setEditingCategory((p) =>
-                          p
-                            ? {
-                              ...p,
-                              groupId:
-                                val === "none"
-                                  ? undefined
-                                  : (val as Id<"category_groups">),
-                            }
-                            : null
-                        )
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="No Group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Group</SelectItem>
-                        {allGroups.map((g) => (
-                          <SelectItem key={g._id} value={g._id}>
-                            {g.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditingCategory(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save Changes</Button>
-                </DialogFooter>
-              </form>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* ── Create Group Dialog ── */}
-        <Dialog open={showGroupDialog} onOpenChange={setShowGroupDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                New Group
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Create a group to organise related categories together.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateGroup} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Group Name</label>
-                <Input
-                  value={groupForm.name}
-                  onChange={(e) =>
-                    setGroupForm((p) => ({ ...p, name: e.target.value }))
-                  }
-                  placeholder="e.g., Bills, Food & Dining"
-                  required
-                />
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowGroupDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">Create Group</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* ── Edit Group Dialog ── */}
-        <Dialog
-          open={!!editingGroup}
-          onOpenChange={(open) => { if (!open) setEditingGroup(null); }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                Rename Group
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Update the name of this category group.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </DialogTitle>
-            </DialogHeader>
-            {editingGroup && (
-              <form onSubmit={handleUpdateGroup} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Group Name</label>
-                  <Input
-                    value={editingGroup.name}
-                    onChange={(e) =>
-                      setEditingGroup((p) =>
-                        p ? { ...p, name: e.target.value } : null
-                      )
-                    }
-                    required
-                  />
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditingGroup(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save Changes</Button>
-                </DialogFooter>
-              </form>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* ── Group Dialogs ── */}
+        <GroupDialogs
+          showGroupDialog={showGroupDialog}
+          setShowGroupDialog={setShowGroupDialog}
+          editingGroup={editingGroup}
+          setEditingGroup={setEditingGroup}
+          groupForm={groupForm}
+          setGroupForm={setGroupForm}
+          handleCreateGroup={handleCreateGroup}
+          handleUpdateGroup={handleUpdateGroup}
+        />
       </div>
     </AppLayout>
   );

@@ -64,6 +64,7 @@ export default defineSchema({
         transactionType: v.optional(v.string()),
         categoryId: v.optional(v.id("categories")),
         isAutoCategorized: v.optional(v.boolean()), // true = applied by rules engine
+        appliedRuleId: v.optional(v.id("category_rules")), // traceability — which rule set this category
         transfer_pair_id: v.optional(v.string()),
         importId: v.optional(v.id("imports")), // ✅ Track which import created this
         createdAt: v.optional(v.number()),
@@ -73,6 +74,7 @@ export default defineSchema({
         .index("by_date", ["date"])
         .index("by_import", ["importId"]) // ✅ Query transactions by import
         .index("by_transfer_pair", ["transfer_pair_id"])
+        .index("by_applied_rule", ["appliedRuleId"]) // rule audit count
         .searchIndex("search_description", {
             searchField: "description",
             filterFields: ["userId", "accountId"],

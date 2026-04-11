@@ -2,7 +2,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { matchDescription, CategoryRule } from "./rulesEngine";
+import { matchDescription, matchDescriptionWithRule, CategoryRule } from "./rulesEngine";
 
 const normalizeDescription = (description: string): string => {
     return description.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -104,7 +104,7 @@ export const importTransactions = mutation({
                     });
                 } else {
                     // No duplicate — apply rules engine for auto-categorization
-                    const autoCategoryId = matchDescription(transaction.description, rules) ?? undefined;
+                    const ruleMatch = matchDescriptionWithRule(transaction.description, rules);
 
                     const insertedId = await ctx.db.insert("transactions", {
                         userId,
@@ -114,8 +114,9 @@ export const importTransactions = mutation({
                         description: transaction.description,
                         importId: importId,
                         transactionType: transaction.transactionType,
-                        categoryId: autoCategoryId,
-                        isAutoCategorized: autoCategoryId ? true : undefined,
+                        categoryId: ruleMatch?.categoryId ?? undefined,
+                        isAutoCategorized: ruleMatch ? true : undefined,
+                        appliedRuleId: ruleMatch?.ruleId ?? undefined,
                         createdAt: Date.now(),
                     });
                     inserted.push(insertedId);
@@ -189,9 +190,18 @@ export const resolveDuplicates = mutation({
         const { importId, accountId } = session;
         let importedCount = session.summary.inserted;
 
+        // Fetch rules once for the whole batch (same pattern as importTransactions)
+        const rules = await ctx.db
+            .query("category_rules")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect() as CategoryRule[];
+
         // Process decisions
         for (const decision of decisions) {
             if (decision.action === "import" && decision.newTransaction) {
+                // Apply rules engine — same entry point as regular imports
+                const ruleMatch = matchDescriptionWithRule(decision.newTransaction.description, rules);
+
                 // Import the transaction
                 const insertedId = await ctx.db.insert("transactions", {
                     userId,
@@ -200,6 +210,9 @@ export const resolveDuplicates = mutation({
                     amount: decision.newTransaction.amount,
                     description: decision.newTransaction.description,
                     transactionType: decision.newTransaction.transactionType,
+                    categoryId: ruleMatch?.categoryId ?? undefined,
+                    isAutoCategorized: ruleMatch ? true : undefined,
+                    appliedRuleId: ruleMatch?.ruleId ?? undefined,
                     importId,
                     createdAt: Date.now(),
                 });
@@ -514,8 +527,15 @@ export const updateTransaction = mutation({
         // Handle clearing category
         if (updates.clearCategoryId) {
             patchData.categoryId = undefined;
+            // Human cleared the category — revoke auto flags
+            patchData.isAutoCategorized = undefined;
+            patchData.appliedRuleId = undefined;
         } else if (updates.categoryId !== undefined) {
             patchData.categoryId = updates.categoryId;
+
+            // Human manually set a category — lock it from future rule sweeps
+            patchData.isAutoCategorized = undefined;
+            patchData.appliedRuleId = undefined;
 
             // If a category is being assigned, inherit its transaction type (unless explicitly clearing transaction type)
             if (updates.categoryId && !updates.clearTransactionType && updates.transactionType === undefined) {
@@ -602,13 +622,14 @@ export const updateTransactionByGroup = mutation({
             }
         }
 
-        const oldCategoryId = transaction.categoryId;
-
-        // Update the transaction
+        // Update the transaction — human override, so revoke auto flags
         const updatedTransaction = {
             ...transaction,
             categoryId: finalCategoryId,
             transactionType: inheritedTransactionType,
+            // Human manually changed category: lock from future rule sweeps
+            isAutoCategorized: undefined as boolean | undefined,
+            appliedRuleId: undefined as Id<"category_rules"> | undefined,
             updatedAt: Date.now(),
         };
 
@@ -792,6 +813,14 @@ export const addAsNewTransaction = mutation({
             throw new Error("Account not found or not owned by user");
         }
 
+        // Apply rules engine (same as regular import path)
+        const rules = await ctx.db
+            .query("category_rules")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect() as CategoryRule[];
+
+        const ruleMatch = matchDescriptionWithRule(newTransactionData.description, rules);
+
         // Insert the new transaction
         const insertedId = await ctx.db.insert("transactions", {
             userId,
@@ -800,7 +829,9 @@ export const addAsNewTransaction = mutation({
             amount: newTransactionData.amount,
             description: newTransactionData.description,
             transactionType: newTransactionData.transactionType,
-            categoryId: undefined,
+            categoryId: ruleMatch?.categoryId ?? undefined,
+            isAutoCategorized: ruleMatch ? true : undefined,
+            appliedRuleId: ruleMatch?.ruleId ?? undefined,
             createdAt: Date.now(),
             importId: newTransactionData.importId,
         });
@@ -882,9 +913,9 @@ export const createManualTransaction = mutation({
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect() as CategoryRule[];
 
-        const autoCategoryId = matchDescription(description, rules);
-        const resolvedCategoryId = args.categoryId ?? autoCategoryId ?? undefined;
-        const isAutoCategorized = !args.categoryId && !!autoCategoryId;
+        const ruleMatch = args.categoryId ? null : matchDescriptionWithRule(description, rules);
+        const resolvedCategoryId = args.categoryId ?? ruleMatch?.categoryId ?? undefined;
+        const isAutoCategorized = !args.categoryId && !!ruleMatch;
 
         const insertedId = await ctx.db.insert("transactions", {
             userId,
@@ -895,6 +926,7 @@ export const createManualTransaction = mutation({
             transactionType,
             categoryId: resolvedCategoryId,
             isAutoCategorized: isAutoCategorized || undefined,
+            appliedRuleId: ruleMatch?.ruleId ?? undefined,
             createdAt: Date.now(),
         });
 
@@ -923,6 +955,7 @@ export const updateTransactionAndCreateRule = mutation({
             ...transaction,
             categoryId,
             isAutoCategorized: undefined, // user took manual control
+            appliedRuleId: undefined,     // revoke rule traceability
             transactionType: category?.transactionType ?? transaction.transactionType,
             updatedAt: Date.now(),
         };
