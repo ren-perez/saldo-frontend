@@ -140,7 +140,7 @@ function TelegramConnectSection() {
                                         ? <span>Open <a href={`https://t.me/${botUsername}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">@{botUsername}</a> on Telegram</span>
                                         : "Open the Saldo bot on Telegram"}
                                 </li>
-                                <li>Send <code className="bg-muted px-1 py-0.5 rounded text-xs">/start</code> if you haven't already</li>
+                                <li>Send <code className="bg-muted px-1 py-0.5 rounded text-xs">/start</code> if you haven&apos;t already</li>
                                 <li>
                                     Send{" "}
                                     <code className="bg-muted px-1 py-0.5 rounded text-xs">

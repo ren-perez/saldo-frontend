@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Wallet, ArrowLeftRight, Target } from "lucide-react"
+import { ArrowRight, Wallet, ArrowLeftRight } from "lucide-react"
 
 interface ActionCardsProps {
   unmatchedIncomeCount: number
@@ -13,8 +13,8 @@ interface ActionCardsProps {
 export function ActionCards({
   unmatchedIncomeCount,
   pendingTransferCount,
-  activeGoalCount,
-  pendingDistributionCount = 0,
+  activeGoalCount: _activeGoalCount,
+  pendingDistributionCount: _pendingDistributionCount = 0,
 }: ActionCardsProps) {
   const actions = [
     {

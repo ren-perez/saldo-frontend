@@ -10,7 +10,7 @@ interface AchievementCardProps {
     formatDate: (dateString?: string) => string | null
 }
 
-export function AchievementCard({ goal, formatCurrency, formatDate }: AchievementCardProps) {
+export function AchievementCard({ goal, formatCurrency, formatDate: _formatDate }: AchievementCardProps) {
     const completedDate = goal.updatedAt
         ? new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(goal.updatedAt))
         : null

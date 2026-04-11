@@ -32,7 +32,6 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
 import { currency } from "@/lib/format";

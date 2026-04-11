@@ -1,8 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Calendar, PiggyBank, Plus, Target, TrendingUp } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { ArrowRight, PiggyBank, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Carousel,
@@ -107,7 +106,7 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                 goal.total_amount > 0
                   ? Math.round((goal.current_amount / goal.total_amount) * 100)
                   : 0
-              const daysUntil = goal.due_date
+              const _daysUntil = goal.due_date
                 ? Math.ceil(
                   (new Date(goal.due_date).getTime() - Date.now()) /
                   (1000 * 60 * 60 * 24)
@@ -131,6 +130,7 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                       {/* Background */}
                       {hasImage ? (
                         <div className="absolute inset-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={goal.image_url}
                             alt={goal.name}
@@ -160,6 +160,7 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
                       {/* Left image strip */}
                       {hasImage && (
                         <div className="relative w-32 flex-shrink-0 overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={goal.image_url}
                             alt={goal.name}

@@ -82,6 +82,7 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
             {/* Header Image */}
             <div className="relative w-full h-[280px] lg:h-[320px] bg-gradient-to-br from-muted/60 via-muted/30 to-background overflow-hidden">
                 {headerImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                         src={headerImage}
                         alt={goal.name}

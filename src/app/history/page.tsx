@@ -99,7 +99,7 @@ function ActionRow({ action }: { action: Action }) {
                 {action.errorText && (
                     <p className="text-xs text-destructive mt-0.5">{action.errorText}</p>
                 )}
-                {action.inputJson && (
+                {!!action.inputJson && (
                     <pre className="text-xs text-muted-foreground mt-1 bg-muted/50 rounded px-2 py-1 overflow-x-auto">
                         {JSON.stringify(action.inputJson, null, 2)}
                     </pre>
