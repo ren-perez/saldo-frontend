@@ -79,9 +79,9 @@ function HeatmapCell({
   const total = income + expenses + goals
   const hasActivity = total > 0
 
-  const incomePct  = hasActivity ? (income   / total) * 100 : 0
-  const expPct     = hasActivity ? (expenses / total) * 100 : 0
-  const goalsPct   = hasActivity ? (goals    / total) * 100 : 0
+  const incomePct = hasActivity ? (income / total) * 100 : 0
+  const expPct = hasActivity ? (expenses / total) * 100 : 0
+  const goalsPct = hasActivity ? (goals / total) * 100 : 0
 
   return (
     <Popover>
@@ -91,7 +91,7 @@ function HeatmapCell({
             "relative w-full aspect-square rounded-md overflow-hidden transition-all duration-150",
             "hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
             !hasActivity && "bg-muted/30",
-            day.dateKey === todayStr && "ring-2 ring-primary/70 ring-offset-1 ring-offset-background"
+            day.dateKey === todayStr && "ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
           )}
         >
           {/* Proportional vertical fill — income top, expenses mid, goals bottom */}
@@ -103,7 +103,7 @@ function HeatmapCell({
                   className="bg-emerald-400/60 dark:bg-emerald-700/50 flex items-center justify-center overflow-hidden shrink-0"
                 >
                   {incomePct >= MIN_LABEL_PCT && (
-                    <span className="text-[7px] sm:text-[8px] font-bold text-emerald-900 dark:text-emerald-100 leading-none px-0.5 drop-shadow-sm">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 dark:text-emerald-100 leading-none px-0.5 drop-shadow-sm">
                       {formatCompact(income)}
                     </span>
                   )}
@@ -115,7 +115,7 @@ function HeatmapCell({
                   className="bg-red-400/60 dark:bg-red-700/50 flex items-center justify-center overflow-hidden shrink-0"
                 >
                   {expPct >= MIN_LABEL_PCT && (
-                    <span className="text-[7px] sm:text-[8px] font-bold text-red-900 dark:text-red-100 leading-none px-0.5 drop-shadow-sm">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-red-900 dark:text-red-100 leading-none px-0.5 drop-shadow-sm">
                       {formatCompact(expenses)}
                     </span>
                   )}
@@ -127,7 +127,7 @@ function HeatmapCell({
                   className="bg-blue-400/60 dark:bg-blue-700/50 flex items-center justify-center overflow-hidden shrink-0"
                 >
                   {goalsPct >= MIN_LABEL_PCT && (
-                    <span className="text-[7px] sm:text-[8px] font-bold text-blue-900 dark:text-blue-100 leading-none px-0.5 drop-shadow-sm">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-blue-900 dark:text-blue-100 leading-none px-0.5 drop-shadow-sm">
                       {formatCompact(goals)}
                     </span>
                   )}
@@ -138,7 +138,7 @@ function HeatmapCell({
 
           {/* Day number — top-left, always on top */}
           <span className={cn(
-            "absolute top-0.5 left-0.5 text-[7px] sm:text-[8px] leading-none font-semibold z-10 tabular-nums",
+            "absolute top-1 left-1 text-[7px] sm:text-[8px] leading-none font-semibold z-10 tabular-nums",
             hasActivity ? "text-foreground/80" : "text-foreground/35"
           )}>
             {day.dayNum}
@@ -255,7 +255,7 @@ function HeatmapGrid({
   const todayStr = new Date().toISOString().split("T")[0]
 
   const firstDay = new Date(year, month, 1)
-  const lastDay  = new Date(year, month + 1, 0)
+  const lastDay = new Date(year, month + 1, 0)
   const startPad = firstDay.getDay()
 
   const days: (DayCell | null)[] = []
@@ -299,19 +299,21 @@ function HeatmapGrid({
       ))}
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-2 text-[9px] sm:text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <span className="size-2 rounded-sm bg-emerald-400/60 dark:bg-emerald-700/50 inline-block" />
-          Income
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="size-2 rounded-sm bg-red-400/60 dark:bg-red-700/50 inline-block" />
-          Expenses
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="size-2 rounded-sm bg-blue-400/60 dark:bg-blue-700/50 inline-block" />
-          Goals
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mt-2 text-[9px] sm:text-[10px] text-muted-foreground">
+        <div className="flex gap-x-3 gap-y-1">
+          <span className="flex items-center gap-1">
+            <span className="size-2 rounded-sm bg-emerald-400/60 dark:bg-emerald-700/50 inline-block" />
+            Income
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="size-2 rounded-sm bg-red-400/60 dark:bg-red-700/50 inline-block" />
+            Expenses
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="size-2 rounded-sm bg-blue-400/60 dark:bg-blue-700/50 inline-block" />
+            Goals
+          </span>
+        </div>
         <span className="flex items-center gap-1">
           <span className="size-2 rounded-sm ring-2 ring-primary/70 inline-block" />
           Today
