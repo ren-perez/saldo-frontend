@@ -1052,17 +1052,48 @@ export const getDashboardStats = query({
             .query("categories")
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect();
+        const categoryNameMap = new Map(categories.map((c) => [c._id.toString(), c.name]));
         const categoryToGroup = new Map(
             categories
                 .filter((c) => c.groupId)
                 .map((c) => [c._id.toString(), c.groupId!.toString()])
         );
 
+        // Fetch goal contributions for the date range (contribution_date is "YYYY-MM-DD" string)
+        const startDateStr = new Date(startDate).toISOString().split("T")[0];
+        const endDateStr = new Date(endDate).toISOString().split("T")[0];
+        const goalContributions = await ctx.db
+            .query("goal_contributions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .filter((q) =>
+                q.and(
+                    q.gte(q.field("contribution_date"), startDateStr),
+                    q.lte(q.field("contribution_date"), endDateStr)
+                )
+            )
+            .collect();
+
         let totalIncome = 0;
         let totalExpenses = 0;
-        const groupSpending = new Map<string, number>();
+        let totalGoals = 0;
+
+        // groupId -> spending data with nested categories
+        type CategoryEntry = { name: string; categoryId: string; amount: number };
+        type GroupEntry = { groupName: string; groupId: string; amount: number; catMap: Map<string, CategoryEntry> };
+        const groupSpending = new Map<string, GroupEntry>();
+
         const accountFlowMap = new Map<string, { inflow: number; outflow: number }>();
-        const dailyNetMap = new Map<string, number>();
+
+        type DailyTx = { description: string; amount: number; category?: string };
+        type DailyEntry = { income: number; expenses: number; goals: number; txs: DailyTx[] };
+        const dailyStatsMap = new Map<string, DailyEntry>();
+
+        function ensureDailyStats(dateKey: string) {
+            if (!dailyStatsMap.has(dateKey)) {
+                dailyStatsMap.set(dateKey, { income: 0, expenses: 0, goals: 0, txs: [] });
+            }
+            return dailyStatsMap.get(dateKey)!;
+        }
 
         const msPerWeek = 7 * 24 * 60 * 60 * 1000;
         const weekBuckets: { weekStart: number; income: number; expenses: number }[] = [];
@@ -1073,20 +1104,43 @@ export const getDashboardStats = query({
         }
 
         for (const tx of transactions) {
+            // Transfers are a top-level type — exclude from all spending/income metrics
             if (tx.transactionType === "transfer") continue;
+
+            const dateKey = new Date(tx.date).toISOString().split("T")[0];
+            const daily = ensureDailyStats(dateKey);
+
+            const catIdStrForTx = tx.categoryId ? tx.categoryId.toString() : null;
+            const categoryLabel = catIdStrForTx ? (categoryNameMap.get(catIdStrForTx) ?? undefined) : undefined;
 
             if (tx.amount > 0) {
                 totalIncome += tx.amount;
+                daily.income += tx.amount;
+                daily.txs.push({ description: tx.description, amount: tx.amount, category: categoryLabel });
             } else {
                 totalExpenses += Math.abs(tx.amount);
-            }
+                daily.expenses += Math.abs(tx.amount);
+                daily.txs.push({ description: tx.description, amount: tx.amount, category: categoryLabel });
 
-            if (tx.amount < 0 && tx.categoryId) {
-                const groupId = categoryToGroup.get(tx.categoryId.toString());
+                // Track spending by group + category
+                const catIdStr = tx.categoryId ? tx.categoryId.toString() : null;
+                const groupId = catIdStr ? categoryToGroup.get(catIdStr) : undefined;
+                const groupIdKey = groupId ?? "uncategorized";
                 const groupName = groupId ? (groupMap.get(groupId) ?? "Uncategorized") : "Uncategorized";
-                groupSpending.set(groupName, (groupSpending.get(groupName) ?? 0) + Math.abs(tx.amount));
-            } else if (tx.amount < 0) {
-                groupSpending.set("Uncategorized", (groupSpending.get("Uncategorized") ?? 0) + Math.abs(tx.amount));
+
+                if (!groupSpending.has(groupIdKey)) {
+                    groupSpending.set(groupIdKey, { groupName, groupId: groupIdKey, amount: 0, catMap: new Map() });
+                }
+                const grp = groupSpending.get(groupIdKey)!;
+                grp.amount += Math.abs(tx.amount);
+
+                if (catIdStr) {
+                    const catName = categoryNameMap.get(catIdStr) ?? "Unknown";
+                    if (!grp.catMap.has(catIdStr)) {
+                        grp.catMap.set(catIdStr, { name: catName, categoryId: catIdStr, amount: 0 });
+                    }
+                    grp.catMap.get(catIdStr)!.amount += Math.abs(tx.amount);
+                }
             }
 
             const accId = tx.accountId.toString();
@@ -1094,10 +1148,6 @@ export const getDashboardStats = query({
             if (tx.amount > 0) flow.inflow += tx.amount;
             else flow.outflow += Math.abs(tx.amount);
             accountFlowMap.set(accId, flow);
-
-            // Daily net flow for heatmap (positive = income, negative = expense)
-            const dateKey = new Date(tx.date).toISOString().split("T")[0];
-            dailyNetMap.set(dateKey, (dailyNetMap.get(dateKey) ?? 0) + tx.amount);
 
             for (const bucket of weekBuckets) {
                 const bucketEnd = bucket.weekStart + msPerWeek;
@@ -1109,8 +1159,21 @@ export const getDashboardStats = query({
             }
         }
 
-        const topCategoryGroups = Array.from(groupSpending.entries())
-            .map(([groupName, amount]) => ({ groupName, amount }))
+        // Process goal contributions (withdrawals excluded from totals)
+        for (const contrib of goalContributions) {
+            if (contrib.is_withdrawal) continue;
+            totalGoals += contrib.amount;
+            const daily = ensureDailyStats(contrib.contribution_date);
+            daily.goals += contrib.amount;
+        }
+
+        const topCategoryGroups = Array.from(groupSpending.values())
+            .map(({ groupName, groupId, amount, catMap }) => ({
+                groupName,
+                groupId,
+                amount,
+                categories: Array.from(catMap.values()).sort((a, b) => b.amount - a.amount),
+            }))
             .sort((a, b) => b.amount - a.amount)
             .slice(0, 5);
 
@@ -1121,16 +1184,18 @@ export const getDashboardStats = query({
             outflow: flow.outflow,
         }));
 
-        const dailyNet: Record<string, number> = Object.fromEntries(dailyNetMap);
+        const dailyStats: Record<string, { income: number; expenses: number; goals: number; txs: { description: string; amount: number; category?: string }[] }> =
+            Object.fromEntries(dailyStatsMap);
 
         return {
             totalIncome,
             totalExpenses,
+            totalGoals,
             netFlow: totalIncome - totalExpenses,
             topCategoryGroups,
             weeklyBreakdown: weekBuckets,
             accountFlows,
-            dailyNet,
+            dailyStats,
         };
     },
 });

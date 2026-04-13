@@ -417,17 +417,25 @@ function TransactionsContent() {
     const { convexUser } = useConvexUser();
     const searchParams = useSearchParams();
     const [selectedAccount, setSelectedAccount] = useState<Id<"accounts"> | null>(null);
-
-    useEffect(() => {
-        const accountId = searchParams.get("accountId");
-        if (accountId) setSelectedAccount(accountId as Id<"accounts">);
-    }, [searchParams]);
     const [search, setSearch] = useState("");
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
     const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
     const [groupFilter, setGroupFilter] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<string | null>(null);
     const [endDate, setEndDate] = useState<string | null>(null);
+
+    useEffect(() => {
+        const accountId = searchParams.get("accountId");
+        if (accountId) setSelectedAccount(accountId as Id<"accounts">);
+        const group = searchParams.get("groupId");
+        if (group) setGroupFilter(group);
+        const category = searchParams.get("categoryId");
+        if (category) setCategoryFilter(category);
+        const sd = searchParams.get("startDate");
+        if (sd) setStartDate(sd);
+        const ed = searchParams.get("endDate");
+        if (ed) setEndDate(ed);
+    }, [searchParams]);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(15);
 

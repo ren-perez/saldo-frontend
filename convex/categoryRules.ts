@@ -353,6 +353,9 @@ export const applyRuleRetroactively = mutation({
         if (!rule) throw new Error("Rule not found");
         if (rule.userId !== userId) throw new Error("Unauthorized");
 
+        // Look up the rule's category once to inherit transactionType
+        const ruleCategory = await ctx.db.get(rule.categoryId);
+
         const allTransactions = await ctx.db
             .query("transactions")
             .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -378,6 +381,7 @@ export const applyRuleRetroactively = mutation({
                     categoryId: rule.categoryId,
                     isAutoCategorized: true,
                     appliedRuleId: ruleId,
+                    ...(ruleCategory?.transactionType ? { transactionType: ruleCategory.transactionType } : {}),
                 });
             }
             patched += chunk.length;
