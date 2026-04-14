@@ -569,7 +569,7 @@ export function AllocationsView({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Rule?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the rule. Existing income distributions won't be affected.
+              This will permanently remove the rule. Existing income distributions won&apos;t be affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
