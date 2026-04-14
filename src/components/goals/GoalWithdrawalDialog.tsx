@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
-import { DollarSign, TrendingDown, AlertCircle, CreditCard } from "lucide-react"
+import { DollarSign, TrendingDown, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
@@ -22,8 +21,12 @@ interface GoalWithdrawalDialogProps {
 
 interface WithdrawalFormData {
     amount: string
+    date: string
     note: string
-    createTransaction: boolean
+}
+
+function todayISODate(): string {
+    return new Date().toISOString().split('T')[0]
 }
 
 export function GoalWithdrawalDialog({
@@ -35,29 +38,20 @@ export function GoalWithdrawalDialog({
     const { convexUser } = useConvexUser()
     const [formData, setFormData] = useState<WithdrawalFormData>({
         amount: '',
+        date: todayISODate(),
         note: '',
-        createTransaction: !!goal?.linked_account
     })
 
     const withdrawMutation = useMutation(api.contributions.withdrawFromGoal)
 
-    // Reset form when dialog opens/closes
     useEffect(() => {
         if (open && goal) {
-            setFormData({
-                amount: '',
-                note: '',
-                createTransaction: !!goal.linked_account
-            })
+            setFormData({ amount: '', date: todayISODate(), note: '' })
         }
     }, [open, goal])
 
     const handleClose = () => {
-        setFormData({
-            amount: '',
-            note: '',
-            createTransaction: false
-        })
+        setFormData({ amount: '', date: todayISODate(), note: '' })
         onOpenChange(false)
     }
 
@@ -67,13 +61,14 @@ export function GoalWithdrawalDialog({
         if (!goal || !convexUser) return
 
         const withdrawalAmount = parseFloat(formData.amount)
-        if (withdrawalAmount <= 0) {
-            toast.error("Please enter a valid amount")
+
+        if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+            toast.error("Please enter a valid amount greater than 0")
             return
         }
 
         if (withdrawalAmount > goal.current_amount) {
-            toast.error("Withdrawal amount exceeds available balance")
+            toast.error("Withdrawal exceeds current goal balance.")
             return
         }
 
@@ -82,21 +77,23 @@ export function GoalWithdrawalDialog({
                 userId: convexUser._id,
                 goalId: goal._id,
                 amount: withdrawalAmount,
-                createTransaction: formData.createTransaction,
-                note: formData.note || undefined
+                date: formData.date,
+                note: formData.note || undefined,
             })
 
             toast.success("Withdrawal completed successfully!")
             handleClose()
-        } catch (error) {
-            toast.error("Failed to complete withdrawal. Please try again.")
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Failed to complete withdrawal."
+            toast.error(message)
             console.error("Error withdrawing from goal:", error)
         }
     }
 
     const withdrawalAmount = parseFloat(formData.amount) || 0
     const remainingBalance = (goal?.current_amount || 0) - withdrawalAmount
-    const isValidAmount = withdrawalAmount > 0 && withdrawalAmount <= (goal?.current_amount || 0)
+    const isOverdraw = withdrawalAmount > 0 && withdrawalAmount > (goal?.current_amount || 0)
+    const isValidAmount = withdrawalAmount > 0 && !isOverdraw
 
     if (!goal) return null
 
@@ -105,7 +102,7 @@ export function GoalWithdrawalDialog({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <TrendingDown className="h-5 w-5" />
+                        <TrendingDown className="h-5 w-5 text-amber-500" />
                         Withdraw from {goal.emoji} {goal.name}
                     </DialogTitle>
                 </DialogHeader>
@@ -115,44 +112,27 @@ export function GoalWithdrawalDialog({
                     <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                         <div className="flex justify-between text-sm">
                             <span>Current Balance:</span>
-                            <span className="font-medium">
-                                {formatCurrency(goal.current_amount)}
-                            </span>
+                            <span className="font-medium">{formatCurrency(goal.current_amount)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span>Goal Target:</span>
-                            <span className="text-muted-foreground">
-                                {formatCurrency(goal.total_amount)}
-                            </span>
+                            <span className="text-muted-foreground">{formatCurrency(goal.total_amount)}</span>
                         </div>
                         {withdrawalAmount > 0 && (
                             <div className="flex justify-between text-sm border-t pt-2">
                                 <span>After Withdrawal:</span>
-                                <span className={`font-medium ${remainingBalance < 0 ? 'text-red-600' : ''}`}>
+                                <span className={`font-medium ${isOverdraw ? 'text-red-600' : ''}`}>
                                     {formatCurrency(remainingBalance)}
                                 </span>
                             </div>
                         )}
                     </div>
 
-                    {/* Linked Account Info */}
-                    {goal.linked_account && (
-                        <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                            <div className="flex items-center gap-2 text-blue-700 text-sm">
-                                <CreditCard className="h-4 w-4" />
-                                <span className="font-medium">Linked Account</span>
-                            </div>
-                            <p className="text-blue-600 text-xs mt-1">
-                                This goal is linked to {goal.linked_account.name}. You can create a withdrawal transaction.
-                            </p>
-                        </div>
-                    )}
-
                     {/* Amount Input */}
                     <div className="space-y-2">
                         <Label htmlFor="amount">Withdrawal Amount *</Label>
                         <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 id="amount"
                                 type="number"
@@ -166,72 +146,43 @@ export function GoalWithdrawalDialog({
                                 required
                             />
                         </div>
-                        {withdrawalAmount > goal.current_amount && (
+                        {isOverdraw && (
                             <div className="flex items-center gap-2 text-sm text-red-600">
                                 <AlertCircle className="h-4 w-4" />
-                                Amount exceeds available balance
+                                Withdrawal exceeds current goal balance.
                             </div>
                         )}
                     </div>
 
                     {/* Quick Amount Buttons */}
                     <div className="grid grid-cols-3 gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setFormData(prev => ({
-                                ...prev,
-                                amount: (goal.current_amount * 0.25).toFixed(2)
-                            }))}
-                        >
-                            25%
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setFormData(prev => ({
-                                ...prev,
-                                amount: (goal.current_amount * 0.5).toFixed(2)
-                            }))}
-                        >
-                            50%
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setFormData(prev => ({
-                                ...prev,
-                                amount: goal.current_amount.toFixed(2)
-                            }))}
-                        >
-                            All
-                        </Button>
+                        {[0.25, 0.5, 1].map((pct) => (
+                            <Button
+                                key={pct}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setFormData(prev => ({
+                                    ...prev,
+                                    amount: (goal.current_amount * pct).toFixed(2)
+                                }))}
+                            >
+                                {pct === 1 ? 'All' : `${pct * 100}%`}
+                            </Button>
+                        ))}
                     </div>
 
-                    {/* Create Transaction Option */}
-                    {goal.linked_account && (
-                        <div className="flex items-center justify-between p-3 border rounded-lg">
-                            <div className="space-y-1">
-                                <Label htmlFor="createTransaction" className="text-sm font-medium">
-                                    Create Account Transaction
-                                </Label>
-                                <p className="text-xs text-muted-foreground">
-                                    Create a withdrawal transaction in {goal.linked_account.name}
-                                </p>
-                            </div>
-                            <Checkbox
-                                id="createTransaction"
-                                checked={formData.createTransaction}
-                                onCheckedChange={(checked: boolean) => setFormData(prev => ({
-                                    ...prev,
-                                    createTransaction: checked
-                                }))}
-                            />
-                        </div>
-                    )}
+                    {/* Date Input */}
+                    <div className="space-y-2">
+                        <Label htmlFor="date">Date *</Label>
+                        <Input
+                            id="date"
+                            type="date"
+                            value={formData.date}
+                            onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                            required
+                        />
+                    </div>
 
                     {/* Note Input */}
                     <div className="space-y-2">
@@ -241,17 +192,17 @@ export function GoalWithdrawalDialog({
                             placeholder="Why are you withdrawing from this goal?"
                             value={formData.note}
                             onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
-                            rows={3}
+                            rows={2}
                         />
                     </div>
 
-                    {/* Impact Warning */}
-                    {withdrawalAmount > 0 && (
-                        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                            <div className="text-sm font-medium text-yellow-800 mb-2">
+                    {/* Progress Impact */}
+                    {withdrawalAmount > 0 && !isOverdraw && (
+                        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                            <div className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
                                 Impact on Goal Progress:
                             </div>
-                            <div className="text-sm text-yellow-700 space-y-1">
+                            <div className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
                                 <div className="flex justify-between">
                                     <span>Current Progress:</span>
                                     <span>{((goal.current_amount / goal.total_amount) * 100).toFixed(1)}%</span>
@@ -260,10 +211,10 @@ export function GoalWithdrawalDialog({
                                     <span>After Withdrawal:</span>
                                     <span>{((remainingBalance / goal.total_amount) * 100).toFixed(1)}%</span>
                                 </div>
-                                <div className="flex justify-between font-medium border-t pt-1">
+                                <div className="flex justify-between font-medium border-t border-amber-300 dark:border-amber-700 pt-1">
                                     <span>Progress Change:</span>
-                                    <span className="text-red-600">
-                                        -{(((withdrawalAmount) / goal.total_amount) * 100).toFixed(1)}%
+                                    <span className="text-red-600 dark:text-red-400">
+                                        -{((withdrawalAmount / goal.total_amount) * 100).toFixed(1)}%
                                     </span>
                                 </div>
                             </div>
@@ -271,11 +222,7 @@ export function GoalWithdrawalDialog({
                     )}
 
                     <DialogFooter className="gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleClose}
-                        >
+                        <Button type="button" variant="outline" onClick={handleClose}>
                             Cancel
                         </Button>
                         <Button

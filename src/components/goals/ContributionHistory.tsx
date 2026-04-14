@@ -242,6 +242,14 @@ export function ContributionHistory({ goalId, formatCurrency }: ContributionHist
                                                             to {contribution.goal.emoji} {contribution.goal.name}
                                                         </span>
                                                     )}
+                                                    {contribution.is_withdrawal && (
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"
+                                                        >
+                                                            Withdrawal
+                                                        </Badge>
+                                                    )}
                                                     <Badge
                                                         variant="secondary"
                                                         className={`text-xs ${SOURCE_COLORS[contribution.source as keyof typeof SOURCE_COLORS]}`}
@@ -300,9 +308,16 @@ export function ContributionHistory({ goalId, formatCurrency }: ContributionHist
 
                                     <div className="text-right">
                                         <p className={`text-lg font-semibold ${
-                                            contribution.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                                            contribution.is_withdrawal
+                                                ? 'text-amber-600 dark:text-amber-400'
+                                                : contribution.amount >= 0
+                                                    ? 'text-green-600'
+                                                    : 'text-red-600'
                                         }`}>
-                                            {contribution.amount >= 0 ? '+' : ''}{formatCurrency(contribution.amount)}
+                                            {contribution.is_withdrawal
+                                                ? `-${formatCurrency(Math.abs(contribution.amount as number))}`
+                                                : `${contribution.amount >= 0 ? '+' : ''}${formatCurrency(contribution.amount)}`
+                                            }
                                         </p>
                                         <p className="text-xs text-muted-foreground">
                                             {format(new Date(contribution.createdAt), 'h:mm a')}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,7 +24,12 @@ import {
 import { useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
+import { cn } from "@/lib/utils"
 import { IncomePlan } from "./income-shared"
+
+// TODO: Goal Withdrawals must NOT be created as IncomePlan records.
+// They must be handled via a dedicated Goal UI mutation, completely
+// decoupled from the income_plans table. Do not add withdrawal flows here.
 
 interface IncomeFormData {
   label: string
@@ -32,6 +37,18 @@ interface IncomeFormData {
   expected_amount: string
   recurrence: string
   notes: string
+}
+
+type FormErrors = Partial<Record<keyof IncomeFormData, string>>
+
+function emptyForm(plan: IncomePlan | null): IncomeFormData {
+  return {
+    label: plan?.label ?? "",
+    expected_date: plan?.expected_date ?? new Date().toISOString().split("T")[0],
+    expected_amount: plan?.expected_amount?.toString() ?? "",
+    recurrence: plan?.recurrence ?? "monthly",
+    notes: plan?.notes ?? "",
+  }
 }
 
 export function IncomeFormDialog({
@@ -47,33 +64,38 @@ export function IncomeFormDialog({
 }) {
   const isEdit = !!plan
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<IncomeFormData>({
-    label: plan?.label ?? "",
-    expected_date:
-      plan?.expected_date ?? new Date().toISOString().split("T")[0],
-    expected_amount: plan?.expected_amount?.toString() ?? "",
-    recurrence: plan?.recurrence ?? "monthly",
-    notes: plan?.notes ?? "",
-  })
+  const [form, setForm] = useState<IncomeFormData>(emptyForm(plan))
+  const [errors, setErrors] = useState<FormErrors>({})
 
-  useMemo(() => {
-    setForm({
-      label: plan?.label ?? "",
-      expected_date:
-        plan?.expected_date ?? new Date().toISOString().split("T")[0],
-      expected_amount: plan?.expected_amount?.toString() ?? "",
-      recurrence: plan?.recurrence ?? "monthly",
-      notes: plan?.notes ?? "",
-    })
-  }, [plan])
+  // Reset form state whenever the dialog opens or the target plan changes
+  useEffect(() => {
+    if (open) {
+      setForm(emptyForm(plan))
+      setErrors({})
+    }
+  }, [open, plan])
 
   const createPlan = useMutation(api.incomePlans.createIncomePlan)
   const updatePlan = useMutation(api.incomePlans.updateIncomePlan)
   const runAllocations = useMutation(api.allocations.runAllocationsForPlan)
 
+  function validate(): FormErrors {
+    const e: FormErrors = {}
+    if (!form.label.trim()) e.label = "Label is required"
+    if (!form.expected_date) e.expected_date = "Date is required"
+    const amt = parseFloat(form.expected_amount)
+    if (!form.expected_amount || isNaN(amt) || amt <= 0)
+      e.expected_amount = "Enter a valid amount greater than 0"
+    return e
+  }
+
   async function handleSave() {
+    const newErrors = validate()
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
     const amount = parseFloat(form.expected_amount)
-    if (!form.label || !form.expected_date || isNaN(amount)) return
     setSaving(true)
     try {
       if (isEdit && plan) {
@@ -107,6 +129,7 @@ export function IncomeFormDialog({
 
   function setField(key: keyof IncomeFormData, value: string) {
     setForm((f) => ({ ...f, [key]: value }))
+    if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }))
   }
 
   return (
@@ -128,7 +151,11 @@ export function IncomeFormDialog({
               placeholder="e.g. Salary, Freelance Invoice..."
               value={form.label}
               onChange={(e) => setField("label", e.target.value)}
+              className={cn(errors.label && "border-destructive focus-visible:ring-destructive")}
             />
+            {errors.label && (
+              <p className="text-xs text-destructive">{errors.label}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -138,7 +165,11 @@ export function IncomeFormDialog({
                 type="date"
                 value={form.expected_date}
                 onChange={(e) => setField("expected_date", e.target.value)}
+                className={cn(errors.expected_date && "border-destructive focus-visible:ring-destructive")}
               />
+              {errors.expected_date && (
+                <p className="text-xs text-destructive">{errors.expected_date}</p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Expected Amount</Label>
@@ -149,7 +180,11 @@ export function IncomeFormDialog({
                 onChange={(e) => setField("expected_amount", e.target.value)}
                 min={0}
                 step={100}
+                className={cn(errors.expected_amount && "border-destructive focus-visible:ring-destructive")}
               />
+              {errors.expected_amount && (
+                <p className="text-xs text-destructive">{errors.expected_amount}</p>
+              )}
             </div>
           </div>
 

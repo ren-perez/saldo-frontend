@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Plus, Target, Trophy, Info, Loader } from "lucide-react"
+import { Plus, Target, Trophy, Info, Loader, ChevronDown, ChevronUp } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { GoalDialog } from "@/components/goals/GoalDialog"
 import { GoalCardItem } from "@/components/goals/GoalCardItem"
@@ -27,21 +27,24 @@ export default function GoalsPage() {
     status: "",
     search: ""
   })
+  const [achievementsOpen, setAchievementsOpen] = useState(false)
+  const [inProgressOpen, setInProgressOpen] = useState(true)
+  const achievementsInitialized = useRef(false)
 
   // Fetch goals data
-  const goals = useQuery(
+  const rawGoals = useQuery(
     convexUser ? api.goals.getGoals : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
-  ) || []
+  )
+  const goals = rawGoals || []
 
   const filterOptions = useQuery(
     convexUser ? api.goals.getFilterOptions : ("skip" as never),
     convexUser ? { userId: convexUser._id } : "skip"
   ) || { accounts: [] }
 
-
   // Loading state
-  const isLoading = goals === undefined || filterOptions === undefined
+  const isLoading = rawGoals === undefined || filterOptions === undefined
 
   // Currency formatter
   const formatCurrency = (amount: number): string => {
@@ -104,6 +107,14 @@ export default function GoalsPage() {
   const activeGoals = filteredGoals.filter((g: Goal) => !g.is_completed)
   const achievedGoals = filteredGoals.filter((g: Goal) => g.is_completed)
 
+  // Set achievements default open state once data loads: open only if there are achievements
+  useEffect(() => {
+    if (rawGoals !== undefined && !achievementsInitialized.current) {
+      achievementsInitialized.current = true
+      setAchievementsOpen(achievedGoals.length > 0)
+    }
+  }, [rawGoals, achievedGoals.length])
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-6 px-4">
@@ -165,21 +176,12 @@ export default function GoalsPage() {
           </Button>
         </div>
 
-        {/* Filters */}
-        {/* <GoalFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-          filterOptions={filterOptions}
-        /> */}
-
-        {/* Unallocated Transactions */}
-        {/* <div className="mb-8">
-          <UnallocatedTransactions formatCurrency={formatCurrency} />
-        </div> */}
-
-        {/* Achievements Section — always visible at top */}
+        {/* Achievements Section */}
         <div className="mb-10">
-          <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => setAchievementsOpen(!achievementsOpen)}
+            className="flex items-center gap-2 mb-4 w-full text-left group"
+          >
             <Trophy className="h-5 w-5 text-amber-500" />
             <h2 className="text-lg font-semibold">Achievements</h2>
             {achievedGoals.length > 0 && (
@@ -188,41 +190,37 @@ export default function GoalsPage() {
               </span>
             )}
             <Separator className="flex-1" />
+            {achievementsOpen
+              ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+              : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+            }
+          </button>
+          <div className={`grid transition-all duration-300 ease-in-out ${achievementsOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+            <div className="overflow-hidden">
+              {achievedGoals.length > 0 ? (
+                <div className="flex flex-wrap gap-3 pb-1">
+                  {achievedGoals.map((goal: Goal) => (
+                    <AchievementCard
+                      key={goal._id}
+                      goal={goal}
+                      formatCurrency={formatCurrency}
+                      formatDate={formatDate}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-muted-foreground/25 py-8 px-6 text-center">
+                  <Trophy className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    No achievements yet. Complete a goal to earn your first trophy!
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-          {achievedGoals.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {achievedGoals.map((goal: Goal) => (
-                <AchievementCard
-                  key={goal._id}
-                  goal={goal}
-                  formatCurrency={formatCurrency}
-                  formatDate={formatDate}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-muted-foreground/25 py-8 px-6 text-center">
-              <Trophy className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">
-                No achievements yet. Complete a goal to earn your first trophy!
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* In Progress Divider */}
-        {activeGoals.length > 0 && (
-          <div className="flex items-center gap-3 mb-6">
-            <Loader className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">In progress</h2>
-            <span className="text-sm text-muted-foreground">
-              ({activeGoals.length})
-            </span>
-            <Separator className="flex-1" />
-          </div>
-        )}
-
-        {/* Active Goals Grid */}
+        {/* In Progress Section */}
         {activeGoals.length === 0 && achievedGoals.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
@@ -242,21 +240,44 @@ export default function GoalsPage() {
               </Button>
             )}
           </Card>
-        ) : activeGoals.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeGoals.map((goal: Goal) => (
-              <GoalCardItem
-                key={goal._id}
-                goal={goal}
-                onEditGoal={handleEditGoal}
-                formatCurrency={formatCurrency}
-                formatDate={formatDate}
-                getProgressPercentage={getProgressPercentage}
-                onGoalCompleted={setCelebratingGoal}
-              />
-            ))}
+        ) : (
+          <div>
+            <button
+              onClick={() => setInProgressOpen(!inProgressOpen)}
+              className="flex items-center gap-3 w-full text-left mb-4"
+            >
+              <Loader className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">In progress</h2>
+              {activeGoals.length > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  ({activeGoals.length})
+                </span>
+              )}
+              <Separator className="flex-1" />
+              {inProgressOpen
+                ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              }
+            </button>
+            <div className={`grid transition-all duration-300 ease-in-out ${inProgressOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+              <div className="overflow-hidden">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-1">
+                  {activeGoals.map((goal: Goal) => (
+                    <GoalCardItem
+                      key={goal._id}
+                      goal={goal}
+                      onEditGoal={handleEditGoal}
+                      formatCurrency={formatCurrency}
+                      formatDate={formatDate}
+                      getProgressPercentage={getProgressPercentage}
+                      onGoalCompleted={setCelebratingGoal}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-        ) : null}
+        )}
 
         {/* Goal Dialog */}
         <GoalDialog

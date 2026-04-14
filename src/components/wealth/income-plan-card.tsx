@@ -18,6 +18,7 @@ import {
   CircleDashed,
   Plus,
   Trash2,
+  Sparkles,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -274,9 +275,19 @@ export function IncomePlanCard({
   plan: IncomePlan
   userId: Id<"users">
   onEdit: (plan: IncomePlan) => void
-  onMatchClick: (plan: IncomePlan) => void
+  onMatchClick: (plan: IncomePlan, preSelectedTxId?: Id<"transactions">) => void
 }) {
   const [showAllocations, setShowAllocations] = useState(false)
+
+  // Query suggested matches only for planned plans to surface a smart-match button
+  const suggestedMatches = useQuery(
+    api.incomePlans.getSuggestedMatches,
+    plan.status === "planned" ? { planId: plan._id, userId } : "skip"
+  )
+  // A "smart match" requires <5% amount variance and must not already be matched
+  const smartMatch = suggestedMatches?.find(
+    (s) => !s.alreadyMatched && s.amountDiff / plan.expected_amount < 0.05
+  )
 
   const allocations = useQuery(api.allocations.getAllocationsForPlan, {
     incomePlanId: plan._id,
@@ -363,6 +374,20 @@ export function IncomePlanCard({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Smart match button — only shown for planned plans with a high-confidence suggestion */}
+            {isPlanned && smartMatch && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+                onClick={() => onMatchClick(plan, smartMatch._id)}
+                title={`Suggested: ${smartMatch.description}`}
+              >
+                <Sparkles className="size-3" />
+                Suggested Match
+              </Button>
+            )}
+
             <div className="text-right">
               <div className="text-sm font-semibold tabular-nums text-foreground">
                 {formatCurrency(displayAmount)}
@@ -398,7 +423,11 @@ export function IncomePlanCard({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => markMissed({ planId: plan._id })}
+                      onClick={() => {
+                        if (window.confirm(`Mark "${plan.label}" as missed? This will delete its allocation records.`)) {
+                          markMissed({ planId: plan._id })
+                        }
+                      }}
                       className="gap-2 text-destructive"
                     >
                       <Ban className="size-3.5" />
@@ -435,7 +464,11 @@ export function IncomePlanCard({
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => deletePlan({ planId: plan._id })}
+                  onClick={() => {
+                    if (window.confirm(`Permanently delete "${plan.label}"? This cannot be undone.`)) {
+                      deletePlan({ planId: plan._id })
+                    }
+                  }}
                   className="gap-2 text-destructive"
                 >
                   <X className="size-3.5" />

@@ -181,12 +181,12 @@ export const getSuggestedMatches = query({
             .collect();
 
         const expectedDate = new Date(plan.expected_date).getTime();
-        const dayRange = 30 * 24 * 60 * 60 * 1000; // 30 days
+        const dayRange = 14 * 24 * 60 * 60 * 1000; // 14 days
 
         // Filter to income transactions near the expected date/amount
         const candidates = transactions
             .filter((t) => t.amount > 0) // Income only
-            .filter((t) => Math.abs(t.date - expectedDate) <= dayRange) // Within 7 days
+            .filter((t) => Math.abs(t.date - expectedDate) <= dayRange) // Within 14 days
             .map((t) => ({
                 ...t,
                 amountDiff: Math.abs(t.amount - plan.expected_amount),
@@ -230,7 +230,7 @@ export const getPlansForTransaction = query({
 
         const txDate = transaction.date;
         const txAmount = transaction.amount;
-        const dayRange = 30 * 24 * 60 * 60 * 1000; // 30 days
+        const dayRange = 14 * 24 * 60 * 60 * 1000; // 14 days
 
         // Get all planned income plans for this user
         const plans = await ctx.db

@@ -136,7 +136,7 @@ export function GoalCardItem({
                           Transfer Funds
                         </DropdownMenuItem>
                       )}
-                      {(goal.current_amount > 0) && (
+                      {goal.tracking_type === "MANUAL" && goal.current_amount > 0 && (
                         <DropdownMenuItem onClick={() => setShowWithdrawalDialog(true)}>
                           <TrendingDown className="h-4 w-4 mr-2" />
                           Withdraw Funds
@@ -298,6 +298,18 @@ export function GoalCardItem({
                   >
                     <ArrowRightLeft className="h-3 w-3" />
                     Transfer
+                  </Button>
+                )}
+                {goal.tracking_type === "MANUAL" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-950"
+                    onClick={() => setShowWithdrawalDialog(true)}
+                    disabled={goal.current_amount === 0}
+                  >
+                    <TrendingDown className="h-3 w-3" />
+                    Withdraw
                   </Button>
                 )}
               </div>

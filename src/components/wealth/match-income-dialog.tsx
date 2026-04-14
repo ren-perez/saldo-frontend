@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,16 +33,27 @@ export function MatchIncomeDialog({
   userId,
   open,
   onOpenChange,
+  preSelectedTxId,
 }: {
   plan: IncomePlan | null
   userId: Id<"users">
   open: boolean
   onOpenChange: (v: boolean) => void
+  preSelectedTxId?: Id<"transactions">
 }) {
   const [selectedTxId, setSelectedTxId] = useState<Id<"transactions"> | null>(
     null
   )
   const [matching, setMatching] = useState(false)
+
+  // Auto-select the pre-selected transaction when dialog opens
+  useEffect(() => {
+    if (open && preSelectedTxId) {
+      setSelectedTxId(preSelectedTxId)
+    } else if (!open) {
+      setSelectedTxId(null)
+    }
+  }, [open, preSelectedTxId])
 
   const suggestions = useQuery(
     api.incomePlans.getSuggestedMatches,
@@ -86,7 +97,7 @@ export function MatchIncomeDialog({
           )}
           {suggestions?.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-6">
-              No income transactions found within 7 days of the expected date.
+              No income transactions found within 14 days of the expected date.
             </p>
           )}
           {suggestions?.map((tx: SuggestedMatch) => (

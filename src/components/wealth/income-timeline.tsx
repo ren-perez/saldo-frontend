@@ -66,9 +66,10 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
   const setFormOpen = onExternalFormOpenChange ?? setInternalFormOpen
   const [editingPlan, setEditingPlan] = useState<IncomePlan | null>(null)
 
-  // Plan → Transaction match (from plan card dropdown)
+  // Plan → Transaction match (from plan card dropdown or suggested match button)
   const [matchingPlan, setMatchingPlan] = useState<IncomePlan | null>(null)
   const [planMatchOpen, setPlanMatchOpen] = useState(false)
+  const [preSelectedTxId, setPreSelectedTxId] = useState<import("../../../convex/_generated/dataModel").Id<"transactions"> | undefined>(undefined)
 
   const plans = useQuery(
     api.incomePlans.listIncomePlans,
@@ -107,9 +108,10 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
     setFormOpen(true)
   }
 
-  // Plan card → "Match to transaction"
-  function handleMatchClick(plan: IncomePlan) {
+  // Plan card → "Match to transaction" (optionally with a pre-selected transaction)
+  function handleMatchClick(plan: IncomePlan, txId?: import("../../../convex/_generated/dataModel").Id<"transactions">) {
     setMatchingPlan(plan)
+    setPreSelectedTxId(txId)
     setPlanMatchOpen(true)
   }
 
@@ -208,8 +210,12 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
         open={planMatchOpen}
         onOpenChange={(v: boolean) => {
           setPlanMatchOpen(v)
-          if (!v) setMatchingPlan(null)
+          if (!v) {
+            setMatchingPlan(null)
+            setPreSelectedTxId(undefined)
+          }
         }}
+        preSelectedTxId={preSelectedTxId}
       />
 
     </div>

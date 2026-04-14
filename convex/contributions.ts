@@ -264,16 +264,27 @@ export const withdrawFromGoal = mutation({
         userId: v.id("users"),
         goalId: v.id("goals"),
         amount: v.number(),
-        createTransaction: v.optional(v.boolean()),
         note: v.optional(v.string()),
+        date: v.optional(v.string()),
+        transactionId: v.optional(v.id("transactions")),
     },
     handler: async (ctx, args) => {
         const { userId } = args;
+
+        // Validate amount
+        if (args.amount <= 0) {
+            throw new Error("Withdrawal amount must be greater than 0");
+        }
 
         // Validate goal belongs to user
         const goal = await ctx.db.get(args.goalId);
         if (!goal || (goal as any).userId !== userId) {
             throw new Error("Goal not found or not authorized");
+        }
+
+        // Block withdrawals on linked-account goals
+        if ((goal as any).tracking_type === "LINKED_ACCOUNT") {
+            throw new Error("Manual withdrawals are not allowed for linked-account goals. The balance syncs automatically from your account.");
         }
 
         // Check if sufficient balance exists
@@ -283,34 +294,20 @@ export const withdrawFromGoal = mutation({
             .collect();
 
         const currentBalance = contributions.reduce((sum, contrib) => sum + contrib.amount, 0);
-        if (currentBalance < args.amount) {
-            throw new Error("Insufficient balance in goal");
+        if (args.amount > currentBalance) {
+            throw new Error("Withdrawal amount exceeds current goal balance");
         }
 
-        let transactionId: Id<"transactions"> | undefined = undefined;
+        const withdrawalDate = args.date || new Date().toISOString().split('T')[0];
 
-        // Create transaction if requested and goal has linked account
-        if (args.createTransaction && (goal as any).linked_account_id) {
-            transactionId = await ctx.db.insert("transactions", {
-                userId,
-                accountId: (goal as any).linked_account_id,
-                amount: -args.amount,
-                date: Date.now(),
-                description: `Goal withdrawal: ${(goal as any).name}`,
-                transactionType: "withdrawal",
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            });
-        }
-
-        // Create withdrawal contribution
+        // Create withdrawal contribution (negative amount)
         const contributionId = await ctx.db.insert("goal_contributions", {
             userId,
             goalId: args.goalId,
-            transactionId,
+            transactionId: args.transactionId,
             amount: -args.amount,
             note: args.note,
-            contribution_date: new Date().toISOString().split('T')[0],
+            contribution_date: withdrawalDate,
             source: "manual_ui",
             is_withdrawal: true,
             createdAt: Date.now(),
@@ -319,7 +316,72 @@ export const withdrawFromGoal = mutation({
         // Update goal completion status
         await updateGoalCompletionStatus(ctx, args.goalId);
 
-        return { _id: contributionId, transactionId };
+        return { _id: contributionId };
+    },
+});
+
+// Delete a contribution (restores goal balance automatically via dynamic calculation)
+export const deleteContribution = mutation({
+    args: {
+        userId: v.id("users"),
+        contributionId: v.id("goal_contributions"),
+    },
+    handler: async (ctx, args) => {
+        const { userId } = args;
+
+        const contribution = await ctx.db.get(args.contributionId);
+        if (!contribution || contribution.userId !== userId) {
+            throw new Error("Contribution not found or not authorized");
+        }
+
+        const goalId = contribution.goalId;
+        await ctx.db.delete(args.contributionId);
+
+        // Recalculate goal completion status (balance restored automatically)
+        await updateGoalCompletionStatus(ctx, goalId);
+
+        return { success: true };
+    },
+});
+
+// Update a contribution's amount, date, or note
+export const updateContribution = mutation({
+    args: {
+        userId: v.id("users"),
+        contributionId: v.id("goal_contributions"),
+        amount: v.optional(v.number()),
+        note: v.optional(v.string()),
+        date: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const { userId } = args;
+
+        const contribution = await ctx.db.get(args.contributionId);
+        if (!contribution || contribution.userId !== userId) {
+            throw new Error("Contribution not found or not authorized");
+        }
+
+        if (args.amount !== undefined && args.amount <= 0) {
+            throw new Error("Amount must be greater than 0");
+        }
+
+        const updateData: Record<string, unknown> = {};
+
+        if (args.amount !== undefined) {
+            // Preserve sign (withdrawal = negative, deposit = positive)
+            const isWithdrawal = contribution.is_withdrawal;
+            updateData.amount = isWithdrawal ? -Math.abs(args.amount) : Math.abs(args.amount);
+        }
+
+        if (args.note !== undefined) updateData.note = args.note;
+        if (args.date !== undefined) updateData.contribution_date = args.date;
+
+        await ctx.db.patch(args.contributionId, updateData as any);
+
+        // Recalculate goal completion status
+        await updateGoalCompletionStatus(ctx, contribution.goalId);
+
+        return { success: true };
     },
 });
 
