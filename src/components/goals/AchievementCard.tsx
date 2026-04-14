@@ -16,7 +16,7 @@ export function AchievementCard({ goal, formatCurrency, formatDate: _formatDate 
         : null
 
     return (
-        <Link href={`/goals/${goal._id}`} className="block group w-72">
+        <Link href={`/goals/${goal._id}`} className="block group w-64">
             <div className="flex items-center gap-4 rounded-xl border bg-card text-card-foreground p-3 hover:shadow-md transition-shadow">
                 {/* Thumbnail */}
                 <div className="relative h-14 w-14 flex-shrink-0 rounded-lg overflow-hidden">

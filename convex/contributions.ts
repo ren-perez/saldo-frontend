@@ -282,9 +282,13 @@ export const withdrawFromGoal = mutation({
             throw new Error("Goal not found or not authorized");
         }
 
-        // Block withdrawals on linked-account goals
-        if ((goal as any).tracking_type === "LINKED_ACCOUNT") {
-            throw new Error("Manual withdrawals are not allowed for linked-account goals. The balance syncs automatically from your account.");
+        // For linked-account goals, validate the provided transactionId belongs to the user
+        // (and ideally to the linked account, as a sanity check)
+        if ((goal as any).tracking_type === "LINKED_ACCOUNT" && args.transactionId) {
+            const tx = await ctx.db.get(args.transactionId);
+            if (!tx || (tx as any).userId !== userId) {
+                throw new Error("Transaction not found or not authorized");
+            }
         }
 
         // Check if sufficient balance exists
@@ -300,6 +304,9 @@ export const withdrawFromGoal = mutation({
 
         const withdrawalDate = args.date || new Date().toISOString().split('T')[0];
 
+        // Determine source: linked to a transaction vs pure manual entry
+        const source = args.transactionId ? "manual_tx" : "manual_ui";
+
         // Create withdrawal contribution (negative amount)
         const contributionId = await ctx.db.insert("goal_contributions", {
             userId,
@@ -308,7 +315,7 @@ export const withdrawFromGoal = mutation({
             amount: -args.amount,
             note: args.note,
             contribution_date: withdrawalDate,
-            source: "manual_ui",
+            source,
             is_withdrawal: true,
             createdAt: Date.now(),
         });
@@ -317,6 +324,93 @@ export const withdrawFromGoal = mutation({
         await updateGoalCompletionStatus(ctx, args.goalId);
 
         return { _id: contributionId };
+    },
+});
+
+// Record any goal balance movement (positive = deposit, negative = withdrawal).
+// Works for both MANUAL and LINKED_ACCOUNT goals.
+// If accountId is provided a matching transaction is created on that account.
+// If transactionId is provided the movement is paired with an existing transaction.
+export const recordGoalMovement = mutation({
+    args: {
+        userId: v.id("users"),
+        goalId: v.id("goals"),
+        amount: v.number(),                            // signed: + deposit, - withdrawal
+        note: v.optional(v.string()),
+        date: v.string(),
+        transactionId: v.optional(v.id("transactions")), // link existing tx
+        accountId: v.optional(v.id("accounts")),         // create new tx on this account
+    },
+    handler: async (ctx, args) => {
+        const { userId } = args;
+
+        if (args.amount === 0) throw new Error("Amount must be non-zero");
+
+        const goal = await ctx.db.get(args.goalId);
+        if (!goal || (goal as any).userId !== userId) {
+            throw new Error("Goal not found or not authorized");
+        }
+
+        const isWithdrawal = args.amount < 0;
+        const absAmount = Math.abs(args.amount);
+
+        // Overdraw guard for withdrawals
+        if (isWithdrawal) {
+            const contributions = await ctx.db
+                .query("goal_contributions")
+                .withIndex("by_goal", (q) => q.eq("goalId", args.goalId))
+                .collect();
+            const balance = contributions.reduce((s, c) => s + c.amount, 0);
+            if (absAmount > balance) {
+                throw new Error("Withdrawal amount exceeds current goal balance");
+            }
+        }
+
+        let transactionId = args.transactionId;
+
+        // Validate existing transaction ownership
+        if (transactionId) {
+            const tx = await ctx.db.get(transactionId);
+            if (!tx || (tx as any).userId !== userId) {
+                throw new Error("Transaction not found or not authorized");
+            }
+        }
+
+        // Create transaction on linked account if accountId provided
+        if (args.accountId && !transactionId) {
+            const account = await ctx.db.get(args.accountId);
+            if (!account || (account as any).userId !== userId) {
+                throw new Error("Account not found or not authorized");
+            }
+            transactionId = await ctx.db.insert("transactions", {
+                userId,
+                accountId: args.accountId,
+                amount: args.amount,           // signed
+                date: new Date(args.date).getTime(),
+                description: `Goal ${isWithdrawal ? "withdrawal" : "contribution"}: ${(goal as any).name}`,
+                transactionType: isWithdrawal ? "withdrawal" : "deposit",
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            });
+        }
+
+        const source = transactionId ? "manual_tx" : "manual_ui";
+
+        const contributionId = await ctx.db.insert("goal_contributions", {
+            userId,
+            goalId: args.goalId,
+            transactionId,
+            amount: args.amount,               // signed
+            note: args.note,
+            contribution_date: args.date,
+            source,
+            is_withdrawal: isWithdrawal,
+            createdAt: Date.now(),
+        });
+
+        await updateGoalCompletionStatus(ctx, args.goalId);
+
+        return { _id: contributionId, transactionId };
     },
 });
 
@@ -382,6 +476,46 @@ export const updateContribution = mutation({
         await updateGoalCompletionStatus(ctx, contribution.goalId);
 
         return { success: true };
+    },
+});
+
+// Get recent transactions from a linked account for withdrawal matching
+export const getAccountTransactionsForWithdrawal = query({
+    args: {
+        userId: v.id("users"),
+        accountId: v.id("accounts"),
+        limit: v.optional(v.number()),
+    },
+    handler: async (ctx, args) => {
+        const account = await ctx.db.get(args.accountId);
+        if (!account || (account as any).userId !== args.userId) {
+            return [];
+        }
+
+        const raw = await ctx.db
+            .query("transactions")
+            .withIndex("by_account", (q) => q.eq("accountId", args.accountId))
+            .order("desc")
+            .take(args.limit || 50);
+
+        // Mark each one as already-linked if it has an existing goal contribution
+        const result = [];
+        for (const tx of raw) {
+            const existing = await ctx.db
+                .query("goal_contributions")
+                .withIndex("by_transaction", (q) => q.eq("transactionId", tx._id))
+                .first();
+            result.push({
+                _id: tx._id,
+                amount: (tx as any).amount,
+                description: (tx as any).description,
+                date: (tx as any).date,
+                transactionType: (tx as any).transactionType,
+                alreadyLinked: !!existing,
+            });
+        }
+
+        return result;
     },
 });
 

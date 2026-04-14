@@ -1,5 +1,5 @@
 // components/goals/GoalCardItem.tsx
-import { Calendar, DollarSign, MoreVertical, Edit, Trash2, Eye, Target, Pencil, ArrowRightLeft, TrendingDown } from "lucide-react"
+import { Calendar, MoreVertical, Edit, Trash2, Eye, Target, Pencil, ArrowUpDown } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -12,9 +12,7 @@ import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
 import { EnhancedImage } from "@/components/enhanced-image"
 import { useState } from "react"
-import { AddContributionDialog } from "@/components/goals/AddContributionDialog"
-import { GoalTransferDialog } from "@/components/goals/GoalTransferDialog"
-import { GoalWithdrawalDialog } from "@/components/goals/GoalWithdrawalDialog"
+import { GoalActionDialog } from "@/components/goals/GoalActionDialog"
 import { Goal } from "@/types/goals"
 
 interface GoalCardItemProps {
@@ -42,9 +40,7 @@ export function GoalCardItem({
 }: GoalCardItemProps) {
   const { convexUser } = useConvexUser()
   const deleteGoalMutation = useMutation(api.goals.deleteGoal)
-  const [showAddContribution, setShowAddContribution] = useState(false)
-  const [showTransferDialog, setShowTransferDialog] = useState(false)
-  const [showWithdrawalDialog, setShowWithdrawalDialog] = useState(false)
+  const [showActionDialog, setShowActionDialog] = useState(false)
 
   const progressPercentage = getProgressPercentage(goal.current_amount || 0, goal.total_amount);
 
@@ -126,22 +122,10 @@ export function GoalCardItem({
                   {!goal.is_completed && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setShowAddContribution(true)}>
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        Add Contribution
+                      <DropdownMenuItem onClick={() => setShowActionDialog(true)}>
+                        <ArrowUpDown className="h-4 w-4 mr-2" />
+                        Move Money
                       </DropdownMenuItem>
-                      {(goal.current_amount > 0) && (
-                        <DropdownMenuItem onClick={() => setShowTransferDialog(true)}>
-                          <ArrowRightLeft className="h-4 w-4 mr-2" />
-                          Transfer Funds
-                        </DropdownMenuItem>
-                      )}
-                      {goal.tracking_type === "MANUAL" && goal.current_amount > 0 && (
-                        <DropdownMenuItem onClick={() => setShowWithdrawalDialog(true)}>
-                          <TrendingDown className="h-4 w-4 mr-2" />
-                          Withdraw Funds
-                        </DropdownMenuItem>
-                      )}
                     </>
                   )}
                   <DropdownMenuSeparator />
@@ -277,68 +261,29 @@ export function GoalCardItem({
               </div>
             )}
 
-            {/* Action Buttons */}
+            {/* Action Button */}
             {!goal.is_completed && (
-              <div className="flex gap-2 w-full mt-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="flex-1 gap-1"
-                  onClick={() => setShowAddContribution(true)}
-                >
-                  <DollarSign className="h-3 w-3" />
-                  Add Contribution
-                </Button>
-                {goal.current_amount > 0 && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1"
-                    onClick={() => setShowTransferDialog(true)}
-                  >
-                    <ArrowRightLeft className="h-3 w-3" />
-                    Transfer
-                  </Button>
-                )}
-                {goal.tracking_type === "MANUAL" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-950"
-                    onClick={() => setShowWithdrawalDialog(true)}
-                    disabled={goal.current_amount === 0}
-                  >
-                    <TrendingDown className="h-3 w-3" />
-                    Withdraw
-                  </Button>
-                )}
-              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="w-full gap-1.5 mt-2"
+                onClick={() => setShowActionDialog(true)}
+              >
+                <ArrowUpDown className="h-3 w-3" />
+                Move Money
+              </Button>
             )}
 
           </div>
         </GoalCardFooter>
       </GoalCard>
 
-      <AddContributionDialog
+      <GoalActionDialog
         goal={goal}
-        open={showAddContribution}
-        onOpenChange={setShowAddContribution}
+        open={showActionDialog}
+        onOpenChange={setShowActionDialog}
         formatCurrency={formatCurrency}
         onGoalCompleted={onGoalCompleted}
-      />
-
-      <GoalTransferDialog
-        sourceGoal={goal}
-        open={showTransferDialog}
-        onOpenChange={setShowTransferDialog}
-        formatCurrency={formatCurrency}
-      />
-
-      <GoalWithdrawalDialog
-        goal={goal}
-        open={showWithdrawalDialog}
-        onOpenChange={setShowWithdrawalDialog}
-        formatCurrency={formatCurrency}
       />
     </>
   )

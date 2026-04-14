@@ -8,6 +8,8 @@ import {
   Plus,
   DollarSign,
   Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,6 +17,7 @@ import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { IncomePlan, formatCurrency } from "./income-shared"
+import { format } from "date-fns"
 import { IncomePlanCard } from "./income-plan-card"
 import { IncomeFormDialog } from "./income-form-dialog"
 import { MatchIncomeDialog } from "./match-income-dialog"
@@ -42,7 +45,7 @@ function MonthSummary({ plans }: { plans: IncomePlan[] }) {
       {planned.length > 0 && (
         <span className="flex items-center gap-1">
           <Clock className="size-3" />
-          {planned.length} pending
+          {planned.length} pending · {formatCurrency(planned.reduce((s, p) => s + p.expected_amount, 0))}
         </span>
       )}
       {missed.length > 0 && (
@@ -57,6 +60,8 @@ function MonthSummary({ plans }: { plans: IncomePlan[] }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+const CURRENT_MONTH_KEY = format(new Date(), "yyyy-MM")
+
 export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: { externalFormOpen?: boolean; onExternalFormOpenChange?: (v: boolean) => void } = {}) {
   const { convexUser } = useConvexUser()
   const userId = convexUser?._id
@@ -65,6 +70,24 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
   const formOpen = externalFormOpen ?? internalFormOpen
   const setFormOpen = onExternalFormOpenChange ?? setInternalFormOpen
   const [editingPlan, setEditingPlan] = useState<IncomePlan | null>(null)
+
+  // Month collapse: past months start collapsed, current/future start expanded.
+  // `toggledMonths` tracks keys that have been manually flipped from their default.
+  const [toggledMonths, setToggledMonths] = useState<Set<string>>(new Set())
+
+  function isExpanded(key: string) {
+    const defaultExpanded = key >= CURRENT_MONTH_KEY
+    return toggledMonths.has(key) ? !defaultExpanded : defaultExpanded
+  }
+
+  function toggleMonth(key: string) {
+    setToggledMonths((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   // Plan → Transaction match (from plan card dropdown or suggested match button)
   const [matchingPlan, setMatchingPlan] = useState<IncomePlan | null>(null)
@@ -98,7 +121,9 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
         month: "long",
         year: "numeric",
       })
-      const totalExpected = items.reduce((s, p) => s + p.expected_amount, 0)
+      const totalExpected = items
+        .filter((p) => p.status !== "missed")
+        .reduce((s, p) => s + (p.status === "matched" ? (p.actual_amount ?? p.expected_amount) : p.expected_amount), 0)
       return { key, label, totalExpected, items }
     })
   }, [plans])
@@ -158,37 +183,55 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
         )}
 
         {/* Month groups */}
-        <div className="flex flex-col gap-10">
-          {grouped.map((group) => (
-            <div key={group.key} className="flex flex-col gap-4">
-              {/* Month header */}
-              <div className="flex items-center gap-3 x-2 py-2 sticky top-16 bg-background/60 backdrop-blur-xl z-10">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
-                  {group.label}
-                </h3>
-                <div className="flex-1 h-px bg-border" />
-                <div className="flex items-center gap-3 shrink-0">
-                  <MonthSummary plans={group.items} />
-                  <span className="text-xs font-medium tabular-nums text-foreground">
-                    {formatCurrency(group.totalExpected)}
-                  </span>
+        <div className="flex flex-col gap-6">
+          {grouped.map((group) => {
+            const expanded = isExpanded(group.key)
+            return (
+              <div key={group.key} className="flex flex-col">
+                {/* Month header — always visible, clickable to collapse/expand */}
+                <button
+                  onClick={() => toggleMonth(group.key)}
+                  className="group flex items-center gap-3 px-2 py-2 sticky top-16 bg-background/60 backdrop-blur-xl z-10 hover:bg-muted/40 rounded-md transition-colors"
+                >
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0 group-hover:text-foreground transition-colors">
+                    {group.label}
+                  </h3>
+                  <div className="flex-1 h-px bg-border" />
+                  <div className="flex items-center gap-3 shrink-0">
+                    <MonthSummary plans={group.items} />
+                    <span className="text-xs font-medium tabular-nums text-foreground">
+                      {formatCurrency(group.totalExpected)} expected
+                    </span>
+                    {expanded ? (
+                      <ChevronUp className="size-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    ) : (
+                      <ChevronDown className="size-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Plan cards — animated expand/collapse */}
+                <div
+                  className="grid transition-[grid-template-rows] duration-200 ease-in-out"
+                  style={{ gridTemplateRows: expanded ? "1fr" : "0fr" }}
+                >
+                  <div className="overflow-hidden">
+                    <div className="flex flex-col gap-4 pt-3 pb-1">
+                      {group.items.map((plan) => (
+                        <IncomePlanCard
+                          key={plan._id}
+                          plan={plan}
+                          userId={userId!}
+                          onEdit={handleEdit}
+                          onMatchClick={handleMatchClick}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Plan cards */}
-              <div className="flex flex-col gap-4">
-                {group.items.map((plan) => (
-                  <IncomePlanCard
-                    key={plan._id}
-                    plan={plan}
-                    userId={userId}
-                    onEdit={handleEdit}
-                    onMatchClick={handleMatchClick}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

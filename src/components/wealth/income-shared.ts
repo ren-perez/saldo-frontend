@@ -46,24 +46,28 @@ export const statusConfig = {
     badgeClass: "border-border text-muted-foreground bg-muted",
     rowClass: "border-border",
     dotClass: "border-muted-foreground/40 bg-muted",
+    accentColor: null,
   },
   matched: {
     label: "Matched",
     badgeClass: "border-sky-400/30 text-sky-600 bg-sky-400/10",
-    rowClass: "border-sky-400/20 bg-sky-400/[0.05]",
+    rowClass: "border-border",
     dotClass: "border-sky-400 bg-sky-400/10",
+    accentColor: "#0ea5e9",
   },
   distributed: {
     label: "Distributed",
     badgeClass: "border-emerald-500/30 text-emerald-600 bg-emerald-500/10",
-    rowClass: "border-emerald-500/20 bg-emerald-500/[0.05]",
+    rowClass: "border-border",
     dotClass: "border-emerald-500 bg-emerald-500/10",
+    accentColor: "#10b981",
   },
   missed: {
     label: "Missed",
     badgeClass: "border-destructive/30 text-destructive bg-destructive/10",
-    rowClass: "border-destructive/20",
+    rowClass: "border-border",
     dotClass: "border-destructive bg-destructive/10",
+    accentColor: "#ef4444",
   },
 } as const
 
@@ -83,12 +87,12 @@ export const distributionStatusConfig = {
 } as const
 
 export const allocColors = [
-  "oklch(0.42 0.095 165)",
-  "oklch(0.55 0.08 200)",
-  "oklch(0.65 0.10 130)",
-  "oklch(0.50 0.06 285)",
-  "oklch(0.60 0.08 45)",
-  "oklch(0.48 0.09 20)",
+  "#3b82f6", // blue-500
+  "#10b981", // emerald-500
+  "#f59e0b", // amber-500
+  "#8b5cf6", // violet-500
+  "#f43f5e", // rose-500
+  "#64748b", // slate-500
 ]
 
 export const categoryLabels: Record<string, string> = {

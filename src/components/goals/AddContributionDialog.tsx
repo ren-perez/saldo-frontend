@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarIcon, DollarSign, CreditCard, HandCoins } from "lucide-react"
+import { CalendarIcon, DollarSign, CreditCard, HandCoins, TrendingUp, TrendingDown } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Progress } from "@/components/ui/progress"
@@ -32,6 +32,7 @@ interface ContributionFormData {
     contribution_date: string
     accountId: string | null
     contributionType: 'off-ledger' | 'account-linked'
+    direction: 'deposit' | 'withdrawal'
 }
 
 export function AddContributionDialog({
@@ -47,7 +48,8 @@ export function AddContributionDialog({
         note: '',
         contribution_date: format(new Date(), 'yyyy-MM-dd'),
         accountId: goal.linked_account?._id || null,
-        contributionType: goal.linked_account ? 'account-linked' : 'off-ledger'
+        contributionType: goal.linked_account ? 'account-linked' : 'off-ledger',
+        direction: 'deposit',
     })
     const [selectedDate, setSelectedDate] = useState<Date>(new Date())
     const [isCalendarOpen, setIsCalendarOpen] = useState(false)
@@ -58,15 +60,20 @@ export function AddContributionDialog({
     )
 
     const addContributionMutation = useMutation(api.contributions.createContribution)
+    const recordMovementMutation = useMutation(api.contributions.recordGoalMovement)
 
+    const isWithdrawal = formData.direction === 'withdrawal'
     const remainingAmount = Math.max(goal.total_amount - goal.current_amount, 0)
     const contributionAmount = parseFloat(formData.amount) || 0
-    const cappedAmount = Math.min(contributionAmount, remainingAmount)
-    const newTotal = goal.current_amount + cappedAmount
+    const cappedAmount = isWithdrawal ? contributionAmount : Math.min(contributionAmount, remainingAmount)
+    const newTotal = isWithdrawal
+        ? goal.current_amount - contributionAmount
+        : goal.current_amount + cappedAmount
     const currentProgress = Math.min((goal.current_amount / goal.total_amount) * 100, 100)
     const newProgress = Math.min((newTotal / goal.total_amount) * 100, 100)
-    const willComplete = newProgress >= 100 && currentProgress < 100
-    const isOverRemaining = contributionAmount > remainingAmount && remainingAmount > 0
+    const willComplete = !isWithdrawal && newProgress >= 100 && currentProgress < 100
+    const isOverRemaining = !isWithdrawal && contributionAmount > remainingAmount && remainingAmount > 0
+    const isOverdraw = isWithdrawal && contributionAmount > goal.current_amount
 
     const handleClose = () => {
         setFormData({
@@ -74,7 +81,8 @@ export function AddContributionDialog({
             note: '',
             contribution_date: format(new Date(), 'yyyy-MM-dd'),
             accountId: goal.linked_account?._id || null,
-            contributionType: goal.linked_account ? 'account-linked' : 'off-ledger'
+            contributionType: goal.linked_account ? 'account-linked' : 'off-ledger',
+            direction: 'deposit',
         })
         setSelectedDate(new Date())
         onOpenChange(false)
@@ -106,12 +114,38 @@ export function AddContributionDialog({
             return
         }
 
+        if (!convexUser) return
+
+        if (isWithdrawal) {
+            // Route withdrawals through recordGoalMovement
+            if (isOverdraw) {
+                toast.error("Withdrawal exceeds current goal balance.")
+                return
+            }
+            try {
+                await recordMovementMutation({
+                    userId: convexUser._id,
+                    goalId: goal._id,
+                    amount: -contributionAmount,  // negative = withdrawal
+                    note: formData.note || undefined,
+                    date: formData.contribution_date,
+                    accountId: formData.contributionType === 'account-linked' && formData.accountId
+                        ? formData.accountId as Id<"accounts">
+                        : undefined,
+                })
+                toast.success("Withdrawal recorded!")
+                handleClose()
+            } catch (error: unknown) {
+                toast.error(error instanceof Error ? error.message : "Failed to record withdrawal.")
+            }
+            return
+        }
+
+        // Deposit path
         if (remainingAmount <= 0) {
             toast.error("This goal is already completed")
             return
         }
-
-        if (!convexUser) return
 
         try {
             const mutationArgs = {
@@ -123,7 +157,6 @@ export function AddContributionDialog({
                 source: "manual_ui"
             }
 
-            // Add account ID if creating transaction
             const finalArgs = formData.contributionType === 'account-linked' && formData.accountId
                 ? { ...mutationArgs, accountId: formData.accountId as Id<"accounts"> }
                 : mutationArgs
@@ -169,9 +202,34 @@ export function AddContributionDialog({
                             </div>
                         </div>
 
+                        {/* Direction toggle */}
+                        <div className="space-y-2">
+                            <Label>Direction</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    type="button"
+                                    variant={formData.direction === 'deposit' ? 'default' : 'outline'}
+                                    className="h-auto p-3 flex flex-col items-center gap-2"
+                                    onClick={() => setFormData(prev => ({ ...prev, direction: 'deposit' }))}
+                                >
+                                    <TrendingUp className="h-5 w-5 text-green-500" />
+                                    <span className="text-sm">Deposit</span>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={formData.direction === 'withdrawal' ? 'destructive' : 'outline'}
+                                    className="h-auto p-3 flex flex-col items-center gap-2"
+                                    onClick={() => setFormData(prev => ({ ...prev, direction: 'withdrawal' }))}
+                                >
+                                    <TrendingDown className="h-5 w-5 text-amber-500" />
+                                    <span className="text-sm">Withdrawal</span>
+                                </Button>
+                            </div>
+                        </div>
+
                         {/* Contribution Type Selection */}
                         <div className="space-y-2">
-                            <Label>Contribution Type</Label>
+                            <Label>Source</Label>
                             <div className="grid grid-cols-2 gap-2">
                                 <Button
                                     type="button"
@@ -261,6 +319,11 @@ export function AddContributionDialog({
                                     Amount will be capped to {formatCurrency(remainingAmount)} (remaining balance)
                                 </p>
                             )}
+                            {isOverdraw && (
+                                <p className="text-xs text-red-600 dark:text-red-400">
+                                    Withdrawal exceeds current goal balance ({formatCurrency(goal.current_amount)}).
+                                </p>
+                            )}
                         </div>
 
                         {/* Date Input */}
@@ -348,14 +411,16 @@ export function AddContributionDialog({
                             </Button>
                             <Button
                                 type="submit"
+                                variant={isWithdrawal ? "destructive" : "default"}
                                 disabled={
                                     !formData.amount ||
                                     parseFloat(formData.amount) <= 0 ||
-                                    remainingAmount <= 0 ||
+                                    isOverdraw ||
+                                    (!isWithdrawal && remainingAmount <= 0) ||
                                     (formData.contributionType === 'account-linked' && !formData.accountId)
                                 }
                             >
-                                {willComplete ? "Complete Goal" : "Add Contribution"}
+                                {isWithdrawal ? "Record Withdrawal" : willComplete ? "Complete Goal" : "Add Contribution"}
                             </Button>
                         </DialogFooter>
                     </form>

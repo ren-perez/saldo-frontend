@@ -1,18 +1,19 @@
 "use client"
 
-import { use } from "react"
+import { use, useState } from "react"
 import { useQuery } from "convex/react"
 import { api } from "../../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, Calendar, TrendingUp, Target, HandCoins, CreditCard } from "lucide-react"
+import { ArrowLeft, Calendar, TrendingUp, Target, HandCoins, CreditCard, TrendingDown, ArrowRightLeft, ArrowUpDown } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { Id } from "../../../../convex/_generated/dataModel"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"
+import { GoalActionDialog } from "@/components/goals/GoalActionDialog"
 
 export default function GoalDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params)
@@ -35,6 +36,7 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
     )
 
     const goal = goals?.find(g => g._id === goalId)
+    const [showActionDialog, setShowActionDialog] = useState(false)
 
     if (!goal) {
         return (
@@ -204,56 +206,96 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
                         </div>
                     )}
 
-                    {/* Contributions */}
+                    {/* Activity */}
                     <div className="flex flex-col gap-4">
-                        <h2 className="text-base font-semibold text-foreground">
-                            Contributions
-                        </h2>
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-base font-semibold text-foreground">Activity</h2>
+                            {!goal.is_completed && (
+                                <Button size="sm" variant="secondary" className="gap-1.5"
+                                    onClick={() => setShowActionDialog(true)}>
+                                    <ArrowUpDown className="h-3.5 w-3.5" />
+                                    Move Money
+                                </Button>
+                            )}
+                        </div>
 
                         {contributionHistory && contributionHistory.length > 0 ? (
                             <div className="flex flex-col gap-2">
-                                {contributionHistory.map((contribution) => (
-                                    <div
-                                        key={contribution._id}
-                                        className="flex items-center justify-between py-3 px-4 rounded-lg border border-border hover:bg-muted/30 transition-colors"
-                                    >
-                                        <div className="flex-1 min-w-0 space-y-0.5">
-                                            <div className="flex items-center gap-2">
-                                                <Badge
-                                                    variant={
-                                                        contribution.source === "manual_ui" ? "default" :
-                                                            "outline"
-                                                    }
-                                                    className="text-[10px]"
-                                                >
-                                                    {contribution.source === "manual_ui" ? "Manual" :
-                                                        contribution.source}
-                                                </Badge>
-                                                {contribution.transaction?.account && (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        from {contribution.transaction.account.name}
-                                                    </span>
+                                {contributionHistory.map((contribution) => {
+                                    const isWithdrawal = contribution.is_withdrawal || contribution.amount < 0
+                                    const isTransfer = !!contribution.transfer_pair_id
+                                    const absAmount = Math.abs(contribution.amount as number)
+
+                                    const icon = isWithdrawal
+                                        ? <TrendingDown className="h-4 w-4 text-amber-500 shrink-0" />
+                                        : isTransfer
+                                            ? <ArrowRightLeft className="h-4 w-4 text-blue-500 shrink-0" />
+                                            : <TrendingUp className="h-4 w-4 text-emerald-500 shrink-0" />
+
+                                    const amountColor = isWithdrawal
+                                        ? "text-amber-600 dark:text-amber-400"
+                                        : "text-emerald-600 dark:text-emerald-400"
+
+                                    const amountPrefix = isWithdrawal ? "−" : "+"
+
+                                    const typeLabel = isWithdrawal
+                                        ? "Withdrawal"
+                                        : isTransfer
+                                            ? (contribution.amount >= 0 ? "Transfer In" : "Transfer Out")
+                                            : "Contribution"
+
+                                    const sourceLabel: Record<string, string> = {
+                                        manual_ui: "Manual",
+                                        manual_tx: "Transaction",
+                                        import: "Import",
+                                        auto: "Auto",
+                                    }
+
+                                    return (
+                                        <div
+                                            key={contribution._id}
+                                            className="flex items-center gap-3 py-3 px-4 rounded-lg border border-border hover:bg-muted/30 transition-colors"
+                                        >
+                                            {icon}
+                                            <div className="flex-1 min-w-0 space-y-0.5">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-medium">{typeLabel}</span>
+                                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                                        {sourceLabel[contribution.source as string] ?? contribution.source}
+                                                    </Badge>
+                                                    {contribution.transaction?.account && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            · {contribution.transaction.account.name}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {contribution.note && (
+                                                    <p className="text-xs text-muted-foreground italic">{contribution.note as string}</p>
                                                 )}
+                                                <p className="text-xs text-muted-foreground">
+                                                    {format(new Date(contribution.contribution_date as string), "MMM dd, yyyy")}
+                                                </p>
                                             </div>
-                                            {contribution.note && (
-                                                <p className="text-xs text-muted-foreground">{contribution.note}</p>
-                                            )}
-                                            <p className="text-xs text-muted-foreground">
-                                                {format(new Date(contribution.contribution_date), "MMM dd, yyyy")}
-                                            </p>
+                                            <span className={`text-sm font-semibold tabular-nums shrink-0 ${amountColor}`}>
+                                                {amountPrefix}{formatCurrency(absAmount)}
+                                            </span>
                                         </div>
-                                        <span className="text-sm font-semibold text-green-600 dark:text-green-400 tabular-nums">
-                                            +{formatCurrency(contribution.amount)}
-                                        </span>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         ) : (
                             <div className="text-center py-12 text-muted-foreground text-sm">
-                                No contributions yet. Start saving toward your goal!
+                                No activity yet. Use &quot;Move Money&quot; to start saving!
                             </div>
                         )}
                     </div>
+
+                    <GoalActionDialog
+                        goal={goal}
+                        open={showActionDialog}
+                        onOpenChange={setShowActionDialog}
+                        formatCurrency={formatCurrency}
+                    />
                 </div>
             </div>
         </AppLayout>

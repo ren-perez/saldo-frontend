@@ -73,9 +73,10 @@ function ProgressBarOnly({
   return (
     <button
       onClick={onClick}
-      className="w-full flex flex-col gap-1.5 text-left cursor-pointer group"
+      className="w-full flex flex-col gap-2 text-left cursor-pointer group"
     >
-      <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+      {/* Segmented bar */}
+      <div className="flex h-1.5 rounded-full overflow-hidden bg-muted">
         {allocations.map((a, i) => (
           <div
             key={a._id}
@@ -83,11 +84,32 @@ function ProgressBarOnly({
             style={{
               width: `${(a.amount / total) * 100}%`,
               backgroundColor: allocColors[i % allocColors.length],
-              opacity: a.is_forecast ? 0.5 : 1,
+              opacity: a.is_forecast ? 0.4 : 1,
             }}
           />
         ))}
       </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {allocations.map((a, i) => (
+          <div key={a._id} className="flex items-center gap-1.5" style={{ opacity: a.is_forecast ? 0.55 : 1 }}>
+            <div
+              className="size-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: allocColors[i % allocColors.length] }}
+            />
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {a.accountName} · {formatCurrency(a.amount)}
+              {a.is_forecast ? " ·" : ""}
+            </span>
+            {a.is_forecast && (
+              <span className="text-[9px] text-muted-foreground/60 italic">forecast</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Summary row */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
           {formatCurrency(totalAllocated)} of {formatCurrency(total)} allocated
@@ -320,10 +342,17 @@ export function IncomePlanCard({
   const isPlanned = plan.status === "planned"
 
   return (
-    <Card className={cn("border transition-colors", config.rowClass)}>
+    <Card className="border border-border transition-colors relative overflow-hidden">
+      {/* Status accent — 3px left border; absent for planned */}
+      {config.accentColor && (
+        <div
+          className="absolute inset-y-0 left-0 w-[3px]"
+          style={{ backgroundColor: config.accentColor }}
+        />
+      )}
       <CardContent className="p-0">
         {/* ── Main row ── */}
-        <div className="flex items-center gap-3 px-4 pb-4">
+        <div className="flex items-center gap-3 px-4 pt-4 pb-4">
           <div
             className={cn(
               "flex size-8 shrink-0 items-center justify-center rounded-full border-2",
