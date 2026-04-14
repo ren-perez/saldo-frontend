@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Inbox, Plus, Calendar, ArrowRight, Link2, DollarSign, Info, Undo2 } from "lucide-react"
+import { Inbox, Plus, Calendar, ArrowRight, Link2, DollarSign, Info, Undo2, SlidersHorizontal } from "lucide-react"
 import { AllocationsView } from "@/components/allocation/allocations-view"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"
@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
@@ -34,14 +33,11 @@ export default function IncomePage() {
 
   const { count } = useUnmatchedIncomeCount(userId)
 
-  const [activeTab, setActiveTab] = useState("timeline")
   const [unmatchedOpen, setUnmatchedOpen] = useState(false)
   const [matchingTx, setMatchingTx] = useState<UnmatchedTransaction | null>(null)
   const [txMatchOpen, setTxMatchOpen] = useState(false)
-
-  // Lifted state for child dialogs
   const [incomeFormOpen, setIncomeFormOpen] = useState(false)
-  const [allocationFormOpen, setAllocationFormOpen] = useState(false)
+  const [allocationRulesOpen, setAllocationRulesOpen] = useState(false)
 
   function handleUnmatchedTxMatch(tx: UnmatchedTransaction) {
     setMatchingTx(tx)
@@ -65,64 +61,51 @@ export default function IncomePage() {
           </Tooltip>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex items-center justify-between gap-3">
-            <TabsList>
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="allocations">Allocation Rules</TabsTrigger>
-            </TabsList>
-
-            <div className="flex items-center gap-2">
-              {count > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={() => setUnmatchedOpen(true)}
-                  className="gap-2 border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 text-amber-700 hover:from-amber-500/20 hover:to-amber-500/10 hover:text-amber-800 dark:text-amber-500 dark:hover:text-amber-400"
-                >
-                  <Inbox className="size-4" />
-                  <span className="hidden sm:inline">Match Your Income</span>
-                  <span className="inline sm:hidden">Match</span>
-                </Button>
-              )}
-
-              {activeTab === "timeline" && (
-                <Button
-                  className="gap-2"
-                  onClick={() => setIncomeFormOpen(true)}
-                >
-                  <Plus className="size-4" />
-                  <span className="hidden sm:inline">Add Income</span>
-                  <span className="inline sm:hidden">Add</span>
-                </Button>
-              )}
-
-              {activeTab === "allocations" && (
-                <Button
-                  size="sm"
-                  className="gap-1.5 h-8 text-xs"
-                  onClick={() => setAllocationFormOpen(true)}
-                >
-                  <Plus className="size-3.5" />
-                  <span className="hidden sm:inline">Add Rule</span>
-                  <span className="inline sm:hidden">Add</span>
-                </Button>
-              )}
-            </div>
+        {/* Action bar */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {count > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setUnmatchedOpen(true)}
+                className="gap-2 border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 text-amber-700 hover:from-amber-500/20 hover:to-amber-500/10 hover:text-amber-800 dark:text-amber-500 dark:hover:text-amber-400"
+              >
+                <Inbox className="size-4" />
+                <span className="hidden sm:inline">Match Your Income</span>
+                <span className="inline sm:hidden">Match</span>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setAllocationRulesOpen(true)}
+              className="gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <SlidersHorizontal className="size-4" />
+              <span className="hidden sm:inline">Allocation Rules</span>
+              <span className="inline sm:hidden">Rules</span>
+            </Button>
           </div>
 
-          <TabsContent value="timeline" className="my-6">
-            <IncomeTimeline
-              externalFormOpen={incomeFormOpen}
-              onExternalFormOpenChange={setIncomeFormOpen}
-            />
-          </TabsContent>
-          <TabsContent value="allocations" className="mt-6">
-            <AllocationsView
-              externalShowAdd={allocationFormOpen}
-              onExternalShowAddChange={setAllocationFormOpen}
-            />
-          </TabsContent>
-        </Tabs>
+          <Button className="gap-2" onClick={() => setIncomeFormOpen(true)}>
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">Add Income</span>
+            <span className="inline sm:hidden">Add</span>
+          </Button>
+        </div>
+
+        {/* Timeline */}
+        <div className="mt-6">
+          <IncomeTimeline
+            externalFormOpen={incomeFormOpen}
+            onExternalFormOpenChange={setIncomeFormOpen}
+          />
+        </div>
+
+        {/* Allocation Rules dialog */}
+        <AllocationsView
+          open={allocationRulesOpen}
+          onOpenChange={setAllocationRulesOpen}
+        />
       </div>
 
       {/* Unmatched Income Modal */}

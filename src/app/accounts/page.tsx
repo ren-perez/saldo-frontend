@@ -50,6 +50,7 @@ import {
     Target,
     FileText,
     Landmark,
+    ChevronDown,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -111,6 +112,7 @@ export default function AccountsPage() {
         type: string;
     } | null>(null);
     const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+    const [collapsedSections, setCollapsedSections] = useState<Set<AccountType>>(new Set());
     const [form, setForm] = useState({
         bank: "",
         name: "",
@@ -142,6 +144,15 @@ export default function AccountsPage() {
                 </div>
             </AppLayout>
         );
+    }
+
+    function toggleSection(type: AccountType) {
+        setCollapsedSections(prev => {
+            const next = new Set(prev);
+            if (next.has(type)) next.delete(type);
+            else next.add(type);
+            return next;
+        });
     }
 
     function resetForm() {
@@ -260,15 +271,22 @@ export default function AccountsPage() {
                 {/* Account cards grid — grouped by type */}
                 {viewMode === "grid" && groupedAccounts.length > 0 && groupedAccounts.map((group) => {
                     const GroupIcon = typeIcons[group.type];
+                    const isCollapsed = collapsedSections.has(group.type);
                     return (
                         <div key={group.type}>
-                            <div className="flex items-center gap-2 mb-4">
+                            <button
+                                className="flex items-center gap-2 mb-4 w-full text-left"
+                                onClick={() => toggleSection(group.type)}
+                            >
                                 <GroupIcon className={`h-5 w-5 ${typeColors[group.type].split(" ")[1]}`} />
                                 <h2 className="text-lg font-semibold">{typeLabels[group.type]}</h2>
                                 <span className="text-sm text-muted-foreground">({group.accounts.length})</span>
                                 <Separator className="flex-1" />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${isCollapsed ? "-rotate-90" : ""}`} />
+                            </button>
+                            <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
+                            <div className="overflow-hidden">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-1">
                                 {group.accounts.map((account) => {
                                     const acctType = group.type;
                                     const balance = account.balance ?? 0;
@@ -361,6 +379,8 @@ export default function AccountsPage() {
                                     );
                                 })}
                             </div>
+                            </div>
+                            </div>
                         </div>
                     );
                 })}
@@ -381,20 +401,25 @@ export default function AccountsPage() {
                                         <TableHead className="w-24 text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
-                                <TableBody>
-                                    {groupedAccounts.map((group) => {
-                                        const GroupIcon = typeIcons[group.type];
-                                        return [
-                                            <TableRow key={`header-${group.type}`} className="bg-muted/30 hover:bg-muted/30">
+                                {groupedAccounts.map((group) => {
+                                    const GroupIcon = typeIcons[group.type];
+                                    const isCollapsed = collapsedSections.has(group.type);
+                                    return (
+                                        <TableBody key={group.type}>
+                                            <TableRow
+                                                className="bg-muted/30 hover:bg-muted/40 cursor-pointer select-none"
+                                                onClick={() => toggleSection(group.type)}
+                                            >
                                                 <TableCell colSpan={7} className="py-2">
                                                     <div className="flex items-center gap-2">
                                                         <GroupIcon className={`h-4 w-4 ${typeColors[group.type].split(" ")[1]}`} />
                                                         <span className="text-sm font-semibold">{typeLabels[group.type]}</span>
                                                         <span className="text-xs text-muted-foreground">({group.accounts.length})</span>
+                                                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground ml-auto transition-transform duration-300 ${isCollapsed ? "-rotate-90" : ""}`} />
                                                     </div>
                                                 </TableCell>
-                                            </TableRow>,
-                                            ...group.accounts.map((account) => {
+                                            </TableRow>
+                                            {!isCollapsed && group.accounts.map((account) => {
                                                 const balance = account.balance ?? 0;
                                                 const activeGoals = account.linkedGoals.filter(g => !g.is_completed);
                                                 return (
@@ -465,10 +490,10 @@ export default function AccountsPage() {
                                                         </TableCell>
                                                     </TableRow>
                                                 );
-                                            }),
-                                        ];
-                                    })}
-                                </TableBody>
+                                            })}
+                                        </TableBody>
+                                    );
+                                })}
                             </Table>
                         </CardContent>
                     </Card>

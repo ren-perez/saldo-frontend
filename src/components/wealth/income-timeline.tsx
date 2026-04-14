@@ -124,7 +124,12 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
       const totalExpected = items
         .filter((p) => p.status !== "missed")
         .reduce((s, p) => s + (p.status === "matched" ? (p.actual_amount ?? p.expected_amount) : p.expected_amount), 0)
-      return { key, label, totalExpected, items }
+      const totalReceived = items
+        .filter((p) => p.status === "matched")
+        .reduce((s, p) => s + (p.actual_amount ?? p.expected_amount), 0)
+      const isComplete =
+        items.length > 0 && items.every((p) => p.status === "matched")
+      return { key, label, totalExpected, totalReceived, isComplete, items }
     })
   }, [plans])
 
@@ -198,10 +203,19 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
                   </h3>
                   <div className="flex-1 h-px bg-border" />
                   <div className="flex items-center gap-3 shrink-0">
-                    <MonthSummary plans={group.items} />
-                    <span className="text-xs font-medium tabular-nums text-foreground">
-                      {formatCurrency(group.totalExpected)} expected
-                    </span>
+                    {group.isComplete ? (
+                      <span className="flex items-center gap-1 text-xs font-medium tabular-nums text-emerald-600">
+                        <Check className="size-3" />
+                        {formatCurrency(group.totalReceived)}
+                      </span>
+                    ) : (
+                      <>
+                        <MonthSummary plans={group.items} />
+                        <span className="text-xs font-medium tabular-nums text-foreground">
+                          {formatCurrency(group.totalExpected)} expected
+                        </span>
+                      </>
+                    )}
                     {expanded ? (
                       <ChevronUp className="size-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     ) : (
