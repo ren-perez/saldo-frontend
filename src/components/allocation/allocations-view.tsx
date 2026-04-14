@@ -176,19 +176,19 @@ export function AllocationsView({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
+        <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden">
 
           {/* ── Header ── */}
-          <div className="px-5 pt-5 pb-4 border-b border-border">
+          <div className="px-6 pt-6 pb-5 border-b border-border">
             <DialogHeader>
               <DialogTitle className="text-base">Allocation Rules</DialogTitle>
-              <DialogDescription className="text-xs">
+              <DialogDescription className="text-sm">
                 Automatically split each paycheck across accounts.
               </DialogDescription>
             </DialogHeader>
 
             {/* Preview income row */}
-            <div className="flex items-center gap-2.5 mt-3">
+            <div className="flex items-center gap-3 mt-4">
               <span className="text-xs text-muted-foreground shrink-0">Preview with</span>
               <div className="relative">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">
@@ -224,7 +224,7 @@ export function AllocationsView({
           </div>
 
           {/* ── Rules list ── */}
-          <div className="overflow-y-auto max-h-[50vh]">
+          <div className="overflow-y-auto max-h-[55vh]">
             {rules === undefined ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
                 <Loader2 className="size-4 animate-spin" />
@@ -239,7 +239,7 @@ export function AllocationsView({
                 </p>
               </div>
             ) : (
-              <div className="py-1">
+              <div className="py-2">
                 {sortedRules.map((rule, idx) => {
                   const account = accounts?.find((a) => a._id === rule.accountId)
                   const ruleGoal = getLinkedGoal(rule.accountId)
@@ -249,7 +249,7 @@ export function AllocationsView({
                     <div
                       key={rule._id}
                       className={cn(
-                        "flex items-center gap-2 px-4 py-2.5 transition-colors hover:bg-muted/40",
+                        "flex items-center gap-3 px-6 py-3 transition-colors hover:bg-muted/40",
                         !rule.active && "opacity-40"
                       )}
                     >
@@ -295,7 +295,7 @@ export function AllocationsView({
                         value={rule.category}
                         onValueChange={(v) => updateRuleMut({ ruleId: rule._id, category: v })}
                       >
-                        <SelectTrigger className="h-6 text-[10px] w-[80px] shrink-0 border-0 bg-muted/60 px-2 gap-1">
+                        <SelectTrigger className="h-7 text-xs w-[90px] shrink-0 border-0 bg-muted/60 px-2 gap-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -307,9 +307,9 @@ export function AllocationsView({
                       </Select>
 
                       {/* Rule type toggle + value */}
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
-                          className="text-[10px] font-mono w-4 text-center text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-xs font-mono w-4 text-center text-muted-foreground hover:text-foreground transition-colors"
                           onClick={() =>
                             updateRuleMut({
                               ruleId: rule._id,
@@ -322,7 +322,7 @@ export function AllocationsView({
                         </button>
                         <Input
                           type="number"
-                          className="h-6 w-14 text-xs text-right tabular-nums border-0 bg-muted/60 px-1.5"
+                          className="h-7 w-16 text-xs text-right tabular-nums border-0 bg-muted/60 px-1.5"
                           defaultValue={rule.value}
                           min={0}
                           onBlur={(e) => {
@@ -334,14 +334,14 @@ export function AllocationsView({
                       </div>
 
                       {/* Preview amount */}
-                      <span className="w-14 text-right text-xs font-semibold tabular-nums text-foreground shrink-0">
+                      <span className="w-16 text-right text-xs font-semibold tabular-nums text-foreground shrink-0">
                         {alloc ? currencyExact(alloc.amount) : "—"}
                       </span>
 
                       {/* Options */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground">
                             <MoreHorizontal className="h-3.5 w-3.5" />
                             <span className="sr-only">Rule options</span>
                           </Button>
@@ -375,7 +375,7 @@ export function AllocationsView({
                       : a.ruleValue
                   return a.amount < expected - 0.01
                 }) && (
-                  <div className="mx-4 my-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                  <div className="mx-6 my-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-4 py-3">
                     <p className="text-xs text-amber-600">
                       Some allocations were reduced because the income is less than the total rules.
                     </p>
@@ -387,16 +387,16 @@ export function AllocationsView({
 
           {/* ── Inline Add Rule form ── */}
           {showAddForm && (
-            <div className="border-t border-border px-5 py-4 bg-muted/20 flex flex-col gap-3">
+            <div className="border-t border-border px-6 py-5 bg-muted/20 flex flex-col gap-4">
               {/* Account */}
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1.5">
                 <Label className="text-xs flex items-center gap-1.5">
                   Account
                   {attempted && !form.accountId && (
-                    <span className="text-[10px] text-destructive font-normal">required</span>
+                    <span className="text-xs text-destructive font-normal">required</span>
                   )}
                   {isDuplicateAccount && (
-                    <span className="text-[10px] text-amber-600 font-normal">already has a rule</span>
+                    <span className="text-xs text-amber-600 font-normal">already has a rule</span>
                   )}
                 </Label>
                 <Select
@@ -443,8 +443,8 @@ export function AllocationsView({
               </div>
 
               {/* Category + Type + Value */}
-              <div className="flex items-end gap-2">
-                <div className="flex flex-col gap-1 w-[100px] shrink-0">
+              <div className="flex items-end gap-3">
+                <div className="flex flex-col gap-1.5 w-[120px] shrink-0">
                   <Label className="text-xs">Category</Label>
                   <Select
                     value={form.category}
@@ -460,7 +460,7 @@ export function AllocationsView({
                   </Select>
                 </div>
 
-                <div className="flex flex-col gap-1 w-[68px] shrink-0">
+                <div className="flex flex-col gap-1.5 w-[80px] shrink-0">
                   <Label className="text-xs">Type</Label>
                   <Select
                     value={form.ruleType}
@@ -474,11 +474,11 @@ export function AllocationsView({
                   </Select>
                 </div>
 
-                <div className="flex flex-col gap-1 flex-1 min-w-0">
+                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                   <Label className="text-xs flex items-center gap-1">
                     {form.ruleType === "percent" ? "Percent" : "Amount"}
                     {attempted && (!form.value || Number(form.value) <= 0) && (
-                      <span className="text-[10px] text-destructive font-normal">required</span>
+                      <span className="text-xs text-destructive font-normal">required</span>
                     )}
                   </Label>
                   <div className="relative">
@@ -509,7 +509,7 @@ export function AllocationsView({
               </div>
 
               {/* Form actions */}
-              <div className="flex gap-2 justify-end pt-0.5">
+              <div className="flex gap-2 justify-end pt-1">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -531,7 +531,7 @@ export function AllocationsView({
           )}
 
           {/* ── Footer ── */}
-          <div className="border-t border-border px-5 py-3 flex items-center justify-between bg-muted/5">
+          <div className="border-t border-border px-6 py-4 flex items-center justify-between bg-muted/5">
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               {sortedRules.length > 0 && (
                 <span>{sortedRules.length} rule{sortedRules.length !== 1 ? "s" : ""}</span>

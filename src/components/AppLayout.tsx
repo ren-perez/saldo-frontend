@@ -5,6 +5,7 @@ import { AppSidebar } from "./AppSidebar"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { useEffect, useState } from "react"
+import { PendingActionsDropdown } from "./PendingActionsDropdown"
 
 interface AppLayoutProps {
     children: React.ReactNode
@@ -48,8 +49,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             <Separator orientation="vertical" className="h-4" />
                             <div className="flex flex-1 items-center justify-between">
                                 <h1 className="text-lg font-semibold pl-4">Saldo</h1>
-                                <div className="text-sm text-gray-500 font-medium pr-6">
-                                    {today}
+                                <div className="flex items-center gap-3 pr-4">
+                                    <PendingActionsDropdown />
+                                    <Separator orientation="vertical" className="h-4" />
+                                    <div className="text-sm text-gray-500 font-medium">
+                                        {today}
+                                    </div>
                                 </div>
                             </div>
                         </header>

@@ -4,7 +4,6 @@ import { useState, useMemo } from "react"
 import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
-import { ActionCards } from "@/components/dashboard/action-cards"
 import { AccountsSnapshot } from "@/components/dashboard/accounts-snapshot"
 import { MonthlyOverview } from "@/components/dashboard/monthly-overview"
 import { GoalsProgress } from "@/components/dashboard/goals-progress"
@@ -62,28 +61,11 @@ export default function DashboardPage() {
     convexUser ? { userId: convexUser._id } : "skip"
   )
 
-  const potentialTransfers = useQuery(
-    convexUser ? api.transfers.getPotentialTransfers : ("skip" as never),
-    convexUser ? { userId: convexUser._id } : "skip"
-  )
-
-  const activeDistributions = useQuery(
-    convexUser ? api.allocations.getActiveDistributions : ("skip" as never),
-    convexUser ? { userId: convexUser._id } : "skip"
-  )
-
   // Only block on initial data – avoid full-page flash when month changes
   const isInitialLoad =
     accounts === undefined ||
     goals === undefined ||
-    incomeSummary === undefined ||
-    potentialTransfers === undefined
-
-  // Compute action card counts
-  const unmatchedIncomeCount = incomeSummary?.thisMonth.plannedCount ?? 0
-  const pendingTransferCount = potentialTransfers?.length ?? 0
-  const activeGoalCount = goals?.filter((g: { is_completed: boolean }) => !g.is_completed).length ?? 0
-  const pendingDistributionCount = activeDistributions?.length ?? 0
+    incomeSummary === undefined
 
   return (
     <AppLayout>
@@ -96,13 +78,6 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              <ActionCards
-                unmatchedIncomeCount={unmatchedIncomeCount}
-                pendingTransferCount={pendingTransferCount}
-                activeGoalCount={activeGoalCount}
-                pendingDistributionCount={pendingDistributionCount}
-              />
-
               <GoalsProgress goals={goals ?? []} />
 
               <div className="grid gap-6 lg:grid-cols-2">
