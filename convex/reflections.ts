@@ -26,6 +26,7 @@ export const getMonthlySummary = query({
         // Calculate totals by transaction type, excluding transfers
         let totalIncome = 0;
         let totalExpenses = 0;
+        let totalReimbursements = 0;
 
         for (const transaction of transactions) {
             // Skip transfers
@@ -33,19 +34,26 @@ export const getMonthlySummary = query({
                 continue;
             }
 
-            // Use transactionType field for proper classification
             if (transaction.transactionType === "income") {
                 totalIncome += Math.abs(transaction.amount);
             } else if (transaction.transactionType === "expense") {
-                totalExpenses += Math.abs(transaction.amount);
+                if (transaction.amount > 0) {
+                    // Positive amount + expense type = reimbursement
+                    totalReimbursements += transaction.amount;
+                } else {
+                    totalExpenses += Math.abs(transaction.amount);
+                }
             }
         }
 
-        const netDifference = totalIncome - totalExpenses;
+        const netExpenses = totalExpenses - totalReimbursements;
+        const netDifference = totalIncome - netExpenses;
 
         return {
             totalIncome,
             totalExpenses,
+            totalReimbursements,
+            netExpenses,
             netDifference,
             transactionCount: transactions.length,
             period: { startDate, endDate },

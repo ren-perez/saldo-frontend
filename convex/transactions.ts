@@ -1075,7 +1075,15 @@ export const getDashboardStats = query({
 
         let totalIncome = 0;
         let totalExpenses = 0;
+        let totalReimbursements = 0;
         let totalGoals = 0;
+
+        // Build a map of categoryId -> transactionType for reimbursement detection
+        const categoryTypeMap = new Map(
+            categories
+                .filter((c) => c.transactionType)
+                .map((c) => [c._id.toString(), c.transactionType!])
+        );
 
         // groupId -> spending data with nested categories
         type CategoryEntry = { name: string; categoryId: string; amount: number };
@@ -1113,7 +1121,38 @@ export const getDashboardStats = query({
             const catIdStrForTx = tx.categoryId ? tx.categoryId.toString() : null;
             const categoryLabel = catIdStrForTx ? (categoryNameMap.get(catIdStrForTx) ?? undefined) : undefined;
 
-            if (tx.amount > 0) {
+            // A reimbursement is a positive amount explicitly typed as "expense"
+            // (or whose category is expense-typed) — it offsets spending, not income.
+            const catIdStrForReimb = tx.categoryId ? tx.categoryId.toString() : null;
+            const isReimbursement =
+                tx.amount > 0 &&
+                (tx.transactionType === "expense" ||
+                    (catIdStrForReimb !== null && categoryTypeMap.get(catIdStrForReimb) === "expense"));
+
+            if (isReimbursement) {
+                totalReimbursements += tx.amount;
+                daily.txs.push({ description: tx.description, amount: tx.amount, category: categoryLabel });
+
+                // Reduce the category group's net spending by the reimbursement amount
+                const catIdStr = catIdStrForReimb;
+                const groupId = catIdStr ? categoryToGroup.get(catIdStr) : undefined;
+                const groupIdKey = groupId ?? "uncategorized";
+                const groupName = groupId ? (groupMap.get(groupId) ?? "Uncategorized") : "Uncategorized";
+
+                if (!groupSpending.has(groupIdKey)) {
+                    groupSpending.set(groupIdKey, { groupName, groupId: groupIdKey, amount: 0, catMap: new Map() });
+                }
+                const grp = groupSpending.get(groupIdKey)!;
+                grp.amount -= tx.amount; // positive reimbursement reduces net spending
+
+                if (catIdStr) {
+                    const catName = categoryNameMap.get(catIdStr) ?? "Unknown";
+                    if (!grp.catMap.has(catIdStr)) {
+                        grp.catMap.set(catIdStr, { name: catName, categoryId: catIdStr, amount: 0 });
+                    }
+                    grp.catMap.get(catIdStr)!.amount -= tx.amount;
+                }
+            } else if (tx.amount > 0) {
                 totalIncome += tx.amount;
                 daily.income += tx.amount;
                 daily.txs.push({ description: tx.description, amount: tx.amount, category: categoryLabel });
@@ -1171,9 +1210,13 @@ export const getDashboardStats = query({
             .map(({ groupName, groupId, amount, catMap }) => ({
                 groupName,
                 groupId,
-                amount,
-                categories: Array.from(catMap.values()).sort((a, b) => b.amount - a.amount),
+                // Cap at 0 — reimbursements can't turn net spending negative
+                amount: Math.max(0, amount),
+                categories: Array.from(catMap.values())
+                    .map((c) => ({ ...c, amount: Math.max(0, c.amount) }))
+                    .sort((a, b) => b.amount - a.amount),
             }))
+            .filter((g) => g.amount > 0)
             .sort((a, b) => b.amount - a.amount)
             .slice(0, 5);
 
@@ -1190,12 +1233,61 @@ export const getDashboardStats = query({
         return {
             totalIncome,
             totalExpenses,
+            totalReimbursements,
             totalGoals,
-            netFlow: totalIncome - totalExpenses,
+            netFlow: totalIncome - (totalExpenses - totalReimbursements),
             topCategoryGroups,
             weeklyBreakdown: weekBuckets,
             accountFlows,
             dailyStats,
         };
+    },
+});
+
+// ─── Reimbursement Pairing ────────────────────────────────────────────────────
+
+export const getReimbursementPairs = query({
+    args: { userId: v.id("users") },
+    handler: async (ctx, { userId }) => {
+        return ctx.db
+            .query("reimbursement_pairs")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+    },
+});
+
+export const pairReimbursement = mutation({
+    args: {
+        userId: v.id("users"),
+        reimbursementTransactionId: v.id("transactions"),
+        expenseTransactionId: v.id("transactions"),
+    },
+    handler: async (ctx, { userId, reimbursementTransactionId, expenseTransactionId }) => {
+        // Remove any existing pair for this reimbursement transaction first
+        const existing = await ctx.db
+            .query("reimbursement_pairs")
+            .withIndex("by_reimbursement", (q) => q.eq("reimbursementTransactionId", reimbursementTransactionId))
+            .first();
+        if (existing) await ctx.db.delete(existing._id);
+
+        return ctx.db.insert("reimbursement_pairs", {
+            userId,
+            reimbursementTransactionId,
+            expenseTransactionId,
+            createdAt: Date.now(),
+        });
+    },
+});
+
+export const unpairReimbursement = mutation({
+    args: {
+        reimbursementTransactionId: v.id("transactions"),
+    },
+    handler: async (ctx, { reimbursementTransactionId }) => {
+        const pair = await ctx.db
+            .query("reimbursement_pairs")
+            .withIndex("by_reimbursement", (q) => q.eq("reimbursementTransactionId", reimbursementTransactionId))
+            .first();
+        if (pair) await ctx.db.delete(pair._id);
     },
 });

@@ -302,6 +302,18 @@ export default defineSchema({
         .index("by_outgoing", ["outgoingTransactionId"])
         .index("by_incoming", ["incomingTransactionId"]),
 
+    // ─── Reimbursement Pairing (optional) ─────────────────
+    // Links a reimbursement transaction (positive amount, expense type)
+    // to the original expense transaction it offsets.
+    reimbursement_pairs: defineTable({
+        userId: v.id("users"),
+        reimbursementTransactionId: v.id("transactions"),
+        expenseTransactionId: v.id("transactions"),
+        createdAt: v.number(),
+    }).index("by_user", ["userId"])
+        .index("by_reimbursement", ["reimbursementTransactionId"])
+        .index("by_expense", ["expenseTransactionId"]),
+
     // ─── Telegram Integration ──────────────────────────────
 
     telegram_pairing_codes: defineTable({

@@ -231,6 +231,7 @@ interface MobileTransactionCardProps {
 function MobileTransactionCard({
     transaction,
     account,
+    category,
     group,
     categories,
     categoryGroups,
@@ -266,6 +267,13 @@ function MobileTransactionCard({
     };
 
     const isUnpairedTransfer = transaction.transactionType === "transfer" && !transaction.transfer_pair_id;
+
+    // A reimbursement is a positive inflow explicitly typed as "expense",
+    // or whose linked category is expense-typed.
+    const isReimbursement =
+        transaction.amount > 0 &&
+        (transaction.transactionType === "expense" ||
+            category?.transactionType === "expense");
 
     return (
         <div
@@ -317,6 +325,11 @@ function MobileTransactionCard({
                         {transaction.transfer_pair_id && (
                             <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs py-0 px-1.5 h-4">
                                 <ArrowRightLeft className="h-2.5 w-2.5 mr-1" />Paired
+                            </Badge>
+                        )}
+                        {isReimbursement && (
+                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs py-0 px-1.5 h-4">
+                                Reimbursement
                             </Badge>
                         )}
                         {isUnpairedTransfer && (
@@ -469,7 +482,9 @@ function TransactionsContent() {
         const accountId = searchParams.get("accountId");
         if (accountId) setSelectedAccount(accountId as Id<"accounts">);
         const group = searchParams.get("groupId");
-        if (group) setGroupFilter(group);
+        // "uncategorized" is the backend sentinel for transactions with no group —
+        // normalise it to "NONE" so the Select and query filter both handle it correctly.
+        if (group) setGroupFilter(group === "uncategorized" ? "NONE" : group);
         const category = searchParams.get("categoryId");
         if (category) setCategoryFilter(category);
         const sd = searchParams.get("startDate");

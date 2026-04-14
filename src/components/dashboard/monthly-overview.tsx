@@ -35,6 +35,7 @@ type GroupEntry = {
 type DashboardStats = {
   totalIncome: number
   totalExpenses: number
+  totalReimbursements: number
   totalGoals: number
   netFlow: number
   topCategoryGroups: GroupEntry[]
@@ -472,7 +473,9 @@ export function MonthlyOverview({ stats, month, year, onMonthChange, onGoToToday
   const isCurrentMonth = month === now.getMonth() && year === now.getFullYear()
 
   const income = stats?.totalIncome ?? 0
-  const expenses = stats?.totalExpenses ?? 0
+  const grossExpenses = stats?.totalExpenses ?? 0
+  const reimbursements = stats?.totalReimbursements ?? 0
+  const expenses = Math.max(0, grossExpenses - reimbursements)
   const goals = stats?.totalGoals ?? 0
   const isLoading = stats === undefined
 
@@ -536,7 +539,6 @@ export function MonthlyOverview({ stats, month, year, onMonthChange, onGoToToday
             </div>
             <div className="flex flex-col gap-1 px-2 py-1.5 sm:px-4 sm:py-1.5 text-right">
               <span className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground justify-end">
-                {/* <TrendingDown className="size-3 shrink-0" /> */}
                 Expenses
               </span>
               <span className="text-xs sm:text-sm font-semibold tabular-nums text-red-700/90 dark:text-red-400/90">
