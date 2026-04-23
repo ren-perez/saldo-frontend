@@ -19,6 +19,7 @@ import {
   Plus,
   Trash2,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -45,12 +46,11 @@ import {
   formatDate,
 } from "./income-shared"
 import { Goal } from "@/types/goals"
-import { DistributionChecklist } from "./distribution-checklist"
 
 const statusIcons = {
   planned: Clock,
   matched: CircleDashed,
-  distributed: PartyPopper,
+  completed: PartyPopper,
   missed: AlertTriangle,
 } as const
 
@@ -75,7 +75,6 @@ function ProgressBarOnly({
       onClick={onClick}
       className="w-full flex flex-col gap-2 text-left cursor-pointer group"
     >
-      {/* Segmented bar */}
       <div className="flex h-1.5 rounded-full overflow-hidden bg-muted">
         {allocations.map((a, i) => (
           <div
@@ -90,7 +89,6 @@ function ProgressBarOnly({
         ))}
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap gap-x-3 gap-y-1">
         {allocations.map((a, i) => (
           <div key={a._id} className="flex items-center gap-1.5" style={{ opacity: a.is_forecast ? 0.55 : 1 }}>
@@ -109,7 +107,6 @@ function ProgressBarOnly({
         ))}
       </div>
 
-      {/* Summary row */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
           {formatCurrency(totalAllocated)} of {formatCurrency(total)} allocated
@@ -131,16 +128,18 @@ function ProgressBarOnly({
   )
 }
 
-// ─── Editable Allocation Rows (planned / forecast) ───────────────────────────
+// ─── Allocation Rows (works for planned and matched) ─────────────────────────
 
-function EditableAllocationRows({
+function AllocationRows({
   allocations,
   userId,
   planId,
+  isMatched,
 }: {
   allocations: AllocationRecord[]
   userId: Id<"users">
   planId: Id<"income_plans">
+  isMatched: boolean
 }) {
   const updateAmount = useMutation(api.allocations.updateAllocationAmount)
   const runAllocations = useMutation(api.allocations.runAllocationsForPlan)
@@ -169,16 +168,23 @@ function EditableAllocationRows({
             ? `${goalPart} · ${a.accountName}`
             : a.accountName
 
+          const verStatus = a.verification_status ?? "pending"
+
           return (
             <div
               key={a._id}
-              className="group flex items-center gap-2.5 rounded-md bg-gray-100/70 dark:bg-zinc-800/60 px-2.5 py-2.5"
+              className={cn(
+                "group flex items-center gap-2.5 rounded-md px-2.5 py-2.5",
+                verStatus === "verified"
+                  ? "bg-emerald-500/[0.04]"
+                  : "bg-gray-100/70 dark:bg-zinc-800/60"
+              )}
             >
               <div
                 className="size-2.5 rounded-full shrink-0 ml-2"
                 style={{
                   backgroundColor: allocColors[i % allocColors.length],
-                  opacity: 0.5,
+                  opacity: a.is_forecast ? 0.5 : 1,
                 }}
               />
               <div className="flex-1 min-w-0">
@@ -189,99 +195,127 @@ function EditableAllocationRows({
                   {categoryLabels[a.category] ?? a.category}
                 </span>
               </div>
-              <Input
-                type="number"
-                className="w-24 h-7 text-xs text-right tabular-nums"
-                defaultValue={a.amount}
-                min={0}
-                step={50}
-                onBlur={(e) => {
-                  const val = parseFloat(e.target.value)
-                  if (!isNaN(val) && val !== a.amount) {
-                    updateAmount({ recordId: a._id, amount: val })
-                  }
-                }}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                title="Remove allocation"
-                onClick={() => deleteRecord({ recordId: a._id })}
-              >
-                <Trash2 className="size-3" />
-              </Button>
+
+              {/* Verification badge (matched plans only) */}
+              {isMatched && (
+                <div className="shrink-0">
+                  {verStatus === "verified" ? (
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                      <ShieldCheck className="size-3" />
+                      Verified
+                    </span>
+                  ) : verStatus === "reserved" ? (
+                    <span className="text-[10px] text-sky-600">Reserved</span>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Editable amount (planned plans only) */}
+              {!isMatched ? (
+                <Input
+                  type="number"
+                  className="w-24 h-7 text-xs text-right tabular-nums"
+                  defaultValue={a.amount}
+                  min={0}
+                  step={50}
+                  onBlur={(e) => {
+                    const val = parseFloat(e.target.value)
+                    if (!isNaN(val) && val !== a.amount) {
+                      updateAmount({ recordId: a._id, amount: val })
+                    }
+                  }}
+                />
+              ) : (
+                <span className="text-xs font-semibold tabular-nums text-foreground shrink-0">
+                  {formatCurrency(a.amount)}
+                </span>
+              )}
+
+              {/* Delete (planned only) */}
+              {!isMatched && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                  title="Remove allocation"
+                  onClick={() => deleteRecord({ recordId: a._id })}
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              )}
             </div>
           )
         })}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-1">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
-            >
-              <Plus className="size-2.5" />
-              Add
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-60">
-            {availableAccounts.length === 0 ? (
-              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                All accounts already added
-              </DropdownMenuItem>
-            ) : (
-              availableAccounts.map((acc) => {
-                const linkedGoal = goals?.find(
-                  (g) => g.linked_account?._id === acc._id && !g.is_completed
-                )
-                return (
-                  <DropdownMenuItem
-                    key={acc._id}
-                    className="text-xs gap-2"
-                    onClick={() =>
-                      addRecord({
-                        incomePlanId: planId,
-                        accountId: acc._id as Id<"accounts">,
-                        amount: 0,
-                        category: "savings",
-                      })
-                    }
-                  >
-                    {linkedGoal ? (
-                      <span className="flex flex-col gap-0">
-                        <span>
-                          {linkedGoal.emoji ?? "🎯"}{" "}
-                          {linkedGoal.name}
+      {/* Footer (planned only) */}
+      {!isMatched && (
+        <div className="flex items-center justify-between pt-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+              >
+                <Plus className="size-2.5" />
+                Add
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-60">
+              {availableAccounts.length === 0 ? (
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                  All accounts already added
+                </DropdownMenuItem>
+              ) : (
+                availableAccounts.map((acc) => {
+                  const linkedGoal = goals?.find(
+                    (g) => g.linked_account?._id === acc._id && !g.is_completed
+                  )
+                  return (
+                    <DropdownMenuItem
+                      key={acc._id}
+                      className="text-xs gap-2"
+                      onClick={() =>
+                        addRecord({
+                          incomePlanId: planId,
+                          accountId: acc._id as Id<"accounts">,
+                          amount: 0,
+                          category: "savings",
+                        })
+                      }
+                    >
+                      {linkedGoal ? (
+                        <span className="flex flex-col gap-0">
+                          <span>
+                            {linkedGoal.emoji ?? "🎯"}{" "}
+                            {linkedGoal.name}
+                          </span>
+                          <span className="text-muted-foreground text-[10px]">
+                            {acc.name}
+                          </span>
                         </span>
-                        <span className="text-muted-foreground text-[10px]">
-                          {acc.name}
-                        </span>
-                      </span>
-                    ) : (
-                      acc.name
-                    )}
-                  </DropdownMenuItem>
-                )
-              })
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                      ) : (
+                        acc.name
+                      )}
+                    </DropdownMenuItem>
+                  )
+                })
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 text-[10px] gap-1"
-          onClick={() => runAllocations({ userId, incomePlanId: planId })}
-        >
-          <RotateCcw className="size-2.5" />
-          Reset to rules
-        </Button>
-      </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] gap-1"
+            onClick={() => runAllocations({ userId, incomePlanId: planId })}
+          >
+            <RotateCcw className="size-2.5" />
+            Reset to rules
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -301,12 +335,10 @@ export function IncomePlanCard({
 }) {
   const [showAllocations, setShowAllocations] = useState(false)
 
-  // Query suggested matches only for planned plans to surface a smart-match button
   const suggestedMatches = useQuery(
     api.incomePlans.getSuggestedMatches,
     plan.status === "planned" ? { planId: plan._id, userId } : "skip"
   )
-  // A "smart match" requires <5% amount variance and must not already be matched
   const smartMatch = suggestedMatches?.find(
     (s) => !s.alreadyMatched && s.amountDiff / plan.expected_amount < 0.05
   )
@@ -315,18 +347,18 @@ export function IncomePlanCard({
     incomePlanId: plan._id,
   }) as AllocationRecord[] | undefined
 
-  const checklist = useQuery(
-    api.allocations.getDistributionChecklist,
-    plan.status === "matched" ? { incomePlanId: plan._id } : "skip"
-  )
+  // Derive "completed" status: matched + all allocations verified
+  const isCompleted =
+    plan.status === "matched" &&
+    !!allocations &&
+    allocations.length > 0 &&
+    allocations.every((a) => a.verification_status === "verified")
 
-  const isFullyDistributed =
-    plan.status === "matched" && checklist?.isComplete === true
-  const effectiveStatus = isFullyDistributed
-    ? ("distributed" as const)
+  const effectiveStatus = isCompleted
+    ? ("completed" as const)
     : (plan.status as keyof typeof statusConfig)
-  const config = statusConfig[effectiveStatus]
-  const StatusIcon = statusIcons[effectiveStatus]
+  const config = statusConfig[effectiveStatus] ?? statusConfig.planned
+  const StatusIcon = statusIcons[effectiveStatus] ?? Clock
 
   const unmatch = useMutation(api.incomePlans.unmatchIncomePlan)
   const markMissed = useMutation(api.incomePlans.markMissed)
@@ -343,7 +375,6 @@ export function IncomePlanCard({
 
   return (
     <Card className="border border-border transition-colors relative overflow-hidden">
-      {/* Status accent — 3px left border; absent for planned */}
       {config.accentColor && (
         <div
           className="absolute inset-y-0 left-0 w-[3px]"
@@ -357,7 +388,7 @@ export function IncomePlanCard({
             className={cn(
               "flex size-8 shrink-0 items-center justify-center rounded-full border-2",
               config.dotClass,
-              isFullyDistributed && "animate-check-bounce"
+              isCompleted && "animate-check-bounce"
             )}
           >
             <StatusIcon className="size-3.5" />
@@ -369,7 +400,7 @@ export function IncomePlanCard({
                 {plan.label}
               </span>
               <Badge className={cn("text-[10px] shrink-0 border", config.badgeClass)}>
-                {isFullyDistributed ? "Distributed" : config.label}
+                {config.label}
               </Badge>
               {plan.recurrence !== "once" && (
                 <Badge variant="outline" className="text-[10px] capitalize shrink-0">
@@ -403,7 +434,6 @@ export function IncomePlanCard({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Smart match button — only shown for planned plans with a high-confidence suggestion */}
             {isPlanned && smartMatch && (
               <Button
                 size="sm"
@@ -453,7 +483,7 @@ export function IncomePlanCard({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => {
-                        if (window.confirm(`Mark "${plan.label}" as missed? This will delete its allocation records.`)) {
+                        if (window.confirm(`Mark "${plan.label}" as missed? This will delete its allocations.`)) {
                           markMissed({ planId: plan._id })
                         }
                       }}
@@ -546,14 +576,13 @@ export function IncomePlanCard({
                     Run allocations
                   </Button>
                 </div>
-              ) : isPlanned ? (
-                <EditableAllocationRows
+              ) : plan.status !== "missed" ? (
+                <AllocationRows
                   allocations={allocations}
                   userId={userId}
                   planId={plan._id}
+                  isMatched={isMatched}
                 />
-              ) : isMatched ? (
-                <DistributionChecklist incomePlanId={plan._id} userId={userId} />
               ) : null}
             </div>
           </div>

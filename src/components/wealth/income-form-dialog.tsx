@@ -37,6 +37,7 @@ interface IncomeFormData {
   expected_amount: string
   recurrence: string
   notes: string
+  scheduleDays: string // comma-separated day numbers, e.g. "5, 20"
 }
 
 type FormErrors = Partial<Record<keyof IncomeFormData, string>>
@@ -48,7 +49,15 @@ function emptyForm(plan: IncomePlan | null): IncomeFormData {
     expected_amount: plan?.expected_amount?.toString() ?? "",
     recurrence: plan?.recurrence ?? "monthly",
     notes: plan?.notes ?? "",
+    scheduleDays: plan?.schedule_pattern?.days?.join(", ") ?? "",
   }
+}
+
+function parseScheduleDays(raw: string): number[] | null {
+  if (!raw.trim()) return null
+  const parts = raw.split(",").map((s) => parseInt(s.trim(), 10))
+  if (parts.some((n) => isNaN(n) || n < 1 || n > 28)) return null
+  return [...new Set(parts)].sort((a, b) => a - b)
 }
 
 export function IncomeFormDialog({
@@ -67,7 +76,6 @@ export function IncomeFormDialog({
   const [form, setForm] = useState<IncomeFormData>(emptyForm(plan))
   const [errors, setErrors] = useState<FormErrors>({})
 
-  // Reset form state whenever the dialog opens or the target plan changes
   useEffect(() => {
     if (open) {
       setForm(emptyForm(plan))
@@ -86,6 +94,10 @@ export function IncomeFormDialog({
     const amt = parseFloat(form.expected_amount)
     if (!form.expected_amount || isNaN(amt) || amt <= 0)
       e.expected_amount = "Enter a valid amount greater than 0"
+    if (form.recurrence === "monthly" && form.scheduleDays.trim()) {
+      const days = parseScheduleDays(form.scheduleDays)
+      if (!days) e.scheduleDays = "Enter valid day numbers 1–28, comma-separated"
+    }
     return e
   }
 
@@ -96,6 +108,11 @@ export function IncomeFormDialog({
       return
     }
     const amount = parseFloat(form.expected_amount)
+    const days = form.recurrence === "monthly" ? parseScheduleDays(form.scheduleDays) : null
+    const schedule_pattern = days && days.length > 0
+      ? { type: "monthly_dates", days }
+      : undefined
+
     setSaving(true)
     try {
       if (isEdit && plan) {
@@ -106,6 +123,7 @@ export function IncomeFormDialog({
           expected_amount: amount,
           recurrence: form.recurrence,
           notes: form.notes || undefined,
+          schedule_pattern,
         })
         if (plan.status === "planned") {
           await runAllocations({ userId, incomePlanId: plan._id })
@@ -118,6 +136,7 @@ export function IncomeFormDialog({
           expected_amount: amount,
           recurrence: form.recurrence,
           notes: form.notes || undefined,
+          schedule_pattern,
         })
         await runAllocations({ userId, incomePlanId: planId })
       }
@@ -131,6 +150,8 @@ export function IncomeFormDialog({
     setForm((f) => ({ ...f, [key]: value }))
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }))
   }
+
+  const showScheduleDays = form.recurrence === "monthly"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -207,6 +228,29 @@ export function IncomeFormDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Schedule days — only for monthly */}
+          {showScheduleDays && (
+            <div className="flex flex-col gap-1.5">
+              <Label>
+                Specific monthly dates{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                placeholder="e.g. 5, 20"
+                value={form.scheduleDays}
+                onChange={(e) => setField("scheduleDays", e.target.value)}
+                className={cn(errors.scheduleDays && "border-destructive focus-visible:ring-destructive")}
+              />
+              {errors.scheduleDays ? (
+                <p className="text-xs text-destructive">{errors.scheduleDays}</p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Day numbers (1–28). Leave blank to repeat one month from the matched date.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label>

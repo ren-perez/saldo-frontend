@@ -7,60 +7,35 @@
 
 ## Page Structure
 
-- Wrapped in `AppLayout` (shared nav/shell) + `InitUser` (Convex user bootstrap on mount)
-- Top-level flex column, 24px gap/padding
-- Header: `DollarSign` icon + "Income" h1 + `Info` tooltip ("Track and allocate your income across accounts.")
-- Below header: full-width **Tabs** component
+- Wrapped in `AppLayout` + `InitUser`
+- Header: `DollarSign` icon + "Income" h1 + `Info` tooltip
+- Action bar (below header)
+- `IncomeTimeline` always rendered (no tabs)
+- `AllocationsView` rendered as a Dialog
+- `UnmatchedIncomeModal` + `MatchTransactionDialog` inline at bottom
 
 ---
 
-## Tabs
-
-| Tab key | Label | Component |
-|---|---|---|
-| `timeline` | Timeline | `IncomeTimeline` |
-| `allocations` | Allocation Rules | `AllocationsView` |
-
-Tab state is local (`activeTab`, default `"timeline"`).
-
----
-
-## Header Action Bar (right of tab list)
-
-Three conditionally rendered buttons:
+## Action Bar
 
 | Button | Visible when | Action |
 |---|---|---|
-| "Match Your Income" (`Inbox` icon, amber) | `unmatchedCount > 0` | **Only opens** `UnmatchedIncomeModal` (never toggles closed) |
-| "Add Income" (`Plus` icon) | `activeTab === "timeline"` | Opens `IncomeFormDialog` (create mode) |
-| "Add Rule" (`Plus` icon, smaller) | `activeTab === "allocations"` | Opens allocation rule form |
+| "Match Your Income" (`Inbox`, amber) | `unmatchedCount > 0` | Opens `UnmatchedIncomeModal` (only opens, never closes) |
+| "Allocation Rules" (`SlidersHorizontal`) | Always | Opens `AllocationsView` dialog |
+| "Add Income" (`Plus`) | Always | Opens `IncomeFormDialog` (create mode) |
 
-Responsive: full labels on `sm+`, abbreviated on mobile.
+`IncomeTimeline` receives `externalFormOpen` + `onExternalFormOpenChange` props from the page.
 
 ---
 
-## Timeline Tab — `IncomeTimeline`
+## Timeline — `IncomeTimeline`
 
 **File:** `src/components/wealth/income-timeline.tsx`
 
-### States
-- **Loading:** Spinner + "Loading income plans..."
-- **Empty:** Card with icon + "No income planned" + "Add Income" button
-- **Populated:** Month-grouped `IncomePlanCard` list
-
-### Grouping
-- Sorted by `expected_date` descending (newest first)
-- Grouped by `YYYY-MM`
-- Sticky month headers (`top-16`, blurred bg) show: month label, divider, `MonthSummary`, total expected
-
-### Month Summary
-Shows contextual stats for the month:
-- Emerald: total received (matched plans only)
-- Neutral: pending count
-- Red: missed count
-
-### Smart Match Pre-selection
-`IncomeTimeline` tracks `preSelectedTxId` state. When a card's "Suggested Match" button is clicked, `handleMatchClick(plan, txId)` sets both `matchingPlan` and `preSelectedTxId`, which is forwarded to `MatchIncomeDialog`.
+- States: loading spinner / empty card / month-grouped `IncomePlanCard` list
+- Sorted by `expected_date` descending, grouped by `YYYY-MM`
+- Sticky month headers: month label + `MonthSummary` (received, pending, missed counts)
+- Tracks `preSelectedTxId`: when card "Suggested Match" clicked, `handleMatchClick(plan, txId)` forwards pre-selection to `MatchIncomeDialog`
 
 ---
 
@@ -70,122 +45,68 @@ Shows contextual stats for the month:
 
 ### Status Model
 
-| Status | Icon | Color | Notes |
-|---|---|---|---|
-| `planned` | `Clock` | Muted/neutral | Default state |
-| `matched` | `CircleDashed` | Sky blue | Transaction linked |
-| `distributed` | `PartyPopper` | Emerald | Derived: matched + checklist complete |
-| `missed` | `AlertTriangle` | Red/destructive | Manually set |
+| Status | Notes |
+|---|---|
+| `planned` | Default; forecast allocations active |
+| `matched` | Transaction linked; allocations reserved |
+| `completed` | **Derived UI-only** — matched + all allocations verified; not stored in DB |
+| `missed` | Manually set; allocations deleted |
 
-`distributed` is derived — not stored in DB.
-
-### Main Row
-- Status dot (animated bounce when distributed)
-- Plan label, status badge, recurrence badge (hidden if `once`)
-- Expected date, received date (if differs), amount diff vs expected
-- Display amount (`actual_amount` if present, else `expected_amount`); strikethrough of expected when diff exists
-- **Suggested Match button** (planned plans only — see below)
-- 3-dot action menu
+`completed` derived as: `status === "matched" && allocations.every(a => a.verification_status === "verified")`
 
 ### Suggested Match Button
-For `planned` plans, `getSuggestedMatches` is queried (14-day window). If a result has `amountDiff / expected_amount < 0.05` and is not already matched, a `Sparkles` button labelled "Suggested Match" appears in the action row. Clicking it calls `onMatchClick(plan, tx._id)`, opening `MatchIncomeDialog` with that transaction pre-selected.
+`getSuggestedMatches` queried for planned plans (14-day window). Button shown if `amountDiff / expected_amount < 0.05` and not already matched. Opens `MatchIncomeDialog` with pre-selected tx.
 
-### 3-Dot Action Menu (context-sensitive)
+### 3-Dot Action Menu
 
-**Planned:**
-- Match to transaction → `MatchIncomeDialog`
-- Edit plan → `IncomeFormDialog`
-- **Mark as missed** — requires `window.confirm` before executing (destructive: deletes allocations)
+**Planned:** Match → `MatchIncomeDialog` | Edit → `IncomeFormDialog` | Mark missed (`window.confirm`, deletes allocations)
 
-**Matched:**
-- Unmatch transaction → `unmatch` + `runAllocations`
-- Edit plan
+**Matched:** Unmatch (reverses goal contributions, re-runs allocations) | Edit
 
-**Missed:**
-- Mark as planned
+**Missed:** Mark as planned (restores status + re-runs allocations)
 
-**Always:**
-- **Delete plan** — requires `window.confirm` before executing (permanent)
+**Always:** Delete plan (`window.confirm`, cascades to allocations + goal contributions)
 
-### Progress Bar
-- Shown only when allocations exist
-- Segmented bar: one segment per allocation, colored from `allocColors` palette
-- Forecast allocations rendered at 50% opacity
-- Click to toggle allocation detail panel (animated grid expand)
-- Shows: "{X} of {Y} allocated" + amber "{Z} unallocated" + chevron
+### Allocation Panel (expandable)
 
-### Allocation Detail Panel (expandable)
+Uses `AllocationRows` component for both `planned` and `matched` plan states:
+- **Planned:** editable amounts on blur, Add dropdown, Reset to rules button
+- **Matched:** read-only amounts, verification badge per row ("Reserved" / "Verified" with shield icon)
+- **Missed:** hidden
+- **No allocations:** "Run allocations" button
 
-| Plan Status | Panel Content |
-|---|---|
-| `planned` | `EditableAllocationRows` |
-| `matched` | `DistributionChecklist` |
-| `missed` | Nothing |
-| No allocations | "No allocations yet" + "Run allocations" button |
+Progress bar: segmented by allocation, forecast at 50% opacity.
 
 ---
 
-## Editable Allocation Rows (Planned plans)
+## Match Income Dialog — `MatchIncomeDialog`
 
-**File:** `src/components/wealth/income-plan-card.tsx` (inline component)
+**File:** `src/components/wealth/match-income-dialog.tsx`
 
-- Per row: color dot, account name (goal name prepended if linked), category label, amount input, delete button (hover-reveal)
-- Amount input: saves on `blur` only if changed → `updateAllocationAmount`
-- Delete: `deleteAllocationRecord`
-- Footer:
-  - "Add" dropdown: accounts not already in list, shows goal emoji+name if linked; adds with `amount: 0`, category `savings`
-  - "Reset to rules" → `runAllocationsForPlan`
-
----
-
-## Distribution Checklist (Matched plans)
-
-**File:** `src/components/wealth/distribution-checklist.tsx`
-
-- Header: `{completed}/{total} distributed` + optional amber "extra" amount + "Add" account dropdown
-- Completion banner (emerald, `PartyPopper`) when all items done
-
-### Per Allocation Row
-- Toggle complete button (circle → filled check with bounce animation)
-  - Mark complete: `markAllocationComplete`
-  - Unmark: removes all matched transactions + `unmarkAllocationComplete`
-- Color dot, display name (goal + account), category label
-- Amount display:
-  - Partial: `matchedAmount / plannedAmount` in amber
-  - Complete with diff: actual in emerald + strikethrough planned
-  - Click to edit inline (`EditableAmount`): Enter/Escape/blur to commit
-- Hover-reveal `Link2` → `AllocationMatchDialog` (match this item to a specific tx)
-- Hover-reveal `Trash2` → delete record
-
-### Matched Transactions Section
-Shown below a separator if any allocation has matches:
-- Per match: description, account + date, amount, X button to unmatch
+- Entry: plan card menu or Suggested Match button (plan-first flow)
+- Optional `preSelectedTxId` auto-selected via `useEffect` on open
+- Queries `getSuggestedMatches` (14-day window, top 5) and `getAllocationsForPlan`
+- Already-matched transactions disabled at 50% opacity
+- **Diff Resolver:** if selected transaction amount differs from expected by > $0.01:
+  - Shows amber banner with mismatch warning
+  - Displays editable allocation list pre-filled with proportionally scaled amounts
+  - Running total indicator; Confirm disabled until total equals actual amount
+  - "Distribute evenly" shortcut button
+- On confirm: `matchIncomePlan` (with optional `customAllocations`) → fire-and-forget `verifyAllocations`
 
 ---
 
-## Unmatched Income Modal — `UnmatchedIncomeModal`
+## Unmatched Income Modal
 
 **File:** `src/app/income/page.tsx` (inline component)
 
-- Rendered only when `userId` exists; queries skipped when closed (`"skip"` pattern)
-- `sm:max-w-md` dialog with amber gradient header
-- Summary: amber badge (count), emerald total
-- **Two tabs:** "Unmatched" and "Recently Matched" (tab switcher in header)
+- Queries skipped when closed (`"skip"` pattern); `limit: 200, incomeOnly: true`
+- `PAGE_SIZE = 20`, "Show N more" pagination (no hard cap)
+- **Two tabs:** Unmatched | Recently Matched
 
-### Unmatched Tab
-- Account filter Select (re-queries with `accountId` when changed)
-- Transaction list with **pagination** (`PAGE_SIZE = 20`; "Show N more (K remaining)" button — no hard cap)
-- Per row: amount, description, date, account badge
-- Suggestion: finds planned plans within 14 days and <20% amount diff; shows plan label with `ArrowRight`
-- Hover-reveal "Match" with `Link2` (suggestion exists) or `DollarSign` (no suggestion)
-- Click → closes modal, opens `MatchTransactionDialog`
-- Empty state: "No unmatched income found."
+**Unmatched tab:** account filter → transaction list → suggestion (14d, <20% diff) → click opens `MatchTransactionDialog`
 
-### Recently Matched Tab
-- Lists last 20 income plans with `status === "matched"`, sorted by `date_received` descending
-- Per row: amount, plan label, received date, **Undo** button
-- Undo: `window.confirm` → `unmatchIncomePlan` + `runAllocationsForPlan`
-- Empty state: "No recently matched income."
+**Recently Matched tab:** last 20 matched plans sorted by `date_received` desc; Undo = `window.confirm` → `unmatchIncomePlan` + `runAllocationsForPlan`
 
 ---
 
@@ -193,25 +114,9 @@ Shown below a separator if any allocation has matches:
 
 **File:** `src/components/wealth/match-transaction-dialog.tsx`
 
-- Entry point: Unmatched Income Modal (transaction-first flow)
-- Shows selected transaction summary card
-- Loads plans via `getPlansForTransaction` (**14-day window**)
-- Plan list: label, date, recurrence, days apart, expected amount, amount diff
-- Selection: `border-primary bg-primary/5`
-- On confirm: `matchIncomePlan` → `runAllocationsForPlan` → close + clear state
-
----
-
-## Match Plan → Transaction Dialog — `MatchIncomeDialog`
-
-**File:** `src/components/wealth/match-income-dialog.tsx`
-
-- Entry point: plan card 3-dot menu or "Suggested Match" button (plan-first flow)
-- Accepts optional `preSelectedTxId?: Id<"transactions">` — when set, the matching transaction is auto-selected via `useEffect` on open
-- Description shows plan label, expected amount/date
-- Loads suggestions via `getSuggestedMatches` (**14-day window**)
-- Already-matched transactions: 50% opacity, disabled, "Already matched" label
-- On confirm: same mutation chain as above
+- Entry: Unmatched Income Modal (transaction-first flow)
+- Queries `getPlansForTransaction` (14-day window, top 10 planned plans)
+- Confirm: `matchIncomePlan` → `verifyAllocations` (fire-and-forget)
 
 ---
 
@@ -219,48 +124,151 @@ Shown below a separator if any allocation has matches:
 
 **File:** `src/components/wealth/income-form-dialog.tsx`
 
-Dual-mode: Add and Edit.
+| Field | Default |
+|---|---|
+| Label | `""` |
+| Expected Date | Today |
+| Expected Amount | `""` (min 0, step 100) |
+| Recurrence | `monthly` |
+| Schedule days | `""` (optional, only shown for monthly) |
+| Notes | `""` (optional) |
 
-| Field | Type | Default |
-|---|---|---|
-| Label | Text | `""` |
-| Expected Date | `date` | Today |
-| Expected Amount | `number` (min 0, step 100) | `""` |
-| Recurrence | Select | `monthly` |
-| Notes | Textarea (optional, 3 rows) | `""` |
+**Schedule days field:** comma-separated day numbers 1–28 (e.g. "5, 20"). Only shown when recurrence = monthly. When set, creates `schedule_pattern: { type: "monthly_dates", days: [...] }`. This enables JIT recurrence — matching the plan auto-creates the next occurrence.
 
-**Recurrence options:** Once, Weekly, Bi-weekly, Monthly, Quarterly, Annually
-
-- Form state resets via `useEffect` on `open` / `plan` changes (previously used `useMemo` incorrectly for side effects)
-- **Validation:** Label, date, and amount (> 0) are required. Invalid fields show a red border + inline error message. Errors clear per-field on change.
-- Edit mode hint shown for planned plans: "Saving will re-run allocation rules with the updated amount."
+- Form resets via `useEffect` on `open`/`plan` change
+- Validation: label, date, amount > 0 required; schedule days validated as 1–28 integers
+- Edit hint (planned): "Saving will re-run allocation rules with the updated amount."
 - Create: `createIncomePlan` → `runAllocationsForPlan` → close
 - Edit: `updateIncomePlan` → `runAllocationsForPlan` (planned only) → close
-- Button label: "Create & Allocate" | "Save Changes"
 
-> **NOTE (Goal Withdrawal):** `IncomeFormDialog` must not be used for Goal Withdrawals. A TODO comment is present at the top of the file. Goal withdrawals must be handled via a dedicated Goal UI mutation, completely decoupled from the `income_plans` table.
+> **TODO (enforced only by comment):** `IncomeFormDialog` must not be used for Goal Withdrawals.
 
 ---
 
-## Data Model — `IncomePlan`
+## Data Model
 
-**File:** `src/components/wealth/income-shared.ts`
+### `income_plans` — active
 
-```ts
-{
-  _id: Id<"income_plans">
-  userId: Id<"users">
-  label: string
-  expected_date: string       // YYYY-MM-DD
-  expected_amount: number
-  actual_amount?: number      // set when matched
-  status: "planned" | "matched" | "missed"
-  recurrence: string
-  notes?: string
-  matched_transaction_id?: Id<"transactions">
-  date_received?: string
-}
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | `id("users")` | indexed |
+| `expected_date` | `string` | YYYY-MM-DD |
+| `expected_amount` | `number` | |
+| `label` | `string` | |
+| `recurrence` | `string` | display only unless schedule_pattern set |
+| `status` | `string` | `"planned"` \| `"matched"` \| `"missed"` |
+| `notes` | `string?` | |
+| `matched_transaction_id` | `id("transactions")?` | set on match |
+| `actual_amount` | `number?` | set from tx on match |
+| `date_received` | `string?` | set from tx on match |
+| `schedule_pattern` | `{ type: string, days: number[] }?` | enables JIT recurrence |
+| `createdAt` | `number` | |
+
+### `allocation_records` — active
+
+| Field | Type | Notes |
+|---|---|---|
+| `income_plan_id` | `id("income_plans")` | |
+| `accountId` | `id("accounts")` | |
+| `rule_id` | `id("allocation_rules")` | required |
+| `amount` | `number` | editable |
+| `category` | `string` | denormalized from rule |
+| `is_forecast` | `boolean` | `true` = planned, `false` = matched |
+| `verification_status` | `string?` | `"pending"` \| `"reserved"` \| `"verified"` |
+| `transfer_transaction_id` | `id("transactions")?` | set passively by `verifyAllocations` |
+| `createdAt` | `number` | |
+
+### `goal_contributions` — relevant fields added
+
+| Field | Notes |
+|---|---|
+| `income_plan_id` | links contribution to income plan; used for idempotent reversal on unmatch/delete |
+| `source` | `"income_allocation"` when created from income match |
+
+### `allocation_rules` — active
+
+`percent` or `fixed` rules per account/category. Drives `runAllocationsForPlan`.
+
+### ~~`allocation_transaction_matches`~~ — **DELETED**
+
+Removed. Allocation-to-transaction matching is no longer a feature.
+
+---
+
+## Backend Surface
+
+### `convex/incomePlans.ts`
+
+| Export | Type | Purpose |
+|---|---|---|
+| `listIncomePlans` | query | All plans for user, sorted by date desc |
+| `createIncomePlan` | mutation | Insert with `status: "planned"`, supports `schedule_pattern` |
+| `updateIncomePlan` | mutation | Patch provided fields, supports `schedule_pattern` |
+| `deleteIncomePlan` | mutation | Reverse goal contributions if matched → delete records → delete plan |
+| `matchIncomePlan` | mutation | Reserve allocations (scale if diff), update goal balances (idempotent), JIT recurrence |
+| `unmatchIncomePlan` | mutation | Reverse goal contributions, revert plan + allocations to planned/pending state |
+| `markMissed` | mutation | Reverse goal contributions if matched, set missed, delete allocation records |
+| `markPlanned` | mutation | Restore to planned, re-run allocations from rules |
+| `getSuggestedMatches` | query | 14-day window, top 5 by amount diff, marks already-matched txs |
+| `getPlansForTransaction` | query | 14-day window, top 10 planned plans by amount diff |
+| `getIncomeSummary` | query | This-month stats + upcoming 5 + `avgMonthlyIncome` (per distinct month, not per plan) |
+
+### `convex/allocations.ts`
+
+| Export | Type | Purpose |
+|---|---|---|
+| `runAllocationsForPlan` | mutation | Delete + recreate forecast records from rules; called on create/edit/restore |
+| `previewAllocation` | query | Preview without persisting |
+| `updateAllocationAmount` | mutation | Edit single record amount |
+| `getAllocationsForPlan` | query | Enriched with accountName, goalName, goalEmoji |
+| `getMonthlyForecast` | query | 3-month forecast by category |
+| `addAllocationRecord` | mutation | Add single record to plan |
+| `deleteAllocationRecord` | mutation | Delete single record |
+| `verifyAllocations` | mutation | Passive scan: links transfer transactions to allocations; fire-and-forget after match |
+
+---
+
+## Match Flow (New Model)
+
 ```
+User selects transaction in MatchIncomeDialog
+  └── if amountDiff > 0: show Diff Resolver
+       - pre-fill allocations scaled to actual_amount
+       - user adjusts until total == actual
+  └── Confirm →
+
+matchIncomePlan (Convex mutation)
+  1. Patch plan: status=matched, actual_amount, date_received, matched_transaction_id
+  2. Patch allocations: is_forecast=false, verification_status="reserved", amounts (scaled or custom)
+  3. Create goal_contributions for each allocation linked to a goal (idempotent guard)
+  4. If schedule_pattern: generate ONE next plan with same label/amount/allocation structure
+
+verifyAllocations (fire-and-forget after match)
+  - For each "reserved" allocation:
+    - Scan inflows to allocation.accountId within 10 days
+    - Gold standard: also verify matching outflow from income account
+    - If found: set verification_status="verified", transfer_transaction_id
+```
+
+## Unmatch Flow
+
+```
+unmatchIncomePlan
+  1. Delete goal_contributions where income_plan_id = planId
+  2. Patch plan: status=planned, clear matched fields
+  3. Patch allocations: is_forecast=true, verification_status="pending", clear transfer_transaction_id
+
+runAllocationsForPlan (called from UI after unmatch)
+  - Deletes + recreates forecast records from expected_amount + rules
+```
+
+## JIT Recurrence
+
+- Triggered inside `matchIncomePlan` when `plan.schedule_pattern` exists
+- Only `type: "monthly_dates"` supported
+- Computes next date from `days` array after `date_received`
+- Creates ONE new plan (same label, expected_amount, allocation structure)
+- Deduplication: skips creation if a plan with same label+date already exists
 
 ---
 
@@ -268,52 +276,68 @@ Dual-mode: Add and Edit.
 
 ```
 Page load
-  └── useUnmatchedIncomeCount  → always live, drives button badge
+  └── useUnmatchedIncomeCount  → drives "Match Your Income" badge
 
-Timeline tab
-  └── listIncomePlans          → grouped by month
-      └── IncomePlanCard
-          ├── getAllocationsForPlan
-          ├── getDistributionChecklist  (matched plans only)
-          └── getSuggestedMatches       (planned plans only — for smart match button)
+IncomeTimeline (always rendered)
+  └── listIncomePlans → IncomePlanCard
+      ├── getAllocationsForPlan
+      └── getSuggestedMatches  (planned only)
 
 UnmatchedIncomeModal (when open)
-  ├── getUnallocatedTransactions  (filtered by account, limit 200)
+  ├── getUnallocatedTransactions  (limit 200, incomeOnly)
   ├── getGoalAccounts
-  └── listIncomePlans             (for suggestion matching + recently matched tab)
+  └── listIncomePlans             (suggestions + recently matched tab)
 
-MatchTransactionDialog (when open)
-  └── getPlansForTransaction      (14-day window)
-
-MatchIncomeDialog (when open)
-  └── getSuggestedMatches         (14-day window)
+MatchTransactionDialog  → getPlansForTransaction
+MatchIncomeDialog       → getSuggestedMatches + getAllocationsForPlan
 ```
 
 ---
 
-## Known Issues & Gaps (Remaining)
+## Dead Code (removed)
 
-### UX Gaps
+- ~~`src/components/wealth/income-view.tsx`~~ — deleted (701-line old table UI)
+- ~~`src/components/wealth/distribution-checklist.tsx`~~ — deleted
+- ~~`src/components/wealth/allocation-match-dialog.tsx`~~ — deleted
+- ~~`convex/allocations.ts: getDistributionChecklist, matchAllocationTransaction, unmatchAllocationTransaction, markAllocationComplete, unmarkAllocationComplete, getSuggestedTransactionsForAllocation, getActiveDistributions`~~ — deleted
+
+---
+
+## Known Gaps (Remaining)
+
 - No success toast after matching
 - No bulk-match or bulk-dismiss for unmatched transactions
-- Missed plans cannot be matched directly — must first "Mark as planned"
+- Missed plans must "Mark as planned" before they can be matched directly
 - No date range filter or search on the Timeline
-- Recurrence field is informational only — does not auto-generate future plans
-- Unmatch + re-run allocations overwrites manually edited allocation amounts without warning
-
-### Accessibility
-- Progress bar toggle button missing `aria-expanded` / `aria-controls`
-- Hover-reveal "Match" text not triggered by keyboard focus
-- `EditableAmount` mode switch has no `aria-live` announcement
-- Account filter Select missing `aria-label`
+- `rule_id` in `allocation_records` is required — manually added records need a best-match rule
 
 ---
 
 ## Changelog
 
+### 2026-04-22 (MVP Refactor)
+- **[Model]** New core model: Plan → Match (1-click) → System executes allocations → passive verification → JIT next plan
+- **[Schema]** Added `schedule_pattern` to `income_plans`; added `verification_status` + `transfer_transaction_id` to `allocation_records`; added `income_plan_id` to `goal_contributions`; deleted `allocation_transaction_matches` table
+- **[Backend]** Rewrote `matchIncomePlan`: auto-reserves allocations, scales for diffs, creates goal contributions (idempotent), JIT recurrence
+- **[Backend]** Fixed `markMissed`: reverses goal contributions if plan was matched
+- **[Backend]** Fixed `markPlanned`: re-runs allocations from rules (was no-op before)
+- **[Backend]** Fixed `unmatchIncomePlan`: reverses goal contributions, resets verification state
+- **[Backend]** Fixed `getIncomeSummary.avgMonthlyIncome`: now divides by distinct month count, not plan count
+- **[Backend]** Added `verifyAllocations` mutation: passive transfer detection (gold standard: checks both inflow to goal account + outflow from income account)
+- **[Frontend]** Deleted `distribution-checklist.tsx`, `allocation-match-dialog.tsx`, `income-view.tsx`
+- **[Frontend]** `IncomePlanCard`: replaced distribution checklist with unified `AllocationRows` component; verification badges ("Reserved" / "Verified") on matched plans
+- **[Frontend]** `MatchIncomeDialog`: added Diff Resolver inline state; removed separate `runAllocations` call (match now handles it); fires `verifyAllocations` after match
+- **[Frontend]** `IncomeFormDialog`: added "Schedule days" field for monthly recurrence → sets `schedule_pattern`
+- **[Frontend]** `income-shared.ts`: updated `AllocationRecord` type (added `verification_status`, removed checklist fields); `IncomePlan` type (added `schedule_pattern`); renamed `distributed` → `completed` in `statusConfig`
+
+### 2026-04-22 (Audit)
+- Confirmed page has no Tabs — `IncomeTimeline` always rendered, `AllocationsView` is a Dialog.
+- Confirmed `income-view.tsx` (701 lines) was dead code.
+- Documented `markMissed` orphan bug, `markPlanned` allocation gap, `avgMonthlyIncome` calculation bug, dual unmatched-count signal mismatch.
+
 ### 2026-04-13
-- **[Step 1]** Unified matching date window to **14 days** in both `getSuggestedMatches` and `getPlansForTransaction` Convex queries; updated UI text in `MatchTransactionDialog` ("30d" → "14d") and `MatchIncomeDialog` ("7d" → "14d").
-- **[Step 2]** `IncomePlanCard` now queries `getSuggestedMatches` for planned plans and surfaces a "Suggested Match" (`Sparkles`) button when a transaction within 14 days has <5% amount variance. Clicking pre-selects that transaction in `MatchIncomeDialog` via a new `preSelectedTxId` prop (auto-selected via `useEffect`).
-- **[Step 3]** `UnmatchedIncomeModal`: fixed toggle bug (button now only opens, never closes the modal); added "Recently Matched" tab (last 20 matched plans, sortable by `date_received`, with Undo action); removed 15-item hard cap and replaced with "Show more" pagination (`PAGE_SIZE = 20`).
-- **[Step 4]** `IncomeFormDialog`: replaced `useMemo` side-effect with proper `useEffect` for form reset; added per-field validation (label, date, amount) with red border + inline error messages, clearing on change; state now fully resets on dialog open. `IncomePlanCard`: `markMissed` and `deletePlan` now require `window.confirm` before executing.
-- **[Step 5]** Added `TODO` comment in `IncomeFormDialog` prohibiting use of `income_plans` for Goal Withdrawals; no withdrawal-specific UI text was found in income components.
+- **[Step 1]** Unified matching date window to 14 days.
+- **[Step 2]** `IncomePlanCard` Suggested Match button with `< 5%` threshold.
+- **[Step 3]** `UnmatchedIncomeModal`: open-only toggle fix; Recently Matched tab; pagination.
+- **[Step 4]** `IncomeFormDialog`: `useEffect` form reset; per-field validation.
+- **[Step 5]** TODO comment re: Goal Withdrawals.

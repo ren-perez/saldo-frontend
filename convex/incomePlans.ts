@@ -2,6 +2,50 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+function computeNextMonthlyDate(days: number[], fromDate: Date): string {
+    const sorted = [...days].sort((a, b) => a - b);
+    const currentDay = fromDate.getDate();
+    const year = fromDate.getFullYear();
+    const month = fromDate.getMonth();
+
+    const nextInMonth = sorted.find((d) => d > currentDay);
+    if (nextInMonth) {
+        return `${year}-${String(month + 1).padStart(2, "0")}-${String(nextInMonth).padStart(2, "0")}`;
+    }
+
+    const nextMonth = month + 1 > 11 ? 0 : month + 1;
+    const nextYear = month + 1 > 11 ? year + 1 : year;
+    return `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(sorted[0]).padStart(2, "0")}`;
+}
+
+// Add months to a date string, clamping to last day of month (e.g. Jan 31 → Feb 28)
+function addMonths(dateStr: string, months: number): string {
+    const d = new Date(dateStr);
+    const day = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + months);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(day, lastDay));
+    return d.toISOString().split("T")[0];
+}
+
+function addDays(dateStr: string, days: number): string {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split("T")[0];
+}
+
+function computeNextDateFromRecurrence(recurrence: string, fromDateStr: string): string | null {
+    switch (recurrence) {
+        case "weekly":     return addDays(fromDateStr, 7);
+        case "biweekly":   return addDays(fromDateStr, 14);
+        case "monthly":    return addMonths(fromDateStr, 1);
+        case "quarterly":  return addMonths(fromDateStr, 3);
+        case "annually":   return addMonths(fromDateStr, 12);
+        default:           return null; // "once" and unknown
+    }
+}
+
 export const listIncomePlans = query({
     args: { userId: v.id("users") },
     handler: async (ctx, { userId }) => {
@@ -21,6 +65,10 @@ export const createIncomePlan = mutation({
         label: v.string(),
         recurrence: v.string(),
         notes: v.optional(v.string()),
+        schedule_pattern: v.optional(v.object({
+            type: v.string(),
+            days: v.array(v.number()),
+        })),
     },
     handler: async (ctx, args) => {
         const planId = await ctx.db.insert("income_plans", {
@@ -40,6 +88,10 @@ export const updateIncomePlan = mutation({
         label: v.optional(v.string()),
         recurrence: v.optional(v.string()),
         notes: v.optional(v.string()),
+        schedule_pattern: v.optional(v.object({
+            type: v.string(),
+            days: v.array(v.number()),
+        })),
     },
     handler: async (ctx, { planId, ...updates }) => {
         const cleaned = Object.fromEntries(
@@ -52,21 +104,29 @@ export const updateIncomePlan = mutation({
 export const deleteIncomePlan = mutation({
     args: { planId: v.id("income_plans") },
     handler: async (ctx, { planId }) => {
-        // Delete associated allocation records and their transaction matches
+        const plan = await ctx.db.get(planId);
+        if (!plan) return;
+
+        // Reverse goal contributions if plan was matched
+        if (plan.status === "matched") {
+            const contributions = await ctx.db
+                .query("goal_contributions")
+                .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
+                .collect();
+            for (const contrib of contributions) {
+                await ctx.db.delete(contrib._id);
+            }
+        }
+
+        // Delete allocation records
         const records = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
             .collect();
         for (const record of records) {
-            const matches = await ctx.db
-                .query("allocation_transaction_matches")
-                .withIndex("by_allocation", (q) => q.eq("allocation_record_id", record._id))
-                .collect();
-            for (const match of matches) {
-                await ctx.db.delete(match._id);
-            }
             await ctx.db.delete(record._id);
         }
+
         await ctx.db.delete(planId);
     },
 });
@@ -75,12 +135,20 @@ export const matchIncomePlan = mutation({
     args: {
         planId: v.id("income_plans"),
         transactionId: v.id("transactions"),
+        // Optional custom allocations from diff resolver
+        customAllocations: v.optional(v.array(v.object({
+            recordId: v.id("allocation_records"),
+            amount: v.number(),
+        }))),
     },
-    handler: async (ctx, { planId, transactionId }) => {
+    handler: async (ctx, { planId, transactionId, customAllocations }) => {
+        const plan = await ctx.db.get(planId);
+        if (!plan) throw new Error("Plan not found");
+
         const transaction = await ctx.db.get(transactionId);
         if (!transaction) throw new Error("Transaction not found");
 
-        // Prevent double-matching: check if this transaction is already matched to another plan
+        // Prevent double-matching this transaction to another plan
         const allPlans = await ctx.db
             .query("income_plans")
             .withIndex("by_user", (q) => q.eq("userId", transaction.userId))
@@ -90,20 +158,113 @@ export const matchIncomePlan = mutation({
         );
         if (alreadyMatched) throw new Error("Transaction is already matched to another income plan");
 
+        const actualAmount = transaction.amount;
+        const dateReceived = new Date(transaction.date).toISOString().split("T")[0];
+        const wasAlreadyMatched = plan.status === "matched";
+
+        // Update plan
         await ctx.db.patch(planId, {
             status: "matched",
             matched_transaction_id: transactionId,
-            actual_amount: transaction.amount,
-            date_received: new Date(transaction.date).toISOString().split("T")[0],
+            actual_amount: actualAmount,
+            date_received: dateReceived,
         });
 
-        // Update allocation records to no longer be forecast
+        // Get existing allocation records
         const records = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
             .collect();
+
+        // Build final allocation amounts
+        // If customAllocations provided, use them. Otherwise scale proportionally.
+        const allocationAmounts = new Map<string, number>();
+        if (customAllocations && customAllocations.length > 0) {
+            for (const ca of customAllocations) {
+                allocationAmounts.set(ca.recordId.toString(), ca.amount);
+            }
+        } else if (actualAmount !== plan.expected_amount && records.length > 0) {
+            const totalExpected = records.reduce((s, r) => s + r.amount, 0);
+            const ratio = totalExpected > 0 ? actualAmount / totalExpected : 1;
+            for (const record of records) {
+                allocationAmounts.set(record._id.toString(), Math.round(record.amount * ratio * 100) / 100);
+            }
+        }
+
+        // Reserve allocations and update amounts if needed
         for (const record of records) {
-            await ctx.db.patch(record._id, { is_forecast: false });
+            const newAmount = allocationAmounts.get(record._id.toString()) ?? record.amount;
+            await ctx.db.patch(record._id, {
+                is_forecast: false,
+                verification_status: "reserved",
+                amount: newAmount,
+            });
+        }
+
+        // Idempotent goal balance: only apply if plan was NOT previously matched
+        if (!wasAlreadyMatched) {
+            for (const record of records) {
+                const finalAmount = allocationAmounts.get(record._id.toString()) ?? record.amount;
+                const linkedGoal = await ctx.db
+                    .query("goals")
+                    .withIndex("by_account", (q) => q.eq("linked_account_id", record.accountId))
+                    .first();
+
+                if (linkedGoal && !linkedGoal.is_completed) {
+                    await ctx.db.insert("goal_contributions", {
+                        userId: plan.userId,
+                        goalId: linkedGoal._id,
+                        income_plan_id: planId,
+                        amount: finalAmount,
+                        contribution_date: dateReceived,
+                        source: "income_allocation",
+                        note: `Income: ${plan.label}`,
+                        createdAt: Date.now(),
+                    });
+                }
+            }
+        }
+
+        // JIT recurrence: generate next plan based on schedule_pattern (specific dates) or recurrence (standard interval)
+        let nextDate: string | null = null;
+        if (plan.schedule_pattern?.type === "monthly_dates" && plan.schedule_pattern.days.length > 0) {
+            nextDate = computeNextMonthlyDate(plan.schedule_pattern.days, new Date(dateReceived));
+        } else if (plan.recurrence && plan.recurrence !== "once") {
+            nextDate = computeNextDateFromRecurrence(plan.recurrence, dateReceived);
+        }
+
+        if (nextDate) {
+            const existingNext = allPlans.find(
+                (p) => p.label === plan.label && p.expected_date === nextDate
+            );
+
+            if (!existingNext) {
+                const nextPlanId = await ctx.db.insert("income_plans", {
+                    userId: plan.userId,
+                    label: plan.label,
+                    expected_date: nextDate,
+                    expected_amount: plan.expected_amount,
+                    recurrence: plan.recurrence,
+                    status: "planned",
+                    notes: plan.notes,
+                    schedule_pattern: plan.schedule_pattern,
+                    createdAt: Date.now(),
+                });
+
+                for (const record of records) {
+                    await ctx.db.insert("allocation_records", {
+                        userId: plan.userId,
+                        income_plan_id: nextPlanId,
+                        accountId: record.accountId,
+                        rule_id: record.rule_id,
+                        amount: record.amount,
+                        category: record.category,
+                        is_forecast: true,
+                        verification_status: "pending",
+                        createdAt: Date.now(),
+                    });
+                }
+            }
         }
     },
 });
@@ -111,6 +272,15 @@ export const matchIncomePlan = mutation({
 export const unmatchIncomePlan = mutation({
     args: { planId: v.id("income_plans") },
     handler: async (ctx, { planId }) => {
+        // Reverse goal contributions created from this plan
+        const contributions = await ctx.db
+            .query("goal_contributions")
+            .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
+            .collect();
+        for (const contrib of contributions) {
+            await ctx.db.delete(contrib._id);
+        }
+
         await ctx.db.patch(planId, {
             status: "planned",
             matched_transaction_id: undefined,
@@ -118,24 +288,16 @@ export const unmatchIncomePlan = mutation({
             date_received: undefined,
         });
 
-        // Revert allocation records to forecast and clean up distribution matches
+        // Reset allocation records to forecast state
         const records = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
             .collect();
         for (const record of records) {
-            // Delete allocation transaction matches
-            const matches = await ctx.db
-                .query("allocation_transaction_matches")
-                .withIndex("by_allocation", (q) => q.eq("allocation_record_id", record._id))
-                .collect();
-            for (const match of matches) {
-                await ctx.db.delete(match._id);
-            }
             await ctx.db.patch(record._id, {
                 is_forecast: true,
-                status: "pending",
-                matched_amount: 0,
+                verification_status: "pending",
+                transfer_transaction_id: undefined,
             });
         }
     },
@@ -144,9 +306,23 @@ export const unmatchIncomePlan = mutation({
 export const markMissed = mutation({
     args: { planId: v.id("income_plans") },
     handler: async (ctx, { planId }) => {
+        const plan = await ctx.db.get(planId);
+        if (!plan) return;
+
+        // If plan was matched, reverse goal contributions first
+        if (plan.status === "matched") {
+            const contributions = await ctx.db
+                .query("goal_contributions")
+                .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
+                .collect();
+            for (const contrib of contributions) {
+                await ctx.db.delete(contrib._id);
+            }
+        }
+
         await ctx.db.patch(planId, { status: "missed" });
 
-        // Delete allocation records for missed income
+        // Delete allocation records (no allocations for missed plans)
         const records = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
@@ -160,11 +336,58 @@ export const markMissed = mutation({
 export const markPlanned = mutation({
     args: { planId: v.id("income_plans") },
     handler: async (ctx, { planId }) => {
-        await ctx.db.patch(planId, { status: "planned" });
+        const plan = await ctx.db.get(planId);
+        if (!plan) return;
+
+        await ctx.db.patch(planId, {
+            status: "planned",
+            matched_transaction_id: undefined,
+            actual_amount: undefined,
+            date_received: undefined,
+        });
+
+        // Recreate forecast allocations based on rules
+        const rules = await ctx.db
+            .query("allocation_rules")
+            .withIndex("by_user", (q) => q.eq("userId", plan.userId))
+            .collect();
+
+        const activeRules = rules.filter((r) => r.active).sort((a, b) => a.priority - b.priority);
+        const income = plan.expected_amount;
+        let remaining = income;
+
+        const toInsert: Array<{ ruleId: typeof activeRules[0]["_id"]; accountId: typeof activeRules[0]["accountId"]; category: string; amount: number }> = [];
+        for (const rule of activeRules) {
+            let amount: number;
+            if (rule.ruleType === "percent") {
+                amount = Math.round((income * rule.value) / 100 * 100) / 100;
+            } else {
+                amount = rule.value;
+            }
+            if (rule === activeRules[activeRules.length - 1] && rule.ruleType === "percent" && rule.value === 100) {
+                amount = Math.max(0, remaining);
+            }
+            amount = Math.min(amount, Math.max(0, remaining));
+            toInsert.push({ ruleId: rule._id, accountId: rule.accountId, category: rule.category, amount });
+            remaining -= amount;
+        }
+
+        for (const alloc of toInsert) {
+            await ctx.db.insert("allocation_records", {
+                userId: plan.userId,
+                income_plan_id: planId,
+                accountId: alloc.accountId,
+                rule_id: alloc.ruleId,
+                amount: alloc.amount,
+                category: alloc.category,
+                is_forecast: true,
+                verification_status: "pending",
+                createdAt: Date.now(),
+            });
+        }
     },
 });
 
-// Find income transactions that could match a plan
 export const getSuggestedMatches = query({
     args: {
         planId: v.id("income_plans"),
@@ -174,28 +397,25 @@ export const getSuggestedMatches = query({
         const plan = await ctx.db.get(planId);
         if (!plan) return [];
 
-        // Get all income transactions (positive amounts)
         const transactions = await ctx.db
             .query("transactions")
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect();
 
         const expectedDate = new Date(plan.expected_date).getTime();
-        const dayRange = 14 * 24 * 60 * 60 * 1000; // 14 days
+        const dayRange = 14 * 24 * 60 * 60 * 1000;
 
-        // Filter to income transactions near the expected date/amount
         const candidates = transactions
-            .filter((t) => t.amount > 0) // Income only
-            .filter((t) => Math.abs(t.date - expectedDate) <= dayRange) // Within 14 days
+            .filter((t) => t.amount > 0)
+            .filter((t) => Math.abs(t.date - expectedDate) <= dayRange)
             .map((t) => ({
                 ...t,
                 amountDiff: Math.abs(t.amount - plan.expected_amount),
                 dateDiff: Math.abs(t.date - expectedDate),
             }))
-            .sort((a, b) => a.amountDiff - b.amountDiff) // Best amount match first
+            .sort((a, b) => a.amountDiff - b.amountDiff)
             .slice(0, 5);
 
-        // Check which transactions are already matched to other plans
         const allPlans = await ctx.db
             .query("income_plans")
             .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -218,7 +438,6 @@ export const getSuggestedMatches = query({
     },
 });
 
-// Find planned income plans that could match a given transaction (reverse flow)
 export const getPlansForTransaction = query({
     args: {
         transactionId: v.id("transactions"),
@@ -230,9 +449,8 @@ export const getPlansForTransaction = query({
 
         const txDate = transaction.date;
         const txAmount = transaction.amount;
-        const dayRange = 14 * 24 * 60 * 60 * 1000; // 14 days
+        const dayRange = 14 * 24 * 60 * 60 * 1000;
 
-        // Get all planned income plans for this user
         const plans = await ctx.db
             .query("income_plans")
             .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -258,7 +476,6 @@ export const getPlansForTransaction = query({
     },
 });
 
-// Get summary stats for dashboard
 export const getIncomeSummary = query({
     args: { userId: v.id("users") },
     handler: async (ctx, { userId }) => {
@@ -279,21 +496,21 @@ export const getIncomeSummary = query({
         const totalMatched = matched.reduce((sum, p) => sum + (p.actual_amount ?? p.expected_amount), 0);
         const totalMissed = missed.reduce((sum, p) => sum + p.expected_amount, 0);
 
-        // Upcoming: planned income in the future
         const todayStr = now.toISOString().split("T")[0];
         const upcoming = plans
             .filter((p) => p.status === "planned" && p.expected_date >= todayStr)
             .sort((a, b) => a.expected_date.localeCompare(b.expected_date))
             .slice(0, 5);
 
-        // Average monthly income from matched plans in the last 6 months
+        // Average monthly income: sum of matched in last 6 months divided by distinct month count
         const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
         const sixMonthsAgoStr = `${sixMonthsAgo.getFullYear()}-${String(sixMonthsAgo.getMonth() + 1).padStart(2, "0")}`;
         const recentMatched = plans.filter(
             (p) => p.status === "matched" && p.expected_date >= sixMonthsAgoStr && p.expected_date < currentMonth
         );
-        const avgMonthlyIncome = recentMatched.length > 0
-            ? Math.round(recentMatched.reduce((s, p) => s + (p.actual_amount ?? p.expected_amount), 0) / recentMatched.length)
+        const distinctMonths = new Set(recentMatched.map((p) => p.expected_date.slice(0, 7))).size;
+        const avgMonthlyIncome = distinctMonths > 0
+            ? Math.round(recentMatched.reduce((s, p) => s + (p.actual_amount ?? p.expected_amount), 0) / distinctMonths)
             : 0;
 
         return {

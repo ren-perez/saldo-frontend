@@ -15,6 +15,10 @@ export interface IncomePlan {
   notes?: string
   matched_transaction_id?: Id<"transactions">
   date_received?: string
+  schedule_pattern?: {
+    type: string
+    days: number[]
+  }
 }
 
 export interface UnmatchedTransaction {
@@ -29,13 +33,13 @@ export interface AllocationRecord {
   _id: Id<"allocation_records">
   accountId: Id<"accounts">
   accountName: string
+  goalName?: string | null
+  goalEmoji?: string | null
   category: string
   amount: number
   is_forecast: boolean
-  matched_transaction_id?: Id<"transactions">
-  status?: "pending" | "partial" | "complete"
-  matched_amount?: number
-  label?: string
+  verification_status?: "pending" | "reserved" | "verified"
+  transfer_transaction_id?: Id<"transactions">
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -55,8 +59,8 @@ export const statusConfig = {
     dotClass: "border-sky-400 bg-sky-400/10",
     accentColor: "#0ea5e9",
   },
-  distributed: {
-    label: "Distributed",
+  completed: {
+    label: "Completed",
     badgeClass: "border-emerald-500/30 text-emerald-600 bg-emerald-500/10",
     rowClass: "border-border",
     dotClass: "border-emerald-500 bg-emerald-500/10",
@@ -68,21 +72,6 @@ export const statusConfig = {
     rowClass: "border-border",
     dotClass: "border-destructive bg-destructive/10",
     accentColor: "#ef4444",
-  },
-} as const
-
-export const distributionStatusConfig = {
-  pending: {
-    label: "Pending",
-    badgeClass: "border-border text-muted-foreground bg-muted",
-  },
-  partial: {
-    label: "In Progress",
-    badgeClass: "border-amber-500/30 text-amber-600 bg-amber-500/10",
-  },
-  complete: {
-    label: "Done",
-    badgeClass: "border-emerald-500/30 text-emerald-600 bg-emerald-500/10",
   },
 } as const
 

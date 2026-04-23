@@ -196,7 +196,7 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
                 {/* Month header — always visible, clickable to collapse/expand */}
                 <button
                   onClick={() => toggleMonth(group.key)}
-                  className="group flex items-center gap-3 px-2 py-2 sticky top-16 bg-background/60 backdrop-blur-xl z-10 hover:bg-muted/40 rounded-md transition-colors"
+                  className="group flex items-center gap-3 px-2 py-2 sticky top-16 bg-background/60 backdrop-blur-xl z-10 hover:bg-muted/40 transition-colors"
                 >
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0 group-hover:text-foreground transition-colors">
                     {group.label}

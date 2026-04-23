@@ -1,5 +1,5 @@
 // convex/allocations.ts
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
@@ -29,7 +29,6 @@ function calculateAllocations(
             amount = rule.value;
         }
 
-        // Last rule with 100% gets remainder
         if (rule === sortedRules[sortedRules.length - 1] && rule.ruleType === "percent" && rule.value === 100) {
             amount = Math.max(0, remaining);
         }
@@ -68,22 +67,16 @@ export const runAllocationsForPlan = mutation({
             ? plan.actual_amount
             : plan.expected_amount;
         const isForecast = plan.status !== "matched";
+        const verificationStatus = isForecast ? "pending" : "reserved";
 
         const allocations = calculateAllocations(amount, rules);
 
-        // Delete existing records and their transaction matches
+        // Delete existing records
         const existing = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", incomePlanId))
             .collect();
         for (const record of existing) {
-            const matches = await ctx.db
-                .query("allocation_transaction_matches")
-                .withIndex("by_allocation", (q) => q.eq("allocation_record_id", record._id))
-                .collect();
-            for (const match of matches) {
-                await ctx.db.delete(match._id);
-            }
             await ctx.db.delete(record._id);
         }
 
@@ -97,8 +90,7 @@ export const runAllocationsForPlan = mutation({
                 amount: alloc.amount,
                 category: alloc.category,
                 is_forecast: isForecast,
-                status: "pending",
-                matched_amount: 0,
+                verification_status: verificationStatus,
                 createdAt: Date.now(),
             });
         }
@@ -149,7 +141,6 @@ export const previewAllocation = query({
             };
         });
 
-        // Sort: goals first, then accounts
         enriched.sort((a, b) => {
             if (a.goalName && !b.goalName) return -1;
             if (!a.goalName && b.goalName) return 1;
@@ -172,36 +163,35 @@ export const updateAllocationAmount = mutation({
     handler: async (ctx, { recordId, amount }) => {
         const record = await ctx.db.get(recordId);
         if (!record) throw new Error("Allocation record not found");
-
-        // Lock edits only when the entire plan is fully distributed
-        const allRecords = await ctx.db
-            .query("allocation_records")
-            .withIndex("by_income_plan", (q) => q.eq("income_plan_id", record.income_plan_id))
-            .collect();
-        const isFullyDistributed =
-            allRecords.length > 0 && allRecords.every((r) => r.status === "complete");
-        if (isFullyDistributed) throw new Error("Cannot edit a fully distributed income plan");
-
         await ctx.db.patch(recordId, { amount: Math.max(0, amount) });
     },
 });
 
-// Get allocation records for a specific income plan
+// Get allocation records for a specific income plan, enriched with account/goal info
 export const getAllocationsForPlan = query({
     args: { incomePlanId: v.id("income_plans") },
     handler: async (ctx, { incomePlanId }) => {
+        const plan = await ctx.db.get(incomePlanId);
         const records = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", incomePlanId))
             .collect();
 
-        // Enrich with account names
+        const allGoals = plan
+            ? await ctx.db.query("goals").withIndex("by_user", (q) => q.eq("userId", plan.userId)).collect()
+            : [];
+
         const enriched = await Promise.all(
             records.map(async (record) => {
                 const account = await ctx.db.get(record.accountId);
+                const linkedGoal = allGoals.find(
+                    (g) => g.linked_account_id === record.accountId && !g.is_completed
+                );
                 return {
                     ...record,
                     accountName: account?.name ?? "Unknown",
+                    goalName: linkedGoal?.name ?? null,
+                    goalEmoji: linkedGoal?.emoji ?? null,
                 };
             })
         );
@@ -242,7 +232,6 @@ export const getMonthlyForecast = query({
             const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
             const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
-            // Find plans in this month
             const monthPlans = plans.filter((p) => p.expected_date.startsWith(monthStr));
 
             let totalIncome = 0;
@@ -281,323 +270,7 @@ export const getMonthlyForecast = query({
     },
 });
 
-// ─── Distribution Checklist ──────────────────────────────────────────────────
-
-// Get distribution checklist for a matched income plan
-export const getDistributionChecklist = query({
-    args: { incomePlanId: v.id("income_plans") },
-    handler: async (ctx, { incomePlanId }) => {
-        const plan = await ctx.db.get(incomePlanId);
-        if (!plan) return null;
-
-        const records = await ctx.db
-            .query("allocation_records")
-            .withIndex("by_income_plan", (q) => q.eq("income_plan_id", incomePlanId))
-            .collect();
-
-        // Look up goals linked to accounts
-        const allGoals = await ctx.db
-            .query("goals")
-            .withIndex("by_user", (q) => q.eq("userId", plan.userId))
-            .collect();
-
-        const enriched = await Promise.all(
-            records.map(async (record) => {
-                const account = await ctx.db.get(record.accountId);
-                const matches = await ctx.db
-                    .query("allocation_transaction_matches")
-                    .withIndex("by_allocation", (q) => q.eq("allocation_record_id", record._id))
-                    .collect();
-
-                const enrichedMatches = await Promise.all(
-                    matches.map(async (m) => {
-                        const tx = await ctx.db.get(m.transaction_id);
-                        return { ...m, transaction: tx };
-                    })
-                );
-
-                const status = record.status ?? "pending";
-                const matchedAmount = record.matched_amount ?? 0;
-
-                // Find goal linked to this account
-                const linkedGoal = allGoals.find(
-                    (g) => g.linked_account_id === record.accountId && !g.is_completed
-                );
-
-                return {
-                    ...record,
-                    status,
-                    matchedAmount,
-                    accountName: account?.name ?? "Unknown",
-                    matches: enrichedMatches,
-                    remainingAmount: Math.max(0, record.amount - matchedAmount),
-                    goalName: linkedGoal?.name ?? null,
-                    goalEmoji: linkedGoal?.emoji ?? null,
-                    goalId: linkedGoal?._id ?? null,
-                };
-            })
-        );
-
-        // Sort: goals first, then accounts
-        enriched.sort((a, b) => {
-            if (a.goalName && !b.goalName) return -1;
-            if (!a.goalName && b.goalName) return 1;
-            return 0;
-        });
-
-        const totalAmount = plan.actual_amount ?? plan.expected_amount;
-        const totalAllocated = enriched.reduce((s, r) => s + r.amount, 0);
-        const totalMatched = enriched.reduce((s, r) => s + r.matchedAmount, 0);
-        const completedCount = enriched.filter((r) => r.status === "complete").length;
-
-        return {
-            plan,
-            items: enriched,
-            totalAmount,
-            totalAllocated,
-            totalMatched,
-            completedCount,
-            totalItems: enriched.length,
-            progress: totalAllocated > 0 ? totalMatched / totalAllocated : 0,
-            isComplete: enriched.length > 0 && enriched.every((r) => r.status === "complete"),
-            unallocated: Math.max(0, totalAmount - totalAllocated),
-        };
-    },
-});
-
-// Match a transaction to an allocation record
-export const matchAllocationTransaction = mutation({
-    args: {
-        allocationRecordId: v.id("allocation_records"),
-        transactionId: v.id("transactions"),
-        amount: v.number(),
-    },
-    handler: async (ctx, { allocationRecordId, transactionId, amount }) => {
-        const record = await ctx.db.get(allocationRecordId);
-        if (!record) throw new Error("Allocation record not found");
-
-        const tx = await ctx.db.get(transactionId);
-        if (!tx) throw new Error("Transaction not found");
-
-        // Check transaction isn't already matched to another allocation
-        const existing = await ctx.db
-            .query("allocation_transaction_matches")
-            .withIndex("by_transaction", (q) => q.eq("transaction_id", transactionId))
-            .first();
-        if (existing) throw new Error("Transaction already matched to an allocation");
-
-        await ctx.db.insert("allocation_transaction_matches", {
-            userId: record.userId,
-            allocation_record_id: allocationRecordId,
-            transaction_id: transactionId,
-            amount,
-            createdAt: Date.now(),
-        });
-
-        const currentMatched = (record.matched_amount ?? 0) + amount;
-        const newStatus = currentMatched >= record.amount ? "complete" : "partial";
-
-        await ctx.db.patch(allocationRecordId, {
-            matched_amount: currentMatched,
-            status: newStatus,
-        });
-
-        // If this account is linked to an active goal, create a contribution
-        const linkedGoal = await ctx.db
-            .query("goals")
-            .withIndex("by_account", (q) => q.eq("linked_account_id", record.accountId))
-            .first();
-
-        if (linkedGoal && !linkedGoal.is_completed) {
-            const existingContributions = await ctx.db
-                .query("goal_contributions")
-                .withIndex("by_goal", (q) => q.eq("goalId", linkedGoal._id))
-                .collect();
-            const currentTotal = existingContributions.reduce((s, c) => s + c.amount, 0);
-            const remaining = linkedGoal.total_amount - currentTotal;
-            const contributionAmount = Math.min(amount, Math.max(0, remaining));
-
-            if (contributionAmount > 0) {
-                await ctx.db.insert("goal_contributions", {
-                    userId: record.userId,
-                    goalId: linkedGoal._id,
-                    transactionId,
-                    amount: contributionAmount,
-                    contribution_date: new Date(tx.date).toISOString().split("T")[0],
-                    source: "auto",
-                    note: "From allocation match",
-                    createdAt: Date.now(),
-                });
-            }
-        }
-    },
-});
-
-// Unmatch a transaction from an allocation record
-export const unmatchAllocationTransaction = mutation({
-    args: {
-        matchId: v.id("allocation_transaction_matches"),
-    },
-    handler: async (ctx, { matchId }) => {
-        const match = await ctx.db.get(matchId);
-        if (!match) throw new Error("Match not found");
-
-        await ctx.db.delete(matchId);
-
-        // Recalculate matched_amount from remaining matches
-        const remaining = await ctx.db
-            .query("allocation_transaction_matches")
-            .withIndex("by_allocation", (q) => q.eq("allocation_record_id", match.allocation_record_id))
-            .collect();
-        const actualMatched = remaining.reduce((s, m) => s + m.amount, 0);
-
-        const record = await ctx.db.get(match.allocation_record_id);
-        if (!record) return;
-
-        const newStatus = actualMatched >= record.amount ? "complete" : actualMatched > 0 ? "partial" : "pending";
-        await ctx.db.patch(match.allocation_record_id, {
-            matched_amount: actualMatched,
-            status: newStatus,
-        });
-
-        // Remove any goal contributions linked to this transaction
-        const goalContributions = await ctx.db
-            .query("goal_contributions")
-            .withIndex("by_transaction", (q) => q.eq("transactionId", match.transaction_id))
-            .collect();
-        for (const contrib of goalContributions) {
-            await ctx.db.delete(contrib._id);
-        }
-    },
-});
-
-// Mark an allocation as complete (set aside / cash)
-export const markAllocationComplete = mutation({
-    args: {
-        allocationRecordId: v.id("allocation_records"),
-    },
-    handler: async (ctx, { allocationRecordId }) => {
-        const record = await ctx.db.get(allocationRecordId);
-        if (!record) throw new Error("Allocation record not found");
-
-        await ctx.db.patch(allocationRecordId, {
-            status: "complete",
-            matched_amount: record.amount,
-        });
-    },
-});
-
-// Unmark a manually completed allocation
-export const unmarkAllocationComplete = mutation({
-    args: {
-        allocationRecordId: v.id("allocation_records"),
-    },
-    handler: async (ctx, { allocationRecordId }) => {
-        const record = await ctx.db.get(allocationRecordId);
-        if (!record) throw new Error("Allocation record not found");
-
-        const matches = await ctx.db
-            .query("allocation_transaction_matches")
-            .withIndex("by_allocation", (q) => q.eq("allocation_record_id", allocationRecordId))
-            .collect();
-        const actualMatched = matches.reduce((s, m) => s + m.amount, 0);
-        const newStatus = actualMatched >= record.amount ? "complete" : actualMatched > 0 ? "partial" : "pending";
-
-        await ctx.db.patch(allocationRecordId, {
-            status: newStatus,
-            matched_amount: actualMatched,
-        });
-    },
-});
-
-// Get suggested transactions for matching to an allocation
-export const getSuggestedTransactionsForAllocation = query({
-    args: {
-        allocationRecordId: v.id("allocation_records"),
-        userId: v.id("users"),
-    },
-    handler: async (ctx, { allocationRecordId, userId }) => {
-        const record = await ctx.db.get(allocationRecordId);
-        if (!record) return [];
-
-        const plan = await ctx.db.get(record.income_plan_id);
-        if (!plan) return [];
-
-        const dateAnchor = plan.date_received
-            ? new Date(plan.date_received).getTime()
-            : new Date(plan.expected_date).getTime();
-        const dayRange = 30 * 24 * 60 * 60 * 1000;
-        const remainingAmount = record.amount - (record.matched_amount ?? 0);
-
-        // Get transactions for this account
-        const transactions = await ctx.db
-            .query("transactions")
-            .withIndex("by_account", (q) => q.eq("accountId", record.accountId))
-            .collect();
-
-        // Get already-matched transaction IDs
-        const allMatches = await ctx.db
-            .query("allocation_transaction_matches")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-        const matchedTxIds = new Set(allMatches.map((m) => m.transaction_id.toString()));
-
-        const candidates = transactions
-            .filter((t) => !matchedTxIds.has(t._id.toString()))
-            .filter((t) => Math.abs(t.date - dateAnchor) <= dayRange)
-            .map((t) => ({
-                ...t,
-                amountDiff: Math.abs(Math.abs(t.amount) - remainingAmount),
-                dateDiff: Math.abs(t.date - dateAnchor),
-            }))
-            .sort((a, b) => a.amountDiff - b.amountDiff)
-            .slice(0, 10);
-
-        return candidates;
-    },
-});
-
-// Get active (incomplete) distributions for dashboard
-export const getActiveDistributions = query({
-    args: { userId: v.id("users") },
-    handler: async (ctx, { userId }) => {
-        const plans = await ctx.db
-            .query("income_plans")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        const matched = plans.filter((p) => p.status === "matched");
-        const active = [];
-
-        for (const plan of matched) {
-            const records = await ctx.db
-                .query("allocation_records")
-                .withIndex("by_income_plan", (q) => q.eq("income_plan_id", plan._id))
-                .collect();
-
-            if (records.length === 0) continue;
-
-            const allComplete = records.every((r) => (r.status ?? "pending") === "complete");
-            if (!allComplete) {
-                const totalMatched = records.reduce((s, r) => s + (r.matched_amount ?? 0), 0);
-                const totalAmount = records.reduce((s, r) => s + r.amount, 0);
-                const completedCount = records.filter((r) => (r.status ?? "pending") === "complete").length;
-                active.push({
-                    plan,
-                    totalItems: records.length,
-                    completedItems: completedCount,
-                    totalAmount,
-                    totalMatched,
-                    progress: totalAmount > 0 ? totalMatched / totalAmount : 0,
-                });
-            }
-        }
-
-        return active;
-    },
-});
-
-// Add a single allocation record to an income plan (for quick add in checklist)
+// Add a single allocation record to an income plan
 export const addAllocationRecord = mutation({
     args: {
         incomePlanId: v.id("income_plans"),
@@ -609,7 +282,6 @@ export const addAllocationRecord = mutation({
         const plan = await ctx.db.get(incomePlanId);
         if (!plan) throw new Error("Plan not found");
 
-        // Use a dummy rule_id — find an existing rule for this account or use the first rule
         const rules = await ctx.db
             .query("allocation_rules")
             .withIndex("by_user", (q) => q.eq("userId", plan.userId))
@@ -625,31 +297,173 @@ export const addAllocationRecord = mutation({
             amount: Math.max(0, amount),
             category,
             is_forecast: plan.status !== "matched",
-            status: "pending",
-            matched_amount: 0,
+            verification_status: plan.status === "matched" ? "reserved" : "pending",
             createdAt: Date.now(),
         });
     },
 });
 
-// Delete a single allocation record (for quick remove in checklist)
+// Delete a single allocation record
 export const deleteAllocationRecord = mutation({
     args: {
         recordId: v.id("allocation_records"),
     },
     handler: async (ctx, { recordId }) => {
-        const record = await ctx.db.get(recordId);
-        if (!record) throw new Error("Allocation record not found");
-
-        // Delete any transaction matches first
-        const matches = await ctx.db
-            .query("allocation_transaction_matches")
-            .withIndex("by_allocation", (q) => q.eq("allocation_record_id", recordId))
-            .collect();
-        for (const match of matches) {
-            await ctx.db.delete(match._id);
-        }
-
         await ctx.db.delete(recordId);
+    },
+});
+
+// Passive verification: scan for transfers from income account → goal accounts
+// Call fire-and-forget after match. Marks allocations as "verified" when transfer is found.
+export const verifyAllocations = mutation({
+    args: {
+        planId: v.id("income_plans"),
+    },
+    handler: async (ctx, { planId }) => {
+        const plan = await ctx.db.get(planId);
+        if (!plan || plan.status !== "matched" || !plan.date_received) return;
+
+        const incomeAccount = plan.matched_transaction_id
+            ? (await ctx.db.get(plan.matched_transaction_id))?.accountId
+            : undefined;
+
+        const records = await ctx.db
+            .query("allocation_records")
+            .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
+            .collect();
+
+        const dateAnchor = new Date(plan.date_received).getTime();
+        const windowMs = 10 * 24 * 60 * 60 * 1000; // 10 days (covers weekends)
+
+        for (const record of records) {
+            if (record.verification_status === "verified") continue;
+
+            // Scan transactions to the allocation's target account (inflow)
+            const inflows = await ctx.db
+                .query("transactions")
+                .withIndex("by_account", (q) => q.eq("accountId", record.accountId))
+                .collect();
+
+            const amountTolerance = record.amount * 0.05;
+
+            for (const tx of inflows) {
+                if (Math.abs(tx.date - dateAnchor) > windowMs) continue;
+                if (Math.abs(tx.amount - record.amount) > amountTolerance) continue;
+
+                // Gold standard check: if we know the income account, verify outflow matches
+                if (incomeAccount) {
+                    const outflows = await ctx.db
+                        .query("transactions")
+                        .withIndex("by_account", (q) => q.eq("accountId", incomeAccount))
+                        .collect();
+                    const matchingOutflow = outflows.find(
+                        (o) =>
+                            o.amount < 0 &&
+                            Math.abs(Math.abs(o.amount) - record.amount) <= amountTolerance &&
+                            Math.abs(o.date - dateAnchor) <= windowMs
+                    );
+                    if (!matchingOutflow) continue; // outflow didn't exist → likely false positive
+                }
+
+                await ctx.db.patch(record._id, {
+                    verification_status: "verified",
+                    transfer_transaction_id: tx._id,
+                });
+                break;
+            }
+        }
+    },
+});
+
+// One-time migration: strip deprecated pre-refactor fields from allocation_records
+export const migrateStripDeprecatedFields = mutation({
+    args: {},
+    handler: async (ctx) => {
+        const records = await ctx.db.query("allocation_records").collect();
+        let patched = 0;
+        for (const record of records) {
+            if (record.matched_amount !== undefined || record.status !== undefined || record.label !== undefined || record.matched_transaction_id !== undefined) {
+                await ctx.db.patch(record._id, {
+                    matched_amount: undefined,
+                    status: undefined,
+                    label: undefined,
+                    matched_transaction_id: undefined,
+                });
+                patched++;
+            }
+        }
+        return { patched };
+    },
+});
+
+// Observer: called whenever a transaction lands in any account.
+// If the account is goal-linked, scans reserved allocations and verifies matches.
+export const verifyAccountAllocations = internalMutation({
+    args: { accountId: v.id("accounts") },
+    handler: async (ctx, { accountId }) => {
+        const linkedGoal = await ctx.db
+            .query("goals")
+            .withIndex("by_account", (q) => q.eq("linked_account_id", accountId))
+            .first();
+        if (!linkedGoal) return;
+
+        const allRecords = await ctx.db
+            .query("allocation_records")
+            .withIndex("by_account", (q) => q.eq("accountId", accountId))
+            .collect();
+
+        // Track already-claimed transfer IDs to prevent double-matching
+        const usedTxIds = new Set(
+            allRecords
+                .filter((r) => r.transfer_transaction_id)
+                .map((r) => r.transfer_transaction_id!.toString())
+        );
+
+        const reserved = allRecords.filter(
+            (r) => r.verification_status === "reserved" && !r.transfer_transaction_id
+        );
+        if (reserved.length === 0) return;
+
+        // Enrich with plan date and sort oldest-first so earlier months get priority
+        const enriched: Array<{ record: typeof reserved[0]; dateAnchor: string }> = [];
+        for (const r of reserved) {
+            const plan = await ctx.db.get(r.income_plan_id);
+            if (plan?.status === "matched") {
+                enriched.push({
+                    record: r,
+                    dateAnchor: plan.date_received ?? plan.expected_date,
+                });
+            }
+        }
+        enriched.sort((a, b) => a.dateAnchor.localeCompare(b.dateAnchor));
+
+        const inflows = (
+            await ctx.db
+                .query("transactions")
+                .withIndex("by_account", (q) => q.eq("accountId", accountId))
+                .collect()
+        ).filter((t) => t.amount > 0);
+
+        const windowMs = 10 * 24 * 60 * 60 * 1000;
+
+        for (const { record, dateAnchor } of enriched) {
+            const anchor = new Date(dateAnchor).getTime();
+            const tolerance = record.amount * 0.05;
+
+            const match = inflows.find(
+                (t) =>
+                    !usedTxIds.has(t._id.toString()) &&
+                    Math.abs(t.date - anchor) <= windowMs &&
+                    Math.abs(t.amount - record.amount) <= tolerance
+            );
+
+            if (match) {
+                await ctx.db.patch(record._id, {
+                    verification_status: "verified",
+                    transfer_transaction_id: match._id,
+                });
+                usedTxIds.add(match._id.toString());
+            }
+        }
     },
 });

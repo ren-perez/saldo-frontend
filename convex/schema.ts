@@ -124,10 +124,11 @@ export default defineSchema({
         userId: v.id("users"),
         goalId: v.id("goals"),
         transactionId: v.optional(v.id("transactions")),
+        income_plan_id: v.optional(v.id("income_plans")), // set when created from income allocation
         amount: v.number(),
         note: v.optional(v.string()),
         contribution_date: v.string(),
-        source: v.string(), // "manual_ui" | "manual_tx" | "import" | "auto"
+        source: v.string(), // "manual_ui" | "manual_tx" | "import" | "auto" | "income_allocation"
         transfer_pair_id: v.optional(v.string()), // For goal-to-goal transfers
         is_withdrawal: v.optional(v.boolean()), // Track negative contributions
         createdAt: v.number(),
@@ -135,6 +136,7 @@ export default defineSchema({
     }).index("by_user", ["userId"])
         .index("by_goal", ["goalId"])
         .index("by_transaction", ["transactionId"])
+        .index("by_income_plan", ["income_plan_id"])
         .index("by_transfer_pair", ["transfer_pair_id"])
         .index("by_source", ["source"])
         .index("by_date", ["contribution_date"]),
@@ -245,12 +247,16 @@ export default defineSchema({
         expected_date: v.string(),      // ISO date string "2026-02-15"
         expected_amount: v.number(),
         label: v.string(),              // e.g. "Acme Corp", "Freelance"
-        recurrence: v.string(),         // "none" | "weekly" | "biweekly" | "monthly"
+        recurrence: v.string(),         // "once" | "weekly" | "biweekly" | "monthly" | "quarterly" | "annually"
         status: v.string(),             // "planned" | "matched" | "missed"
         notes: v.optional(v.string()),
         matched_transaction_id: v.optional(v.id("transactions")),
         actual_amount: v.optional(v.number()),
         date_received: v.optional(v.string()),
+        schedule_pattern: v.optional(v.object({
+            type: v.string(),           // "monthly_dates"
+            days: v.array(v.number()), // e.g. [5, 20]
+        })),
         createdAt: v.number(),
     }).index("by_user", ["userId"])
         .index("by_status", ["status"])
@@ -273,25 +279,19 @@ export default defineSchema({
         accountId: v.id("accounts"),
         rule_id: v.id("allocation_rules"),
         amount: v.number(),
-        category: v.string(),           // denormalized from rule
-        is_forecast: v.boolean(),       // true = planned, false = matched/actual
-        status: v.optional(v.string()),           // "pending" | "partial" | "complete"
-        matched_amount: v.optional(v.number()),   // sum of matched transaction amounts
-        label: v.optional(v.string()),            // optional display name override
+        category: v.string(),
+        is_forecast: v.boolean(),
+        verification_status: v.optional(v.string()),
+        transfer_transaction_id: v.optional(v.id("transactions")),
         createdAt: v.number(),
+        // Deprecated pre-refactor fields — kept optional to avoid rejecting old documents
+        matched_amount: v.optional(v.number()),
+        status: v.optional(v.string()),
+        label: v.optional(v.string()),
+        matched_transaction_id: v.optional(v.id("transactions")),
     }).index("by_user", ["userId"])
         .index("by_income_plan", ["income_plan_id"])
         .index("by_account", ["accountId"]),
-
-    allocation_transaction_matches: defineTable({
-        userId: v.id("users"),
-        allocation_record_id: v.id("allocation_records"),
-        transaction_id: v.id("transactions"),
-        amount: v.number(),
-        createdAt: v.number(),
-    }).index("by_allocation", ["allocation_record_id"])
-        .index("by_transaction", ["transaction_id"])
-        .index("by_user", ["userId"]),
 
     ignored_transfer_pairs: defineTable({
         userId: v.id("users"),

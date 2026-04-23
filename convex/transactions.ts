@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { matchDescription, matchDescriptionWithRule, CategoryRule } from "./rulesEngine";
+import { internal } from "./_generated/api";
 
 const normalizeDescription = (description: string): string => {
     return description.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -142,6 +143,11 @@ export const importTransactions = mutation({
             }
         }
 
+        // Observer: if any transactions were inserted, sweep goal allocations for this account
+        if (inserted.length > 0) {
+            await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
+        }
+
         // ✅ ALWAYS create import session (no conditional)
         await ctx.db.insert("import_sessions", {
             sessionId,
@@ -266,6 +272,9 @@ export const resolveDuplicates = mutation({
                 });
             }
         }
+
+        // Observer: sweep goal allocations for this account after duplicate resolution
+        await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
 
         // Update session status
         await ctx.db.patch(session._id, {
@@ -862,6 +871,10 @@ export const addAsNewTransaction = mutation({
             importId: newTransactionData.importId,
         });
 
+        if (newTransactionData.amount > 0) {
+            await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
+        }
+
         return { success: true, transactionId: insertedId };
     },
 });
@@ -956,6 +969,10 @@ export const createManualTransaction = mutation({
             appliedRuleId: ruleMatch?.ruleId ?? undefined,
             createdAt: Date.now(),
         });
+
+        if (amount > 0) {
+            await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
+        }
 
         return { success: true, transactionId: insertedId };
     },
