@@ -18,8 +18,8 @@ import {
   CircleDashed,
   Plus,
   Trash2,
-  Sparkles,
   ShieldCheck,
+  Check,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -73,7 +73,7 @@ function ProgressBarOnly({
   return (
     <button
       onClick={onClick}
-      className="w-full flex flex-col gap-2 text-left cursor-pointer group"
+      className="w-full flex flex-col gap-2 text-left cursor-pointer group px-6 py-6"
     >
       <div className="flex h-1.5 rounded-full overflow-hidden bg-muted">
         {allocations.map((a, i) => (
@@ -89,25 +89,25 @@ function ProgressBarOnly({
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
+      <div className="flex flex-wrap gap-x-8 gap-y-1">
         {allocations.map((a, i) => (
           <div key={a._id} className="flex items-center gap-1.5" style={{ opacity: a.is_forecast ? 0.55 : 1 }}>
             <div
               className="size-1.5 rounded-full shrink-0"
               style={{ backgroundColor: allocColors[i % allocColors.length] }}
             />
-            <span className="text-[10px] text-muted-foreground tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {a.accountName} · {formatCurrency(a.amount)}
-              {a.is_forecast ? " ·" : ""}
+              {/* {a.is_forecast ? " ·" : ""} */}
             </span>
-            {a.is_forecast && (
-              <span className="text-[9px] text-muted-foreground/60 italic">forecast</span>
-            )}
+            {/* {a.is_forecast && (
+              <span className="text-xs text-muted-foreground/60 italic">forecast</span>
+            )} */}
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
         <span>
           {formatCurrency(totalAllocated)} of {formatCurrency(total)} allocated
         </span>
@@ -255,10 +255,10 @@ function AllocationRows({
             <DropdownMenuTrigger asChild>
               <Button
                 size="sm"
-                variant="ghost"
-                className="h-6 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                variant="outline"
+                className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground"
               >
-                <Plus className="size-2.5" />
+                <Plus className="size-3" />
                 Add
               </Button>
             </DropdownMenuTrigger>
@@ -307,12 +307,12 @@ function AllocationRows({
 
           <Button
             size="sm"
-            variant="outline"
-            className="h-6 text-[10px] gap-1"
+            variant="ghost"
+            className="h-6 text-xs gap-1"
             onClick={() => runAllocations({ userId, incomePlanId: planId })}
           >
-            <RotateCcw className="size-2.5" />
-            Reset to rules
+            <RotateCcw className="size-3" />
+            Reset to default
           </Button>
         </div>
       )}
@@ -383,70 +383,70 @@ export function IncomePlanCard({
       )}
       <CardContent className="p-0">
         {/* ── Main row ── */}
-        <div className="flex items-center gap-3 px-4 pt-4 pb-4">
-          <div
-            className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full border-2",
-              config.dotClass,
-              isCompleted && "animate-check-bounce"
-            )}
-          >
-            <StatusIcon className="size-3.5" />
-          </div>
-
-          <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 px-6 pb-6">
+          <div className="flex flex-1 flex-col gap-2 min-w-0">
+            {/* Label + status icon/badge on the right */}
+            <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-foreground truncate">
                 {plan.label}
               </span>
-              <Badge className={cn("text-[10px] shrink-0 border", config.badgeClass)}>
-                {config.label}
-              </Badge>
-              {plan.recurrence !== "once" && (
-                <Badge variant="outline" className="text-[10px] capitalize shrink-0">
-                  {plan.recurrence}
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-              <span className="flex items-center gap-1">
-                <Calendar className="size-3" />
-                {formatDate(plan.expected_date)}
-              </span>
-              {plan.date_received && plan.date_received !== plan.expected_date && (
-                <span className="text-emerald-600">
-                  Received {formatDate(plan.date_received)}
-                </span>
-              )}
-              {hasDiff && (
-                <span
-                  className={
-                    plan.actual_amount! > plan.expected_amount
-                      ? "text-emerald-600"
-                      : "text-amber-600"
-                  }
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div
+                  className={cn(
+                    "flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                    config.dotClass,
+                    isCompleted && "animate-check-bounce"
+                  )}
                 >
-                  {plan.actual_amount! > plan.expected_amount ? "+" : ""}
-                  {formatCurrency(plan.actual_amount! - plan.expected_amount)} vs expected
-                </span>
-              )}
+                  <StatusIcon className="size-2.5" />
+                </div>
+                <Badge className={cn("text-[10px] shrink-0 border", config.badgeClass)}>
+                  {config.label}
+                </Badge>
+              </div>
             </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+
+              {/* Date + recurrency grouped (different things, same row) */}
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Calendar className="size-3" />
+                  {formatDate(plan.expected_date)}
+                </span>
+                {plan.recurrence !== "once" && (
+                  <Badge variant="outline" className="text-[10px] capitalize shrink-0">
+                    {plan.recurrence}
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Conditional: received date & amount diff */}
+            {((plan.date_received && plan.date_received !== plan.expected_date) || hasDiff) && (
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+                {plan.date_received && plan.date_received !== plan.expected_date && (
+                  <span className="text-emerald-600">
+                    Received {formatDate(plan.date_received)}
+                  </span>
+                )}
+                {hasDiff && (
+                  <span
+                    className={
+                      plan.actual_amount! > plan.expected_amount
+                        ? "text-emerald-600"
+                        : "text-amber-600"
+                    }
+                  >
+                    {plan.actual_amount! > plan.expected_amount ? "+" : ""}
+                    {formatCurrency(plan.actual_amount! - plan.expected_amount)} vs expected
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {isPlanned && smartMatch && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
-                onClick={() => onMatchClick(plan, smartMatch._id)}
-                title={`Suggested: ${smartMatch.description}`}
-              >
-                <Sparkles className="size-3" />
-                Suggested Match
-              </Button>
-            )}
-
             <div className="text-right">
               <div className="text-sm font-semibold tabular-nums text-foreground">
                 {formatCurrency(displayAmount)}
@@ -538,9 +538,43 @@ export function IncomePlanCard({
           </div>
         </div>
 
+        {/* ── Smart Match CTA ── */}
+        {isPlanned && smartMatch && (
+          <div className="border-t border-emerald-500/20 bg-emerald-500/[0.07] px-6 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 leading-snug">
+                  Found {formatCurrency(smartMatch.amount)} from {smartMatch.description}
+                </span>
+                <span className="text-[11px] text-emerald-600/80">
+                  {new Date(smartMatch.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · Is this it?
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => onMatchClick(plan, smartMatch._id)}
+                >
+                  <Check className="size-3" />
+                  Yes, match it
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => onMatchClick(plan)}
+                >
+                  Not this one
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Progress bar ── */}
         {allocations && allocations.length > 0 && (
-          <div className="border-t border-border px-4 pt-6 pb-6">
+          <div className="border-t border-border">
             <ProgressBarOnly
               allocations={allocations}
               total={displayAmount}
@@ -558,7 +592,8 @@ export function IncomePlanCard({
           )}
         >
           <div className="overflow-hidden">
-            <div className="border-t border-border px-4 pt-3 pb-3">
+            {/* <div className="border-t border-border px-6 pt-3 pb-3"> */}
+            <div className="px-6 pb-3">
               {allocations === undefined ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="size-3 animate-spin" />
