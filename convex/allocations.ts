@@ -337,6 +337,8 @@ export const verifyAllocations = mutation({
 
         for (const record of records) {
             if (record.verification_status === "verified") continue;
+            // Refill allocations (target == income account) are auto-verified on match — skip them here
+            if (incomeAccount && record.accountId === incomeAccount) continue;
 
             // Scan transactions to the allocation's target account (inflow)
             const inflows = await ctx.db
@@ -372,6 +374,86 @@ export const verifyAllocations = mutation({
                 break;
             }
         }
+    },
+});
+
+// Monthly Safe to Spend context: refill pool vs actual expenses
+export const getMonthlyBudgetContext = query({
+    args: {
+        userId: v.id("users"),
+        monthKey: v.string(), // "YYYY-MM"
+    },
+    handler: async (ctx, { userId, monthKey }) => {
+        // Identify refill rules for this user
+        const rules = await ctx.db
+            .query("allocation_rules")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+        const refillRuleIds = new Set(
+            rules.filter((r) => r.scope === "refill").map((r) => r._id.toString())
+        );
+
+        // Sum refill allocation amounts across all plans in this month
+        const plans = await ctx.db
+            .query("income_plans")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+        const monthPlans = plans.filter((p) => p.expected_date.startsWith(monthKey));
+
+        let totalPool = 0;
+        for (const plan of monthPlans) {
+            const records = await ctx.db
+                .query("allocation_records")
+                .withIndex("by_income_plan", (q) => q.eq("income_plan_id", plan._id))
+                .collect();
+            for (const record of records) {
+                if (refillRuleIds.has(record.rule_id.toString())) {
+                    totalPool += record.amount;
+                }
+            }
+        }
+
+        // Build category -> transactionType map for reimbursement detection
+        const categories = await ctx.db.query("categories").collect();
+        const categoryTypeMap = new Map(
+            categories
+                .filter((c) => c.transactionType)
+                .map((c) => [c._id.toString(), c.transactionType!])
+        );
+
+        // Sum expense transactions in this month: negative, not a transfer
+        const [year, month] = monthKey.split("-").map(Number);
+        const startMs = new Date(year, month - 1, 1).getTime();
+        const endMs = new Date(year, month, 1).getTime();
+
+        const allTx = await ctx.db
+            .query("transactions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+
+        const monthTx = allTx.filter(
+            (t) => t.date >= startMs && t.date < endMs && t.transactionType !== "transfer"
+        );
+
+        let grossSpent = 0;
+        let reimbursements = 0;
+        for (const t of monthTx) {
+            const catType = t.categoryId ? categoryTypeMap.get(t.categoryId.toString()) : undefined;
+            const isReimbursement = t.amount > 0 && (t.transactionType === "expense" || catType === "expense");
+            if (isReimbursement) {
+                reimbursements += t.amount;
+            } else if (t.amount < 0) {
+                grossSpent += Math.abs(t.amount);
+            }
+        }
+        const totalSpent = Math.max(0, grossSpent - reimbursements);
+
+        return {
+            monthKey,
+            totalPool: Math.round(totalPool * 100) / 100,
+            totalSpent: Math.round(totalSpent * 100) / 100,
+            remaining: Math.round((totalPool - totalSpent) * 100) / 100,
+        };
     },
 });
 

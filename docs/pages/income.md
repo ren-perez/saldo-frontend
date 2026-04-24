@@ -189,6 +189,15 @@ Progress bar: segmented by allocation, forecast at 50% opacity.
 
 `percent` or `fixed` rules per account/category. Drives `runAllocationsForPlan`.
 
+**Rule scope (new type distinction):**
+
+| Type | Description | Verification |
+|---|---|---|
+| `transfer` | Move money to a different account (Goal, Debt) | System watches for matching bank transaction inflow |
+| `refill` | Stay in the income account (Spending / Cash-in-Hand) | Auto-verified when target account == income receiving account |
+
+Rules are **execution engine instructions**, not just calculators. On match, they fire automatically — no manual "Mark as Transferred" step needed.
+
 ### ~~`allocation_transaction_matches`~~ — **DELETED**
 
 Removed. Allocation-to-transaction matching is no longer a feature.
@@ -225,6 +234,38 @@ Removed. Allocation-to-transaction matching is no longer a feature.
 | `addAllocationRecord` | mutation | Add single record to plan |
 | `deleteAllocationRecord` | mutation | Delete single record |
 | `verifyAllocations` | mutation | Passive scan: links transfer transactions to allocations; fire-and-forget after match |
+
+---
+
+## Safe to Spend Auto-Verification
+
+If an allocation's `accountId` is the **same** as the income plan's receiving account, the system auto-verifies it on match without waiting for a transfer. This creates a "Safe to Spend" pool immediately.
+
+**Rule:** `allocation.accountId === income_receiving_account → verification_status = "verified"` (on match)
+
+This is the mechanism for `refill`-type rules. The money never moves — it's already there.
+
+---
+
+## Budget Architecture (Decoupled from Income)
+
+Expenses are **not** tracked per income plan. The model is:
+
+- **Income → fills "Safe to Spend" pool** via `refill` allocations (auto-verified on match)
+- **Monthly targets → track the drain** independently of which paycheck funded it
+
+Chosen approach: **burn rate gauge** (single "Safe to Spend" pool for the month, not strict per-category limits).
+
+```
+Income arrives ($2,000)
+  ├── Transfer rules → Reserved → Observer waits for bank confirmation
+  └── Refill rules  → Auto-Verified → Safe to Spend pool charges up
+
+Monthly expenses → categorized → drain the Safe to Spend gauge
+  (no link back to a specific paycheck)
+```
+
+Budget engine is a **future feature** — this section documents the intended architecture so allocation rule design decisions are made correctly now.
 
 ---
 
@@ -314,6 +355,15 @@ MatchIncomeDialog       → getSuggestedMatches + getAllocationsForPlan
 ---
 
 ## Changelog
+
+### 2026-04-23 (Architecture: Rules + Budget Decoupling)
+- **[Architecture]** Allocation rules promoted to execution engine instructions (not just calculators)
+- **[Architecture]** Defined two rule scopes: `transfer` (waits for bank verification) and `refill` (auto-verifies when target == receiving account)
+- **[Architecture]** Safe to Spend auto-verification: `refill` allocations whose target account == income receiving account get `verified` on match — no transfer needed
+- **[Architecture]** Budget decoupled from income: income fills a monthly Safe to Spend pool; expenses drain it without linking to a specific paycheck
+- **[Architecture]** Chosen budgeting approach: burn rate gauge (not per-category limits)
+- **[Planned cleanup]** Remove manual verification UI from allocation rules (no "Mark as Transferred" buttons)
+- **[Planned cleanup]** Remove redundant `is_active` / complex status flags from `allocation_rules` once rule `type` field is added
 
 ### 2026-04-22 (MVP Refactor)
 - **[Model]** New core model: Plan → Match (1-click) → System executes allocations → passive verification → JIT next plan

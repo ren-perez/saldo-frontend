@@ -9,7 +9,7 @@ import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import {
     Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus, Info,
-    CreditCard, ArrowUp, ArrowDown, ArrowUpDown, Link2
+    CreditCard, ArrowUp, ArrowDown, ArrowUpDown, Link2, Pencil
 } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/CreateTransactionDialog";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -226,6 +226,7 @@ interface MobileTransactionCardProps {
     onUpdate: (updates: TransactionUpdateData) => void;
     onUpdateByGroup: (groupId: string | undefined, clearGroup: boolean) => void;
     onPair: () => void;
+    onEdit: () => void;
 }
 
 function MobileTransactionCard({
@@ -244,6 +245,7 @@ function MobileTransactionCard({
     onUpdate,
     onUpdateByGroup,
     onPair,
+    onEdit,
 }: MobileTransactionCardProps) {
     const getFilteredCategoryOptions = (transactionType: string | undefined, selectedGroupId: string | undefined) => {
         let filtered = categories || [];
@@ -311,12 +313,22 @@ function MobileTransactionCard({
                                 {transaction.description || "—"}
                             </PopoverContent>
                         </Popover>
-                        <span className={cn(
-                            "text-sm font-mono font-semibold flex-shrink-0",
-                            transaction.amount > 0 ? "text-green-600" : "text-red-500"
-                        )}>
-                            {transaction.amount > 0 ? "+" : ""}{currencyExact(transaction.amount)}
-                        </span>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className={cn(
+                                "text-sm font-mono font-semibold",
+                                transaction.amount > 0 ? "text-green-600" : "text-red-500"
+                            )}>
+                                {transaction.amount > 0 ? "+" : ""}{currencyExact(transaction.amount)}
+                            </span>
+                            {!isDeleteMode && !isExportMode && (
+                                <button
+                                    onClick={onEdit}
+                                    className="text-muted-foreground hover:text-foreground p-0.5"
+                                >
+                                    <Pencil className="h-3 w-3" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                     {/* Sub info: date + account */}
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -477,6 +489,7 @@ function TransactionsContent() {
     const [pairDialogTx, setPairDialogTx] = useState<Transaction | null>(null);
 
     const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
     useEffect(() => {
         const accountId = searchParams.get("accountId");
@@ -1117,6 +1130,7 @@ function TransactionsContent() {
                                                 })
                                             }
                                             onPair={() => setPairDialogTx(transaction)}
+                                            onEdit={() => setEditingTransaction(transaction)}
                                         />
                                     );
                                 })}
@@ -1351,7 +1365,21 @@ function TransactionsContent() {
                                                         </TableCell>
                                                         {!deleteMode && (
                                                             <TableCell className="w-10 pr-6">
-                                                                {/* intentionally empty — use delete mode for deletes */}
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                                                                onClick={() => setEditingTransaction(transaction)}
+                                                                            >
+                                                                                <Pencil className="h-3.5 w-3.5" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Edit transaction</TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
                                                             </TableCell>
                                                         )}
                                                     </TableRow>
@@ -1424,8 +1452,13 @@ function TransactionsContent() {
                 </div>
             </AppLayout>
 
-            {/* Create Transaction Dialog */}
+            {/* Create / Edit Transaction Dialog */}
             <CreateTransactionDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
+            <CreateTransactionDialog
+                open={!!editingTransaction}
+                onOpenChange={(open) => { if (!open) setEditingTransaction(null); }}
+                transaction={editingTransaction ?? undefined}
+            />
 
             {/* Bulk Delete Confirmation */}
             <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>

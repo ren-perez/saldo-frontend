@@ -22,10 +22,12 @@ export const createRule = mutation({
         value: v.number(),
         priority: v.number(),
         active: v.boolean(),
+        scope: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         return await ctx.db.insert("allocation_rules", {
             ...args,
+            scope: args.scope ?? "transfer",
             createdAt: Date.now(),
         });
     },
@@ -39,6 +41,7 @@ export const updateRule = mutation({
         value: v.optional(v.number()),
         priority: v.optional(v.number()),
         active: v.optional(v.boolean()),
+        scope: v.optional(v.string()),
     },
     handler: async (ctx, { ruleId, ...updates }) => {
         const cleaned = Object.fromEntries(

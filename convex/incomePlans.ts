@@ -191,12 +191,15 @@ export const matchIncomePlan = mutation({
             }
         }
 
-        // Reserve allocations and update amounts if needed
+        // Reserve allocations and update amounts.
+        // Refill allocations (target == income account) auto-verify immediately — no transfer needed.
+        const incomeAccountId = transaction.accountId;
         for (const record of records) {
             const newAmount = allocationAmounts.get(record._id.toString()) ?? record.amount;
+            const isRefill = record.accountId === incomeAccountId;
             await ctx.db.patch(record._id, {
                 is_forecast: false,
-                verification_status: "reserved",
+                verification_status: isRefill ? "verified" : "reserved",
                 amount: newAmount,
             });
         }

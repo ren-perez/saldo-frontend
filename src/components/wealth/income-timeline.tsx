@@ -17,6 +17,8 @@ import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { IncomePlan, formatCurrency } from "./income-shared"
+import { cn } from "@/lib/utils"
+import { currencyExact } from "@/lib/format"
 import { format } from "date-fns"
 import { IncomePlanCard } from "./income-plan-card"
 import { IncomeFormDialog } from "./income-form-dialog"
@@ -98,6 +100,11 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
     api.incomePlans.listIncomePlans,
     userId ? { userId } : "skip"
   ) as IncomePlan[] | undefined
+
+  const currentMonthBudget = useQuery(
+    api.allocations.getMonthlyBudgetContext,
+    userId ? { userId, monthKey: CURRENT_MONTH_KEY } : "skip"
+  )
 
   // Group by month, newest first
   const grouped = useMemo(() => {
@@ -203,6 +210,19 @@ export function IncomeTimeline({ externalFormOpen, onExternalFormOpenChange }: {
                   </h3>
                   <div className="flex-1 h-px bg-border" />
                   <div className="flex items-center gap-3 shrink-0">
+                    {/* Safe to Spend mini-pill — current month only */}
+                    {group.key === CURRENT_MONTH_KEY && currentMonthBudget && currentMonthBudget.totalPool > 0 && (
+                      <span className={cn(
+                        "text-[10px] font-medium px-1.5 py-0.5 rounded-full tabular-nums",
+                        currentMonthBudget.remaining < 0
+                          ? "bg-destructive/10 text-destructive"
+                          : currentMonthBudget.remaining < currentMonthBudget.totalPool * 0.1
+                          ? "bg-amber-500/10 text-amber-600"
+                          : "bg-emerald-500/10 text-emerald-600"
+                      )}>
+                        {currentMonthBudget.remaining < 0 ? "-" : ""}{currencyExact(Math.abs(currentMonthBudget.remaining))} to spend
+                      </span>
+                    )}
                     {group.isComplete ? (
                       <span className="flex items-center gap-1 text-xs font-medium tabular-nums text-emerald-600">
                         <Check className="size-3" />

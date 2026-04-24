@@ -26,11 +26,12 @@ import { currencyExact } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
   Trash2, ArrowUp, ArrowDown, Dot, MoreHorizontal, Power,
-  Plus, SlidersHorizontal, Loader2,
+  Plus, SlidersHorizontal, Loader2, ArrowRightLeft, Wallet,
 } from "lucide-react"
 
 type AllocationCategory = "savings" | "investing" | "spending" | "debt"
 type RuleType = "percent" | "fixed"
+type RuleScope = "transfer" | "refill"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,7 @@ export function AllocationsView({
     category: "savings" as AllocationCategory,
     ruleType: "fixed" as RuleType,
     value: "",
+    scope: "transfer" as RuleScope,
   })
 
   const sortedRules = rules ?? []
@@ -139,7 +141,7 @@ export function AllocationsView({
 
   function resetForm() {
     setAttempted(false)
-    setForm({ accountId: "", category: "savings", ruleType: "fixed", value: "" })
+    setForm({ accountId: "", category: "savings", ruleType: "fixed", value: "", scope: "transfer" })
   }
 
   async function handleAdd() {
@@ -149,11 +151,12 @@ export function AllocationsView({
     await createRule({
       userId: convexUser._id,
       accountId: form.accountId as Id<"accounts">,
-      category: form.category,
+      category: form.scope === "refill" ? "spending" : form.category,
       ruleType: form.ruleType,
       value: numValue,
       priority: sortedRules.length,
       active: true,
+      scope: form.scope,
     })
     resetForm()
     setShowAddForm(false)
@@ -290,6 +293,19 @@ export function AllocationsView({
                         )}
                       </div>
 
+                      {/* Scope badge */}
+                      {rule.scope === "refill" ? (
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 bg-emerald-500/10 rounded px-1.5 py-0.5 shrink-0">
+                          <Wallet className="size-2.5" />
+                          Spending
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-sky-600 bg-sky-500/10 rounded px-1.5 py-0.5 shrink-0">
+                          <ArrowRightLeft className="size-2.5" />
+                          Transfer
+                        </span>
+                      )}
+
                       {/* Category select */}
                       <Select
                         value={rule.category}
@@ -346,7 +362,18 @@ export function AllocationsView({
                             <span className="sr-only">Rule options</span>
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem
+                            onClick={() => updateRuleMut({
+                              ruleId: rule._id,
+                              scope: rule.scope === "refill" ? "transfer" : "refill",
+                            })}
+                          >
+                            {rule.scope === "refill"
+                              ? <><ArrowRightLeft className="h-3.5 w-3.5 mr-2" />Switch to Transfer</>
+                              : <><Wallet className="h-3.5 w-3.5 mr-2" />Switch to Spending</>
+                            }
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => updateRuleMut({ ruleId: rule._id, active: !rule.active })}
                           >
@@ -388,6 +415,46 @@ export function AllocationsView({
           {/* ── Inline Add Rule form ── */}
           {showAddForm && (
             <div className="border-t border-border px-6 py-5 bg-muted/20 flex flex-col gap-4">
+
+              {/* Scope selector */}
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">Rule type</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, scope: "transfer" })}
+                    className={cn(
+                      "flex-1 flex items-center gap-2 rounded-md border px-3 py-2 text-xs transition-colors",
+                      form.scope === "transfer"
+                        ? "border-sky-500/40 bg-sky-500/10 text-sky-700"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted/40"
+                    )}
+                  >
+                    <ArrowRightLeft className="size-3 shrink-0" />
+                    <div className="text-left">
+                      <div className="font-medium">Transfer</div>
+                      <div className="text-[10px] opacity-70">Moves money to another account</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, scope: "refill" })}
+                    className={cn(
+                      "flex-1 flex items-center gap-2 rounded-md border px-3 py-2 text-xs transition-colors",
+                      form.scope === "refill"
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted/40"
+                    )}
+                  >
+                    <Wallet className="size-3 shrink-0" />
+                    <div className="text-left">
+                      <div className="font-medium">Spending</div>
+                      <div className="text-[10px] opacity-70">Stays in account — Safe to Spend</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* Account */}
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs flex items-center gap-1.5">
@@ -444,21 +511,23 @@ export function AllocationsView({
 
               {/* Category + Type + Value */}
               <div className="flex items-end gap-3">
-                <div className="flex flex-col gap-1.5 w-[120px] shrink-0">
-                  <Label className="text-xs">Category</Label>
-                  <Select
-                    value={form.category}
-                    onValueChange={(v) => setForm({ ...form, category: v as AllocationCategory })}
-                  >
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="savings">Savings</SelectItem>
-                      <SelectItem value="investing">Investing</SelectItem>
-                      <SelectItem value="spending">Spending</SelectItem>
-                      <SelectItem value="debt">Debt</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {form.scope !== "refill" && (
+                  <div className="flex flex-col gap-1.5 w-[120px] shrink-0">
+                    <Label className="text-xs">Category</Label>
+                    <Select
+                      value={form.category}
+                      onValueChange={(v) => setForm({ ...form, category: v as AllocationCategory })}
+                    >
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="savings">Savings</SelectItem>
+                        <SelectItem value="investing">Investing</SelectItem>
+                        <SelectItem value="spending">Spending</SelectItem>
+                        <SelectItem value="debt">Debt</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1.5 w-[80px] shrink-0">
                   <Label className="text-xs">Type</Label>

@@ -530,6 +530,7 @@ export const updateTransaction = mutation({
             categoryId: v.optional(v.id("categories")),
             description: v.optional(v.string()),
             amount: v.optional(v.number()),
+            date: v.optional(v.number()),
             // Special flags to explicitly clear fields
             clearTransactionType: v.optional(v.boolean()),
             clearCategoryId: v.optional(v.boolean()),
@@ -587,6 +588,10 @@ export const updateTransaction = mutation({
 
         if (updates.amount !== undefined) {
             patchData.amount = updates.amount;
+        }
+
+        if (updates.date !== undefined) {
+            patchData.date = updates.date;
         }
 
         // Use replace instead of patch to ensure undefined values are set

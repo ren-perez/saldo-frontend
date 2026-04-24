@@ -270,6 +270,7 @@ export default defineSchema({
         value: v.number(),
         priority: v.number(),           // ordering (0 = first)
         active: v.boolean(),
+        scope: v.optional(v.string()), // "transfer" | "refill" — refill auto-verifies when target == income account
         createdAt: v.number(),
     }).index("by_user", ["userId"]),
 

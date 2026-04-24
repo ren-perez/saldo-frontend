@@ -23,6 +23,7 @@ import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
 import { format } from "date-fns"
 import { IncomeTimeline } from "@/components/wealth/income-timeline"
+import { SafeToSpendCard } from "@/components/wealth/safe-to-spend-card"
 import { useUnmatchedIncomeCount } from "@/components/wealth/unmatched-income-section"
 import { MatchTransactionDialog } from "@/components/wealth/match-transaction-dialog"
 import { formatCurrency, type UnmatchedTransaction } from "@/components/wealth/income-shared"
@@ -48,22 +49,26 @@ export default function IncomePage() {
     <AppLayout>
       <InitUser />
       <div className="flex flex-col gap-6 p-6">
-        <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <DollarSign className="h-8 w-8 text-primary" />
-            Income
-            </h1>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Info className="size-4 text-muted-foreground cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent>Track and allocate your income across accounts.</TooltipContent>
-          </Tooltip>
-        </div>
 
-        {/* Action bar */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        {/* Header + pill + actions */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+                <DollarSign className="h-8 w-8 text-primary" />
+                Income
+              </h1>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="size-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>Track and allocate your income across accounts.</TooltipContent>
+              </Tooltip>
+            </div>
+            {userId && <SafeToSpendCard userId={userId} />}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
             {count > 0 && (
               <Button
                 variant="outline"
@@ -84,31 +89,28 @@ export default function IncomePage() {
               <span className="hidden sm:inline">Allocation Rules</span>
               <span className="inline sm:hidden">Rules</span>
             </Button>
+            <Button className="gap-2" onClick={() => setIncomeFormOpen(true)}>
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">Add Income</span>
+              <span className="inline sm:hidden">Add</span>
+            </Button>
           </div>
-
-          <Button className="gap-2" onClick={() => setIncomeFormOpen(true)}>
-            <Plus className="size-4" />
-            <span className="hidden sm:inline">Add Income</span>
-            <span className="inline sm:hidden">Add</span>
-          </Button>
         </div>
 
         {/* Timeline */}
-        <div className="mt-6">
+        <div className="mt-2">
           <IncomeTimeline
             externalFormOpen={incomeFormOpen}
             onExternalFormOpenChange={setIncomeFormOpen}
           />
         </div>
 
-        {/* Allocation Rules dialog */}
         <AllocationsView
           open={allocationRulesOpen}
           onOpenChange={setAllocationRulesOpen}
         />
       </div>
 
-      {/* Unmatched Income Modal */}
       {userId && (
         <UnmatchedIncomeModal
           userId={userId}
@@ -118,7 +120,6 @@ export default function IncomePage() {
         />
       )}
 
-      {/* Transaction → Plan match dialog */}
       {userId && (
         <MatchTransactionDialog
           transaction={matchingTx}
