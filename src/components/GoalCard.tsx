@@ -34,7 +34,7 @@ export function GoalCard({ goal }: GoalCardProps) {
   const hasImage = Boolean(goal.image_url)
 
   return (
-    <Link href={`/goals/${goal._id}`} className="group block w-96 flex-shrink-0">
+    <Link href={`/goals/${goal._id}`} className="group block w-80 sm:w-96 flex-shrink-0">
       <div
         className={cn(
           "relative flex h-36 w-full overflow-hidden rounded-2xl shadow-md ring-1 ring-white/10",
@@ -124,7 +124,7 @@ export function GoalCard({ goal }: GoalCardProps) {
 
             {/* Progress bar */}
             <div className="flex items-center gap-2.5">
-              <div className="relative flex-1 h-1.5 overflow-hidden rounded-full bg-black/20 backdrop-blur-sm ring-1 ring-white/20">
+              <div className="relative flex-1 h-1 overflow-hidden rounded-full bg-black/20 backdrop-blur-sm ring-1 ring-white/20">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
                   style={{
@@ -143,8 +143,8 @@ export function GoalCard({ goal }: GoalCardProps) {
             <div className="flex items-center gap-6 text-white/95 drop-shadow text-xs">
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
-                  <PiggyBank className="h-3.5 w-3.5 text-white/70 flex-shrink-0" />
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-white/70">
+                  <PiggyBank className="h-3 w-3 text-white/70 flex-shrink-0" />
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-white/70">
                     Saved
                   </span>
                 </div>
@@ -155,9 +155,9 @@ export function GoalCard({ goal }: GoalCardProps) {
 
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
-                  <Target className="h-3.5 w-3.5 text-white/70 flex-shrink-0" />
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-white/70">
-                    Monthly
+                  <Target className="h-3 w-3 text-white/70 flex-shrink-0" />
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-white/70">
+                    Target
                   </span>
                 </div>
                 <span className="font-semibold tabular-nums">

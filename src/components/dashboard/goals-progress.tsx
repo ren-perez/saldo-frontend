@@ -32,15 +32,15 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
     <div className="flex flex-col gap-4 min-w-0">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <h2 className="font-semibold text-foreground shrink-0">Goals</h2>
+        <h2 className="font-semibold text-foreground shrink-0 leading-none">Goals</h2>
 
         {/* Overall progress bar */}
         <div className="flex flex-1 items-center gap-3 min-w-0">
           <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatCompactCurrency(totalCurrent)} saved
+            {formatCompactCurrency(totalCurrent)} / {formatCompactCurrency(totalTarget)} goal
           </span>
 
-          <div className="flex-1 h-[3px] rounded-full bg-muted overflow-hidden">
+          <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full bg-primary transition-all duration-700 ease-out"
               style={{ width: `${overallPct}%` }}
@@ -51,9 +51,6 @@ export function GoalsProgress({ goals }: GoalsProgressProps) {
             {overallPct}%
           </span>
 
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatCompactCurrency(totalTarget)} goal
-          </span>
         </div>
 
         {/* View all */}

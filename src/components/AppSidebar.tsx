@@ -111,7 +111,7 @@ export function AppSidebar() {
                                     >
                                         <Link href={item.href}>
                                             <item.icon className="size-[18px]" />
-                                            <span className="font-medium">{item.label}</span>
+                                            <span className="font-medium tracking-wide">{item.label}</span>
                                         </Link>
                                     </SidebarMenuButton>
                                     {item.href === "/income" && plannedIncomeCount > 0 && (
@@ -142,7 +142,7 @@ export function AppSidebar() {
                                     >
                                         <Link href={item.href}>
                                             <item.icon className="size-[18px]" />
-                                            <span className="font-medium">{item.label}</span>
+                                            <span className="font-medium tracking-wide">{item.label}</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
@@ -168,7 +168,7 @@ export function AppSidebar() {
                                     >
                                         <Link href={item.href}>
                                             <item.icon className="size-[18px]" />
-                                            <span className="font-medium">{item.label}</span>
+                                            <span className="font-medium tracking-wide">{item.label}</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
