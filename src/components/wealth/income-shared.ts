@@ -10,7 +10,7 @@ export interface IncomePlan {
   expected_date: string
   expected_amount: number
   actual_amount?: number
-  status: "planned" | "matched" | "missed"
+  status: "planned" | "matched" | "completed" | "missed"
   recurrence: string
   notes?: string
   matched_transaction_id?: Id<"transactions">

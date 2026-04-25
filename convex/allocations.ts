@@ -3,8 +3,8 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
-// Shared allocation engine logic
-function calculateAllocations(
+// Shared allocation engine logic — exported for use in incomePlans.ts
+export function calculateAllocations(
     income: number,
     rules: Array<{
         _id: Id<"allocation_rules">;
@@ -48,7 +48,8 @@ function calculateAllocations(
     return allocations;
 }
 
-// Run allocations for an income plan and persist records
+// Run allocations for an income plan and persist records.
+// Gap 3: Preserves already-verified records — only resets non-verified ones.
 export const runAllocationsForPlan = mutation({
     args: {
         userId: v.id("users"),
@@ -66,33 +67,40 @@ export const runAllocationsForPlan = mutation({
         const amount = plan.status === "matched" && plan.actual_amount != null
             ? plan.actual_amount
             : plan.expected_amount;
-        const isForecast = plan.status !== "matched";
+        const isForecast = plan.status !== "matched" && plan.status !== "completed";
         const verificationStatus = isForecast ? "pending" : "reserved";
 
         const allocations = calculateAllocations(amount, rules);
 
-        // Delete existing records
         const existing = await ctx.db
             .query("allocation_records")
             .withIndex("by_income_plan", (q) => q.eq("income_plan_id", incomePlanId))
             .collect();
-        for (const record of existing) {
+
+        // Gap 3: Keep verified records as-is; delete only non-verified ones
+        const verified = existing.filter((r) => r.verification_status === "verified");
+        const nonVerified = existing.filter((r) => r.verification_status !== "verified");
+        const verifiedAccountIds = new Set(verified.map((r) => r.accountId.toString()));
+
+        for (const record of nonVerified) {
             await ctx.db.delete(record._id);
         }
 
-        // Insert new records
+        // Insert fresh records only for accounts that don't already have a verified record
         for (const alloc of allocations) {
-            await ctx.db.insert("allocation_records", {
-                userId,
-                income_plan_id: incomePlanId,
-                accountId: alloc.accountId,
-                rule_id: alloc.ruleId,
-                amount: alloc.amount,
-                category: alloc.category,
-                is_forecast: isForecast,
-                verification_status: verificationStatus,
-                createdAt: Date.now(),
-            });
+            if (!verifiedAccountIds.has(alloc.accountId.toString())) {
+                await ctx.db.insert("allocation_records", {
+                    userId,
+                    income_plan_id: incomePlanId,
+                    accountId: alloc.accountId,
+                    rule_id: alloc.ruleId,
+                    amount: alloc.amount,
+                    category: alloc.category,
+                    is_forecast: isForecast,
+                    verification_status: verificationStatus,
+                    createdAt: Date.now(),
+                });
+            }
         }
 
         return allocations;
@@ -241,17 +249,30 @@ export const getMonthlyForecast = query({
             let totalDebt = 0;
 
             for (const plan of monthPlans) {
-                const amount = plan.status === "matched" && plan.actual_amount != null
-                    ? plan.actual_amount
-                    : plan.expected_amount;
-                totalIncome += amount;
-
-                const allocations = calculateAllocations(amount, rules);
-                for (const alloc of allocations) {
-                    if (alloc.category === "savings") totalSavings += alloc.amount;
-                    else if (alloc.category === "investing") totalInvesting += alloc.amount;
-                    else if (alloc.category === "spending") totalSpending += alloc.amount;
-                    else if (alloc.category === "debt") totalDebt += alloc.amount;
+                // Use actual allocation records for matched/completed plans; re-calculate for planned
+                if (plan.status === "matched" || plan.status === "completed") {
+                    const records = await ctx.db
+                        .query("allocation_records")
+                        .withIndex("by_income_plan", (q) => q.eq("income_plan_id", plan._id))
+                        .collect();
+                    const amount = plan.actual_amount ?? plan.expected_amount;
+                    totalIncome += amount;
+                    for (const record of records) {
+                        if (record.category === "savings") totalSavings += record.amount;
+                        else if (record.category === "investing") totalInvesting += record.amount;
+                        else if (record.category === "spending") totalSpending += record.amount;
+                        else if (record.category === "debt") totalDebt += record.amount;
+                    }
+                } else {
+                    const amount = plan.expected_amount;
+                    totalIncome += amount;
+                    const allocations = calculateAllocations(amount, rules);
+                    for (const alloc of allocations) {
+                        if (alloc.category === "savings") totalSavings += alloc.amount;
+                        else if (alloc.category === "investing") totalInvesting += alloc.amount;
+                        else if (alloc.category === "spending") totalSpending += alloc.amount;
+                        else if (alloc.category === "debt") totalDebt += alloc.amount;
+                    }
                 }
             }
 
@@ -270,7 +291,8 @@ export const getMonthlyForecast = query({
     },
 });
 
-// Add a single allocation record to an income plan
+// Add a single allocation record to an income plan.
+// Gap 4: Prefers the refill-scoped rule for the target account to ensure budget pool inclusion.
 export const addAllocationRecord = mutation({
     args: {
         incomePlanId: v.id("income_plans"),
@@ -286,7 +308,12 @@ export const addAllocationRecord = mutation({
             .query("allocation_rules")
             .withIndex("by_user", (q) => q.eq("userId", plan.userId))
             .collect();
-        const matchingRule = rules.find((r) => r.accountId === accountId) ?? rules[0];
+
+        // Gap 4: prefer refill rule for this account → any rule for this account → rules[0]
+        const matchingRule =
+            rules.find((r) => r.accountId === accountId && r.scope === "refill") ??
+            rules.find((r) => r.accountId === accountId) ??
+            rules[0];
         if (!matchingRule) throw new Error("No allocation rules exist");
 
         await ctx.db.insert("allocation_records", {
@@ -296,8 +323,8 @@ export const addAllocationRecord = mutation({
             rule_id: matchingRule._id,
             amount: Math.max(0, amount),
             category,
-            is_forecast: plan.status !== "matched",
-            verification_status: plan.status === "matched" ? "reserved" : "pending",
+            is_forecast: plan.status !== "matched" && plan.status !== "completed",
+            verification_status: (plan.status === "matched" || plan.status === "completed") ? "reserved" : "pending",
             createdAt: Date.now(),
         });
     },
@@ -313,7 +340,7 @@ export const deleteAllocationRecord = mutation({
     },
 });
 
-// Passive verification: scan for transfers from income account → goal accounts
+// Passive verification: scan for transfers from income account → goal accounts.
 // Call fire-and-forget after match. Marks allocations as "verified" when transfer is found.
 export const verifyAllocations = mutation({
     args: {
@@ -321,7 +348,7 @@ export const verifyAllocations = mutation({
     },
     handler: async (ctx, { planId }) => {
         const plan = await ctx.db.get(planId);
-        if (!plan || plan.status !== "matched" || !plan.date_received) return;
+        if (!plan || (plan.status !== "matched" && plan.status !== "completed") || !plan.date_received) return;
 
         const incomeAccount = plan.matched_transaction_id
             ? (await ctx.db.get(plan.matched_transaction_id))?.accountId
@@ -333,14 +360,21 @@ export const verifyAllocations = mutation({
             .collect();
 
         const dateAnchor = new Date(plan.date_received).getTime();
-        const windowMs = 10 * 24 * 60 * 60 * 1000; // 10 days (covers weekends)
+        const windowMs = 10 * 24 * 60 * 60 * 1000; // 10 days
+
+        // Cache outflows from income account to avoid re-querying per record
+        let incomeOutflows: Array<{ _id: Id<"transactions">; amount: number; date: number }> | undefined;
+        if (incomeAccount) {
+            incomeOutflows = (await ctx.db
+                .query("transactions")
+                .withIndex("by_account", (q) => q.eq("accountId", incomeAccount))
+                .collect()).filter((t) => t.amount < 0);
+        }
 
         for (const record of records) {
             if (record.verification_status === "verified") continue;
-            // Refill allocations (target == income account) are auto-verified on match — skip them here
             if (incomeAccount && record.accountId === incomeAccount) continue;
 
-            // Scan transactions to the allocation's target account (inflow)
             const inflows = await ctx.db
                 .query("transactions")
                 .withIndex("by_account", (q) => q.eq("accountId", record.accountId))
@@ -352,19 +386,18 @@ export const verifyAllocations = mutation({
                 if (Math.abs(tx.date - dateAnchor) > windowMs) continue;
                 if (Math.abs(tx.amount - record.amount) > amountTolerance) continue;
 
-                // Gold standard check: if we know the income account, verify outflow matches
-                if (incomeAccount) {
-                    const outflows = await ctx.db
-                        .query("transactions")
-                        .withIndex("by_account", (q) => q.eq("accountId", incomeAccount))
-                        .collect();
-                    const matchingOutflow = outflows.find(
-                        (o) =>
-                            o.amount < 0 &&
-                            Math.abs(Math.abs(o.amount) - record.amount) <= amountTolerance &&
-                            Math.abs(o.date - dateAnchor) <= windowMs
+                // Adaptive outflow check: enforce only when the income account has outflows
+                // in the window (i.e., it's being tracked). Otherwise, trust the inflow.
+                if (incomeOutflows) {
+                    const outflowsInWindow = incomeOutflows.filter(
+                        (o) => Math.abs(o.date - dateAnchor) <= windowMs
                     );
-                    if (!matchingOutflow) continue; // outflow didn't exist → likely false positive
+                    if (outflowsInWindow.length > 0) {
+                        const hasMatchingOutflow = outflowsInWindow.some(
+                            (o) => Math.abs(Math.abs(o.amount) - record.amount) <= amountTolerance
+                        );
+                        if (!hasMatchingOutflow) continue;
+                    }
                 }
 
                 await ctx.db.patch(record._id, {
@@ -374,44 +407,66 @@ export const verifyAllocations = mutation({
                 break;
             }
         }
+
+        // Gap 11: promote to completed if all allocations are now verified
+        const updatedRecords = await ctx.db
+            .query("allocation_records")
+            .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
+            .collect();
+        if (
+            updatedRecords.length > 0 &&
+            updatedRecords.every((r) => r.verification_status === "verified") &&
+            plan.status !== "completed"
+        ) {
+            await ctx.db.patch(planId, { status: "completed" });
+        }
     },
 });
 
-// Monthly Safe to Spend context: refill pool vs actual expenses
+// Monthly Safe to Spend context: refill pool vs actual expenses.
+// Returns pool breakdown (verified/reserved/pending) for the SafeToSpendCard.
 export const getMonthlyBudgetContext = query({
     args: {
         userId: v.id("users"),
         monthKey: v.string(), // "YYYY-MM"
     },
     handler: async (ctx, { userId, monthKey }) => {
-        // Identify refill rules for this user
         const rules = await ctx.db
             .query("allocation_rules")
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect();
-        const refillRuleIds = new Set(
-            rules.filter((r) => r.scope === "refill").map((r) => r._id.toString())
+
+        // Gap 4 fix: identify refill accounts by accountId (not rule_id), more robust against
+        // manually-added records that may have been assigned an incorrect rule_id.
+        const refillAccountIds = new Set(
+            rules.filter((r) => r.scope === "refill").map((r) => r.accountId.toString())
         );
 
-        // Sum refill allocation amounts across all plans in this month
         const plans = await ctx.db
             .query("income_plans")
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect();
         const monthPlans = plans.filter((p) => p.expected_date.startsWith(monthKey));
 
-        let totalPool = 0;
+        let verifiedPool = 0;
+        let reservedPool = 0;
+        let pendingPool = 0;
+
         for (const plan of monthPlans) {
             const records = await ctx.db
                 .query("allocation_records")
                 .withIndex("by_income_plan", (q) => q.eq("income_plan_id", plan._id))
                 .collect();
             for (const record of records) {
-                if (refillRuleIds.has(record.rule_id.toString())) {
-                    totalPool += record.amount;
-                }
+                if (!refillAccountIds.has(record.accountId.toString())) continue;
+                const status = record.verification_status ?? "pending";
+                if (status === "verified") verifiedPool += record.amount;
+                else if (status === "reserved") reservedPool += record.amount;
+                else pendingPool += record.amount;
             }
         }
+
+        const totalPool = verifiedPool + reservedPool + pendingPool;
 
         // Build category -> transactionType map for reimbursement detection
         const categories = await ctx.db.query("categories").collect();
@@ -421,7 +476,6 @@ export const getMonthlyBudgetContext = query({
                 .map((c) => [c._id.toString(), c.transactionType!])
         );
 
-        // Sum expense transactions in this month: negative, not a transfer
         const [year, month] = monthKey.split("-").map(Number);
         const startMs = new Date(year, month - 1, 1).getTime();
         const endMs = new Date(year, month, 1).getTime();
@@ -451,6 +505,9 @@ export const getMonthlyBudgetContext = query({
         return {
             monthKey,
             totalPool: Math.round(totalPool * 100) / 100,
+            verifiedPool: Math.round(verifiedPool * 100) / 100,
+            reservedPool: Math.round(reservedPool * 100) / 100,
+            pendingPool: Math.round(pendingPool * 100) / 100,
             totalSpent: Math.round(totalSpent * 100) / 100,
             remaining: Math.round((totalPool - totalSpent) * 100) / 100,
         };
@@ -478,23 +535,21 @@ export const migrateStripDeprecatedFields = mutation({
     },
 });
 
-// Observer: called whenever a transaction lands in any account.
-// If the account is goal-linked, scans reserved allocations and verifies matches.
+// Observer: called whenever a positive transaction lands in any account.
+// Scans reserved allocation records for that account and verifies matches.
+//
+// Outflow check is adaptive:
+//   - If the income account has outflows in the window → require a matching one (gold standard).
+//   - If the income account has NO outflows in the window → the account is likely not fully
+//     tracked; verify on the inflow alone so manually-created transfer transactions still work.
 export const verifyAccountAllocations = internalMutation({
     args: { accountId: v.id("accounts") },
     handler: async (ctx, { accountId }) => {
-        const linkedGoal = await ctx.db
-            .query("goals")
-            .withIndex("by_account", (q) => q.eq("linked_account_id", accountId))
-            .first();
-        if (!linkedGoal) return;
-
         const allRecords = await ctx.db
             .query("allocation_records")
             .withIndex("by_account", (q) => q.eq("accountId", accountId))
             .collect();
 
-        // Track already-claimed transfer IDs to prevent double-matching
         const usedTxIds = new Set(
             allRecords
                 .filter((r) => r.transfer_transaction_id)
@@ -506,14 +561,25 @@ export const verifyAccountAllocations = internalMutation({
         );
         if (reserved.length === 0) return;
 
-        // Enrich with plan date and sort oldest-first so earlier months get priority
-        const enriched: Array<{ record: typeof reserved[0]; dateAnchor: string }> = [];
+        // Enrich with plan date + income account, sorted oldest-first so earlier months get priority
+        type EnrichedRecord = {
+            record: typeof reserved[0];
+            dateAnchor: string;
+            incomeAccountId: Id<"accounts"> | undefined;
+        };
+        const enriched: EnrichedRecord[] = [];
         for (const r of reserved) {
             const plan = await ctx.db.get(r.income_plan_id);
-            if (plan?.status === "matched") {
+            if (plan?.status === "matched" || plan?.status === "completed") {
+                let incomeAccountId: Id<"accounts"> | undefined;
+                if (plan.matched_transaction_id) {
+                    const matchedTx = await ctx.db.get(plan.matched_transaction_id);
+                    incomeAccountId = matchedTx?.accountId;
+                }
                 enriched.push({
                     record: r,
                     dateAnchor: plan.date_received ?? plan.expected_date,
+                    incomeAccountId,
                 });
             }
         }
@@ -526,25 +592,72 @@ export const verifyAccountAllocations = internalMutation({
                 .collect()
         ).filter((t) => t.amount > 0);
 
-        const windowMs = 10 * 24 * 60 * 60 * 1000;
+        // Cache outflows per income account (lazy, keyed by accountId)
+        const outflowsCache = new Map<string, Array<{ amount: number; date: number }>>();
+        async function getIncomeOutflows(incomeAccId: Id<"accounts">) {
+            const key = incomeAccId.toString();
+            if (!outflowsCache.has(key)) {
+                const txs = await ctx.db
+                    .query("transactions")
+                    .withIndex("by_account", (q) => q.eq("accountId", incomeAccId))
+                    .collect();
+                outflowsCache.set(key, txs.filter((t) => t.amount < 0));
+            }
+            return outflowsCache.get(key)!;
+        }
 
-        for (const { record, dateAnchor } of enriched) {
+        const windowMs = 10 * 24 * 60 * 60 * 1000;
+        const verifiedPlanIds = new Set<Id<"income_plans">>();
+
+        for (const { record, dateAnchor, incomeAccountId } of enriched) {
             const anchor = new Date(dateAnchor).getTime();
             const tolerance = record.amount * 0.05;
 
-            const match = inflows.find(
+            const matchingInflow = inflows.find(
                 (t) =>
                     !usedTxIds.has(t._id.toString()) &&
                     Math.abs(t.date - anchor) <= windowMs &&
                     Math.abs(t.amount - record.amount) <= tolerance
             );
 
-            if (match) {
-                await ctx.db.patch(record._id, {
-                    verification_status: "verified",
-                    transfer_transaction_id: match._id,
-                });
-                usedTxIds.add(match._id.toString());
+            if (!matchingInflow) continue;
+
+            // Adaptive outflow check: only enforce if the income account has ANY outflows
+            // in the window — meaning it's being tracked. If there are none, the income
+            // account's transactions aren't in the system; trust the inflow alone.
+            if (incomeAccountId) {
+                const outflows = await getIncomeOutflows(incomeAccountId);
+                const outflowsInWindow = outflows.filter(
+                    (o) => Math.abs(o.date - anchor) <= windowMs
+                );
+                if (outflowsInWindow.length > 0) {
+                    // Income account is tracked — require a matching outflow
+                    const hasMatchingOutflow = outflowsInWindow.some(
+                        (o) => Math.abs(Math.abs(o.amount) - record.amount) <= tolerance
+                    );
+                    if (!hasMatchingOutflow) continue;
+                }
+                // No outflows in window → income account not tracked → proceed without check
+            }
+
+            await ctx.db.patch(record._id, {
+                verification_status: "verified",
+                transfer_transaction_id: matchingInflow._id,
+            });
+            usedTxIds.add(matchingInflow._id.toString());
+            verifiedPlanIds.add(record.income_plan_id);
+        }
+
+        // Gap 11: Promote plans to "completed" if all their allocations are now verified
+        for (const planId of verifiedPlanIds) {
+            const plan = await ctx.db.get(planId);
+            if (!plan || plan.status === "completed") continue;
+            const planRecords = await ctx.db
+                .query("allocation_records")
+                .withIndex("by_income_plan", (q) => q.eq("income_plan_id", planId))
+                .collect();
+            if (planRecords.length > 0 && planRecords.every((r) => r.verification_status === "verified")) {
+                await ctx.db.patch(planId, { status: "completed" });
             }
         }
     },

@@ -510,13 +510,45 @@ export const listTransactions = query({
 export const deleteTransaction = mutation({
     args: { transactionId: v.id("transactions") },
     handler: async (ctx, { transactionId }) => {
-        // Get the transaction first to verify it exists
         const transaction = await ctx.db.get(transactionId);
         if (!transaction) {
             throw new Error("Transaction not found");
         }
 
+        // Gap 9: If this transaction was used to verify an allocation, revert those allocations
+        // to "reserved" and un-complete any plans that were completed because of it.
+        const affectedRecords = await ctx.db
+            .query("allocation_records")
+            .withIndex("by_user", (q) => q.eq("userId", transaction.userId))
+            .collect()
+            .then((records) => records.filter((r) => r.transfer_transaction_id === transactionId));
+
+        const affectedPlanIds = new Set<Id<"income_plans">>();
+        for (const record of affectedRecords) {
+            await ctx.db.patch(record._id, {
+                verification_status: "reserved",
+                transfer_transaction_id: undefined,
+            });
+            affectedPlanIds.add(record.income_plan_id);
+        }
+
+        // Revert "completed" plans back to "matched" if any of their allocations are now un-verified
+        for (const planId of affectedPlanIds) {
+            const plan = await ctx.db.get(planId);
+            if (plan?.status === "completed") {
+                await ctx.db.patch(planId, { status: "matched" });
+            }
+        }
+
         await ctx.db.delete(transactionId);
+
+        // Re-trigger passive verification for the account in case other inflows can substitute
+        if (transaction.amount > 0) {
+            await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, {
+                accountId: transaction.accountId,
+            });
+        }
+
         return { success: true };
     },
 });
@@ -602,6 +634,36 @@ export const updateTransaction = mutation({
 
         await ctx.db.replace(transactionId, updatedTransaction);
 
+        // Gap 9: If amount or date changed, stale verifications referencing this transaction
+        // may no longer be valid — revert them to "reserved" and re-trigger passive verification.
+        const amountOrDateChanged = updates.amount !== undefined || updates.date !== undefined;
+        if (amountOrDateChanged) {
+            const affectedRecords = await ctx.db
+                .query("allocation_records")
+                .withIndex("by_user", (q) => q.eq("userId", transaction.userId))
+                .collect()
+                .then((records) => records.filter((r) => r.transfer_transaction_id === transactionId));
+
+            const affectedPlanIds = new Set<Id<"income_plans">>();
+            for (const record of affectedRecords) {
+                await ctx.db.patch(record._id, {
+                    verification_status: "reserved",
+                    transfer_transaction_id: undefined,
+                });
+                affectedPlanIds.add(record.income_plan_id);
+            }
+            for (const planId of affectedPlanIds) {
+                const plan = await ctx.db.get(planId);
+                if (plan?.status === "completed") {
+                    await ctx.db.patch(planId, { status: "matched" });
+                }
+            }
+
+            // Re-trigger passive verification so a re-match can occur with the new values
+            await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, {
+                accountId: transaction.accountId,
+            });
+        }
 
         return { success: true };
     },

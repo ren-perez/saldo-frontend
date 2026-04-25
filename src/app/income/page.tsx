@@ -154,8 +154,7 @@ function UnmatchedIncomeModal({
   const [activeModalTab, setActiveModalTab] = useState<"unmatched" | "recent">("unmatched")
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
-  const unmatchPlan = useMutation(api.incomePlans.unmatchIncomePlan)
-  const runAllocations = useMutation(api.allocations.runAllocationsForPlan)
+  const unmatchAndReset = useMutation(api.incomePlans.unmatchAndResetAllocations)
 
   const transactions = useQuery(
     api.contributions.getUnallocatedTransactions,
@@ -403,8 +402,7 @@ function UnmatchedIncomeModal({
                   title="Undo match"
                   onClick={async () => {
                     if (window.confirm(`Undo match for "${plan.label}"? Allocations will revert to forecast.`)) {
-                      await unmatchPlan({ planId: plan._id })
-                      await runAllocations({ userId, incomePlanId: plan._id })
+                      await unmatchAndReset({ planId: plan._id, userId })
                     }
                   }}
                 >

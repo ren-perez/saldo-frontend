@@ -25,6 +25,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -196,7 +197,7 @@ function AllocationRows({
                 </span>
               </div>
 
-              {/* Verification badge (matched plans only) */}
+              {/* Verification badge (matched/completed plans only) */}
               {isMatched && (
                 <div className="shrink-0">
                   {verStatus === "verified" ? (
@@ -205,7 +206,14 @@ function AllocationRows({
                       Verified
                     </span>
                   ) : verStatus === "reserved" ? (
-                    <span className="text-[10px] text-sky-600">Reserved</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-[10px] text-sky-600 cursor-help">Reserved</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="text-xs max-w-[200px]">
+                        Waiting for bank transfer to clear.
+                      </TooltipContent>
+                    </Tooltip>
                   ) : null}
                 </div>
               )}
@@ -347,20 +355,22 @@ export function IncomePlanCard({
     incomePlanId: plan._id,
   }) as AllocationRecord[] | undefined
 
-  // Derive "completed" status: matched + all allocations verified
-  const isCompleted =
+  // "completed" is now persisted in the DB; derive client-side only as a fallback
+  // for plans that completed before the migration.
+  const clientCompleted =
     plan.status === "matched" &&
     !!allocations &&
     allocations.length > 0 &&
     allocations.every((a) => a.verification_status === "verified")
 
-  const effectiveStatus = isCompleted
-    ? ("completed" as const)
-    : (plan.status as keyof typeof statusConfig)
+  const effectiveStatus =
+    plan.status === "completed" || clientCompleted
+      ? ("completed" as const)
+      : (plan.status as keyof typeof statusConfig)
   const config = statusConfig[effectiveStatus] ?? statusConfig.planned
   const StatusIcon = statusIcons[effectiveStatus] ?? Clock
 
-  const unmatch = useMutation(api.incomePlans.unmatchIncomePlan)
+  const unmatchAndReset = useMutation(api.incomePlans.unmatchAndResetAllocations)
   const markMissed = useMutation(api.incomePlans.markMissed)
   const markPlanned = useMutation(api.incomePlans.markPlanned)
   const deletePlan = useMutation(api.incomePlans.deleteIncomePlan)
@@ -370,7 +380,7 @@ export function IncomePlanCard({
   const hasDiff =
     plan.actual_amount !== undefined &&
     plan.actual_amount !== plan.expected_amount
-  const isMatched = plan.status === "matched"
+  const isMatched = plan.status === "matched" || plan.status === "completed"
   const isPlanned = plan.status === "planned"
 
   return (
@@ -395,7 +405,7 @@ export function IncomePlanCard({
                   className={cn(
                     "flex size-5 shrink-0 items-center justify-center rounded-full border-2",
                     config.dotClass,
-                    isCompleted && "animate-check-bounce"
+                    effectiveStatus === "completed" && "animate-check-bounce"
                   )}
                 >
                   <StatusIcon className="size-2.5" />
@@ -494,13 +504,10 @@ export function IncomePlanCard({
                     </DropdownMenuItem>
                   </>
                 )}
-                {plan.status === "matched" && (
+                {(plan.status === "matched" || plan.status === "completed") && (
                   <>
                     <DropdownMenuItem
-                      onClick={async () => {
-                        await unmatch({ planId: plan._id })
-                        await runAllocations({ userId, incomePlanId: plan._id })
-                      }}
+                      onClick={() => unmatchAndReset({ planId: plan._id, userId })}
                       className="gap-2"
                     >
                       <Unlink className="size-3.5" />

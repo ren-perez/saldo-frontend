@@ -48,6 +48,11 @@ const trackingItems = [
     { href: "/presets", label: "Presets", icon: FileSpreadsheet },
 ]
 
+const chatItems = [
+    { href: "/history", label: "Chat History", icon: History },
+    { href: "/settings", label: "Chat Settings", icon: Settings },
+]
+
 export function AppSidebar() {
     const pathname = usePathname()
     const { setOpenMobile, isMobile } = useSidebar()
@@ -57,168 +62,140 @@ export function AppSidebar() {
         api.incomePlans.listIncomePlans,
         convexUser ? { userId: convexUser._id } : "skip"
     )
+    
     const plannedIncomeCount = useMemo(
         () => (plans ?? []).filter((p) => p.status === "planned").length,
         [plans]
     )
 
-    // Close mobile sidebar when pathname changes
     useEffect(() => {
-        if (isMobile) {
-            setOpenMobile(false)
-        }
+        if (isMobile) setOpenMobile(false)
     }, [pathname, isMobile, setOpenMobile])
 
     return (
-        <Sidebar collapsible="icon"
-            className="border-none bg-transparent"
-            variant="floating">
-            <SidebarHeader className="border-none">
-                <div className="flex items-center justify-between group-data-[collapsible=icon]:px-1 px-2 py-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                        {/* Financial-themed SVG icon - clickable and properly sized */}
-                        <Link href="/" className="flex-shrink-0">
-                            <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="text-primary hover:opacity-80 transition-opacity group-data-[collapsible=icon]:w-6 group-data-[collapsible=icon]:h-6"
-                            >
-                                <defs>
-                                    <linearGradient id="financialGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" style={{ stopColor: '#3b82f6', stopOpacity: 1 }} />
-                                        <stop offset="100%" style={{ stopColor: '#10b981', stopOpacity: 1 }} />
-                                    </linearGradient>
-                                </defs>
-                                <path
-                                    d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                                    stroke="url(#financialGradient)"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
+        <Sidebar 
+            collapsible="icon"
+            variant="floating"
+            className="group-data-[variant=floating]:border-sidebar-border"
+        >
+            <SidebarHeader>
+                <div className="flex items-center gap-3 px-2 py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                    <Link href="/" className="flex items-center gap-3 transition-transform active:scale-95">
+                        <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                             </svg>
-                        </Link>
-                        <Link href="/" className="text-xl font-bold text-primary hover:opacity-80 transition-opacity group-data-[collapsible=icon]:hidden truncate">
+                        </div>
+                        <span className="text-lg font-bold tracking-tight text-foreground group-data-[collapsible=icon]:hidden">
                             Saldo
-                        </Link>
-                    </div>
+                        </span>
+                    </Link>
                 </div>
             </SidebarHeader>
 
-            <SidebarContent className="flex-1 overflow-y-auto">
+            <SidebarContent className="gap-4 px-2">
+                {/* Planning Group */}
                 <SidebarGroup>
-                    <SidebarGroupLabel>Planning</SidebarGroupLabel>
+                    <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                        Planning
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
-                        <SidebarMenu className="space-y-1">
-                            {planningItems.map((item) => {
-                                const IconComponent = item.icon
-                                return (
-                                    <SidebarMenuItem key={item.href}>
-                                        <SidebarMenuButton
-                                            asChild
-                                            isActive={pathname === item.href}
-                                            tooltip={item.label}
-                                        >
-                                            <Link href={item.href}>
-                                                <IconComponent className="w-4 h-4" />
-                                                <span>{item.label}</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                        {item.href === "/income" && plannedIncomeCount > 0 && (
-                                            <SidebarMenuBadge>{plannedIncomeCount}</SidebarMenuBadge>
-                                        )}
-                                    </SidebarMenuItem>
-                                )
-                            })}
+                        <SidebarMenu className="gap-1">
+                            {planningItems.map((item) => (
+                                <SidebarMenuItem key={item.href}>
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={pathname === item.href}
+                                        tooltip={item.label}
+                                        className="h-10 transition-all duration-200 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-md"
+                                    >
+                                        <Link href={item.href}>
+                                            <item.icon className="size-[18px]" />
+                                            <span className="font-medium">{item.label}</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                    {item.href === "/income" && plannedIncomeCount > 0 && (
+                                        <SidebarMenuBadge className="bg-primary/15 text-primary font-bold group-data-[active=true]:bg-primary-foreground/20 group-data-[active=true]:text-primary-foreground">
+                                            {plannedIncomeCount}
+                                        </SidebarMenuBadge>
+                                    )}
+                                </SidebarMenuItem>
+                            ))}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
 
+                {/* Tracking Group */}
                 <SidebarGroup>
-                    <SidebarGroupLabel>Tracking</SidebarGroupLabel>
+                    <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                        Tracking
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
-                        <SidebarMenu className="space-y-1">
-                            {trackingItems.map((item) => {
-                                const IconComponent = item.icon
-                                return (
-                                    <SidebarMenuItem key={item.href}>
-                                        <SidebarMenuButton
-                                            asChild
-                                            isActive={pathname === item.href}
-                                            tooltip={item.label}
-                                        >
-                                            <Link href={item.href}>
-                                                <IconComponent className="w-4 h-4" />
-                                                <span>{item.label}</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                )
-                            })}
+                        <SidebarMenu className="gap-1">
+                            {trackingItems.map((item) => (
+                                <SidebarMenuItem key={item.href}>
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={pathname === item.href}
+                                        tooltip={item.label}
+                                        className="h-10 transition-all duration-200 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
+                                    >
+                                        <Link href={item.href}>
+                                            <item.icon className="size-[18px]" />
+                                            <span className="font-medium">{item.label}</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
 
+                {/* Chat & Config Group */}
                 <SidebarGroup>
+                    <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                        Assistant
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
-                        <SidebarMenu>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton
-                                    asChild
-                                    isActive={pathname === "/history"}
-                                    tooltip="Chat History"
-                                >
-                                    <Link href="/history">
-                                        <History className="w-4 h-4" />
-                                        <span>Chat History</span>
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton
-                                    asChild
-                                    isActive={pathname === "/settings"}
-                                    tooltip="Settings"
-                                >
-                                    <Link href="/settings">
-                                        <Settings className="w-4 h-4" />
-                                        <span>Settings</span>
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                        <SidebarMenu className="gap-1">
+                            {chatItems.map((item) => (
+                                <SidebarMenuItem key={item.href}>
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={pathname === item.href}
+                                        tooltip={item.label}
+                                        className="h-10 transition-all duration-200 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
+                                    >
+                                        <Link href={item.href}>
+                                            <item.icon className="size-[18px]" />
+                                            <span className="font-medium">{item.label}</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
 
-            <SidebarFooter className="p-4 border-t mt-auto">
-                {/* Expanded state footer */}
-                <div className="flex items-center justify-between group-data-[collapsible=icon]:hidden">
-                    <UserButton
-                        afterSignOutUrl="/"
-                        appearance={{
-                            elements: {
-                                avatarBox: "h-8 w-8",
-                            },
-                        }}
-                    />
+            <SidebarFooter className="border-t border-sidebar-border/50 p-3">
+                <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col">
+                    <div className="flex items-center gap-3 group-data-[collapsible=icon]:contents">
+                        <UserButton
+                            afterSignOutUrl="/"
+                            appearance={{
+                                elements: {
+                                    avatarBox: "size-8 rounded-lg ring-1 ring-sidebar-border",
+                                },
+                            }}
+                        />
+                        <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                            <span className="text-xs font-semibold text-foreground truncate max-w-[100px]">
+                                {convexUser?.name || "Account"}
+                            </span>
+                        </div>
+                    </div>
                     <ThemeToggle />
-                </div>
-
-                {/* Collapsed state footer - vertical stack */}
-                <div className="hidden group-data-[collapsible=icon]:flex flex-col items-center gap-3">
-                    <ThemeToggle />
-                    <UserButton
-                        afterSignOutUrl="/"
-                        appearance={{
-                            elements: {
-                                avatarBox: "h-8 w-8",
-                            },
-                        }}
-                    />
                 </div>
             </SidebarFooter>
 
