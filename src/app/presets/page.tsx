@@ -23,7 +23,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Upload, Settings2, Trash2, FileText, Calendar, CheckCircle, XCircle, Clock, AlertCircle, Info, FileSpreadsheet } from "lucide-react";
+import { Plus, Upload, Settings2, Trash2, FileText, Calendar, CheckCircle, XCircle, Clock, AlertCircle, Info } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 
@@ -316,23 +316,6 @@ export default function PresetsPage() {
         <AppLayout>
             <InitUser />
             <div className="container mx-auto py-6 px-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <h1 className="flex items-center gap-3 text-3xl font-bold text-foreground">
-                        <FileSpreadsheet className="h-8 w-8 text-primary" />
-                        Presets
-                        </h1>
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Configure how to import your bank statements. Each bank exports data differently.</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                </div>
-
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex items-center justify-between mb-6">
                         <TabsList>

@@ -8,7 +8,7 @@ import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, MessageCircle, Link2, Link2Off, RefreshCw, CheckCircle2, Clock } from "lucide-react";
+import { MessageCircle, Link2, Link2Off, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 
 function formatTimeLeft(expiresAt: number): string {
     const ms = expiresAt - Date.now();
@@ -189,11 +189,6 @@ export default function SettingsPage() {
         <AppLayout>
             <InitUser />
             <div className="flex flex-col gap-6 py-6 px-6 max-w-2xl">
-                <div className="flex items-center gap-3">
-                    <Settings className="h-8 w-8 text-primary" />
-                    <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-                </div>
-
                 <div className="flex flex-col gap-4">
                     <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                         Integrations

@@ -56,7 +56,7 @@ const chatItems = [
 export function AppSidebar() {
     const pathname = usePathname()
     const { setOpenMobile, isMobile } = useSidebar()
-    const { convexUser } = useConvexUser()
+    const { convexUser, clerkUser } = useConvexUser()
 
     const plans = useQuery(
         api.incomePlans.listIncomePlans,
@@ -115,7 +115,7 @@ export function AppSidebar() {
                                         </Link>
                                     </SidebarMenuButton>
                                     {item.href === "/income" && plannedIncomeCount > 0 && (
-                                        <SidebarMenuBadge className="bg-primary/15 text-primary font-bold group-data-[active=true]:bg-primary-foreground/20 group-data-[active=true]:text-primary-foreground">
+                                        <SidebarMenuBadge className="bg-primary/15 text-primary font-bold group-data-[active=true]:bg-primary-foreground/20 group-data-[active=true]:text-primary-foreground !top-2.5">
                                             {plannedIncomeCount}
                                         </SidebarMenuBadge>
                                     )}
@@ -191,7 +191,7 @@ export function AppSidebar() {
                         />
                         <div className="flex flex-col group-data-[collapsible=icon]:hidden">
                             <span className="text-xs font-semibold text-foreground truncate max-w-[100px]">
-                                {convexUser?.name || "Account"}
+                                {clerkUser?.fullName || clerkUser?.firstName || "Account"}
                             </span>
                         </div>
                     </div>

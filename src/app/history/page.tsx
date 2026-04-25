@@ -8,7 +8,7 @@ import InitUser from "@/components/InitUser";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { History, MessageSquare, Zap, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { MessageSquare, Zap, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { format } from "date-fns";
 
 type Message = {
@@ -126,11 +126,6 @@ export default function HistoryPage() {
         <AppLayout>
             <InitUser />
             <div className="flex flex-col gap-6 py-6 px-6 max-w-3xl">
-                <div className="flex items-center gap-3">
-                    <History className="h-8 w-8 text-primary" />
-                    <h1 className="text-3xl font-bold tracking-tight">Chat History</h1>
-                </div>
-
                 {!convexUser && (
                     <p className="text-muted-foreground">Sign in to view your history.</p>
                 )}

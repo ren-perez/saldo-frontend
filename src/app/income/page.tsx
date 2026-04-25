@@ -53,18 +53,6 @@ export default function IncomePage() {
         {/* Header + pill + actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                <DollarSign className="h-8 w-8 text-primary" />
-                Income
-              </h1>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="size-4 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent>Track and allocate your income across accounts.</TooltipContent>
-              </Tooltip>
-            </div>
             {userId && <SafeToSpendCard userId={userId} />}
           </div>
 

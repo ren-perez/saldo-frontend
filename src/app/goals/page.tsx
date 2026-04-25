@@ -151,24 +151,6 @@ export default function GoalsPage() {
     <AppLayout>
       <InitUser />
       <div className="container mx-auto py-6 px-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Target className="h-8 w-8 text-primary" />
-            Goals
-          </h1>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Track your financial goals and stay motivated on your journey</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-
         <div className="mb-6 text-right">
           <Button onClick={handleCreateNewGoal} className="gap-2">
             <Plus className="h-4 w-4" />

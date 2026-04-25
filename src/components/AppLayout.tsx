@@ -5,7 +5,25 @@ import { AppSidebar } from "./AppSidebar"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 import { PendingActionsDropdown } from "./PendingActionsDropdown"
+
+const NAV_LABELS: { href: string; label: string }[] = [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/income", label: "Income" },
+    { href: "/goals", label: "Goals" },
+    { href: "/accounts", label: "Accounts" },
+    { href: "/transactions", label: "Transactions" },
+    { href: "/categories", label: "Categories" },
+    { href: "/presets", label: "Presets" },
+    { href: "/history", label: "Chat History" },
+    { href: "/settings", label: "Chat Settings" },
+]
+
+function getPageTitle(pathname: string): string {
+    const match = NAV_LABELS.find((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
+    return match?.label ?? "Saldo"
+}
 
 interface AppLayoutProps {
     children: React.ReactNode
@@ -21,6 +39,8 @@ function getFormattedDate() {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
+    const pathname = usePathname()
+    const pageTitle = getPageTitle(pathname)
     const [today, setToday] = useState(getFormattedDate)
 
     useEffect(() => {
@@ -48,7 +68,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             <SidebarTrigger className="ml-3 mr-2" />
                             <Separator orientation="vertical" className="h-4" />
                             <div className="flex flex-1 items-center justify-between">
-                                <h1 className="text-lg font-semibold pl-4">Saldo</h1>
+                                <h1 className="text-lg font-semibold pl-4">{pageTitle}</h1>
                                 <div className="flex items-center gap-3 pr-4">
                                     <PendingActionsDropdown />
                                     <Separator orientation="vertical" className="h-4" />

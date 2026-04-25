@@ -60,7 +60,6 @@ function formatCompact(amount: number): string {
   return Math.round(amount).toString()
 }
 
-// Minimum section height (%) to render an inline label
 const MIN_LABEL_PCT = 24
 
 type DayCell = { dayNum: number; dateKey: string; stats: DailyStats }
@@ -83,28 +82,30 @@ function HeatmapCell({
   const incomePct = hasActivity ? (income / total) * 100 : 0
   const expPct = hasActivity ? (expenses / total) * 100 : 0
   const goalsPct = hasActivity ? (goals / total) * 100 : 0
+  const isToday = day.dateKey === todayStr
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "relative w-full aspect-square rounded-md overflow-hidden transition-all duration-150",
-            "hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-            !hasActivity && "bg-muted/30",
-            day.dateKey === todayStr && "ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
+            "relative w-full aspect-square rounded-[6px] overflow-hidden transition-all duration-150 outline-none",
+            "focus-visible:ring-2 focus-visible:ring-primary",
+            !hasActivity && "bg-muted/40",
+            isToday
+              ? "ring-[1.5px] ring-gray-400/90"
+              : "hover:ring-2 hover:ring-primary/30"
           )}
         >
-          {/* Proportional vertical fill — income top, expenses mid, goals bottom */}
           {hasActivity && (
             <div className="absolute inset-0 flex flex-col">
               {income > 0 && (
                 <div
                   style={{ height: `${incomePct}%` }}
-                  className="bg-emerald-400/60 dark:bg-emerald-700/50 flex items-center justify-center overflow-hidden shrink-0"
+                  className="bg-[oklch(58%_0.14_160/55%)] flex items-center justify-center overflow-hidden shrink-0"
                 >
                   {incomePct >= MIN_LABEL_PCT && (
-                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 dark:text-emerald-100 leading-none px-0.5 drop-shadow-sm">
+                    <span className="text-xs font-bold leading-none px-0.5 text-[oklch(85%_0.1_160/90)]">
                       {formatCompact(income)}
                     </span>
                   )}
@@ -113,10 +114,10 @@ function HeatmapCell({
               {expenses > 0 && (
                 <div
                   style={{ height: `${expPct}%` }}
-                  className="bg-red-400/60 dark:bg-red-700/50 flex items-center justify-center overflow-hidden shrink-0"
+                  className="bg-[oklch(60%_0.18_25/55%)] flex items-center justify-center overflow-hidden shrink-0"
                 >
                   {expPct >= MIN_LABEL_PCT && (
-                    <span className="text-[9px] sm:text-[10px] font-bold text-red-900 dark:text-red-100 leading-none px-0.5 drop-shadow-sm">
+                    <span className="text-xs font-bold leading-none px-0.5 text-[oklch(88%_0.1_25/90)]">
                       {formatCompact(expenses)}
                     </span>
                   )}
@@ -125,10 +126,10 @@ function HeatmapCell({
               {goals > 0 && (
                 <div
                   style={{ height: `${goalsPct}%` }}
-                  className="bg-blue-400/60 dark:bg-blue-700/50 flex items-center justify-center overflow-hidden shrink-0"
+                  className="bg-[oklch(57%_0.16_220/55%)] flex items-center justify-center overflow-hidden shrink-0"
                 >
                   {goalsPct >= MIN_LABEL_PCT && (
-                    <span className="text-[9px] sm:text-[10px] font-bold text-blue-900 dark:text-blue-100 leading-none px-0.5 drop-shadow-sm">
+                    <span className="text-xs font-bold leading-none px-0.5 text-[oklch(85%_0.1_220/90)]">
                       {formatCompact(goals)}
                     </span>
                   )}
@@ -137,17 +138,17 @@ function HeatmapCell({
             </div>
           )}
 
-          {/* Day number — top-left, always on top */}
+          {/* Day number */}
           <span className={cn(
-            "absolute top-1 left-1 text-[7px] sm:text-[8px] leading-none font-semibold z-10 tabular-nums",
-            hasActivity ? "text-foreground/80" : "text-foreground/35"
+            "absolute top-1 left-1 text-[9px] leading-none font-semibold z-10 tabular-nums",
+            hasActivity ? "text-white/90" : "text-muted-foreground/90"
           )}>
             {day.dayNum}
           </span>
         </button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-60 p-0 shadow-md" align="center" side="bottom" sideOffset={4}>
+      <PopoverContent className="w-52 p-0 shadow-lg" align="center" side="bottom" sideOffset={5}>
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border">
           <span className="text-xs font-semibold text-foreground">
@@ -163,74 +164,54 @@ function HeatmapCell({
         </div>
 
         {!hasActivity && (
-          <p className="text-xs text-muted-foreground text-center py-3">No activity</p>
+          <p className="text-[11px] text-muted-foreground text-center py-3">No activity</p>
         )}
 
-        {/* Income section */}
         {income > 0 && (
           <div className="px-3 py-2 border-b border-border/50 last:border-0">
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-sm bg-emerald-400/60 dark:bg-emerald-700/50 shrink-0" />
-                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">Income</span>
-              </div>
-              <span className="text-[11px] font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Income</span>
+              <span className="text-[11px] font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                 {currencyExact(income)}
               </span>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 mt-1.5">
               {(day.stats.txs ?? []).filter(tx => tx.amount > 0).map((tx, i) => (
                 <div key={i} className="flex items-baseline justify-between gap-2">
-                  <span className="text-[10px] text-muted-foreground/70 truncate leading-tight">
-                    {tx.description}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">
-                    {currencyExact(tx.amount)}
-                  </span>
+                  <span className="text-[10px] text-muted-foreground/70 truncate">{tx.description}</span>
+                  <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">{currencyExact(tx.amount)}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Expenses section */}
         {expenses > 0 && (
           <div className="px-3 py-2 border-b border-border/50 last:border-0">
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-sm bg-red-400/60 dark:bg-red-700/50 shrink-0" />
-                <span className="text-[11px] font-semibold text-red-700 dark:text-red-400">Expenses</span>
-              </div>
-              <span className="text-[11px] font-semibold tabular-nums text-red-700 dark:text-red-400">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">Expenses</span>
+              <span className="text-[11px] font-semibold tabular-nums text-red-600 dark:text-red-400">
                 {currencyExact(expenses)}
               </span>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 mt-1.5">
               {(day.stats.txs ?? []).filter(tx => tx.amount < 0).map((tx, i) => (
                 <div key={i} className="flex items-baseline justify-between gap-2">
-                  <span className="text-[10px] text-muted-foreground/70 truncate leading-tight">
+                  <span className="text-[10px] text-muted-foreground/70 truncate">
                     {tx.description}
-                    {tx.category && (
-                      <span className="text-muted-foreground/40 ml-1">· {tx.category}</span>
-                    )}
+                    {tx.category && <span className="text-muted-foreground/40 ml-1">· {tx.category}</span>}
                   </span>
-                  <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">
-                    {currencyExact(Math.abs(tx.amount))}
-                  </span>
+                  <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">{currencyExact(Math.abs(tx.amount))}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Goals section — totals only, no linked transactions */}
         {goals > 0 && (
           <div className="px-3 py-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-sm bg-blue-400/60 dark:bg-blue-700/50 shrink-0" />
-                <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">Goals</span>
-              </div>
+              <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">Goals</span>
               <span className="text-[11px] font-semibold tabular-nums text-blue-600 dark:text-blue-400">
                 {currencyExact(goals)}
               </span>
@@ -272,51 +253,51 @@ function HeatmapGrid({
   return (
     <div className="flex flex-col gap-1">
       {/* Day-of-week labels */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1 mb-0.5">
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-          <div key={i} className="text-center text-[10px] sm:text-[11px] text-muted-foreground font-medium py-0.5">
+          <div key={i} className="text-center text-[9px] text-muted-foreground font-medium py-0.5">
             {d}
           </div>
         ))}
       </div>
 
       {/* Calendar grid */}
-      {weeks.map((week, weekIdx) => (
-        <div key={weekIdx} className="grid grid-cols-7 gap-1">
-          {week.map((day, dayIdx) =>
-            day ? (
-              <HeatmapCell
-                key={dayIdx}
-                day={day}
-                month={month}
-                todayStr={todayStr}
-                onNavigate={onNavigate}
-              />
-            ) : (
-              <div key={dayIdx} className="aspect-square" />
-            )
-          )}
-        </div>
-      ))}
+      <div className="flex flex-col gap-1">
+        {weeks.map((week, weekIdx) => (
+          <div key={weekIdx} className="grid grid-cols-7 gap-1">
+            {week.map((day, dayIdx) =>
+              day ? (
+                <HeatmapCell
+                  key={dayIdx}
+                  day={day}
+                  month={month}
+                  todayStr={todayStr}
+                  onNavigate={onNavigate}
+                />
+              ) : (
+                <div key={dayIdx} className="aspect-square" />
+              )
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mt-2 text-[9px] sm:text-[10px] text-muted-foreground">
-        <div className="flex gap-x-3 gap-y-1">
-          <span className="flex items-center gap-1">
-            <span className="size-2 rounded-sm bg-emerald-400/60 dark:bg-emerald-700/50 inline-block" />
-            Income
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="size-2 rounded-sm bg-red-400/60 dark:bg-red-700/50 inline-block" />
-            Expenses
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="size-2 rounded-sm bg-blue-400/60 dark:bg-blue-700/50 inline-block" />
-            Goals
-          </span>
+      <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1 mt-2.5">
+        <div className="flex gap-3">
+          {[
+            ["bg-[oklch(58%_0.14_160/55%)]", "Income"],
+            ["bg-[oklch(60%_0.18_25/55%)]", "Expenses"],
+            ["bg-[oklch(57%_0.16_220/55%)]", "Goals"],
+          ].map(([cls, label]) => (
+            <span key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span className={cn("size-2 rounded-[2px] inline-block shrink-0", cls)} />
+              {label}
+            </span>
+          ))}
         </div>
-        <span className="flex items-center gap-1">
-          <span className="size-2 rounded-sm ring-2 ring-primary/70 inline-block" />
+        <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <span className="size-2 rounded-[2px] ring-[1.5px] ring-gray-400/90 inline-block shrink-0" />
           Today
         </span>
       </div>
@@ -324,7 +305,7 @@ function HeatmapGrid({
   )
 }
 
-// --- Accordion Spending Breakdown ---
+// --- Spending Breakdown ---
 
 function SpendingBreakdown({
   groups,
@@ -365,13 +346,12 @@ function SpendingBreakdown({
         const hasCategories = grp.categories.length > 0
 
         return (
-          <div key={grp.groupId} className="flex flex-col gap-1.5">
-            {/* Group row — full row is clickable for accordion except the name button */}
+          <div key={grp.groupId}>
+            {/* Group header row */}
             <div
-              className={cn("flex items-center gap-2", hasCategories && "cursor-pointer")}
+              className={cn("flex items-center gap-2 mb-1.5", hasCategories && "cursor-pointer")}
               onClick={() => hasCategories && toggle(grp.groupId)}
             >
-              {/* Name + ExternalLink — content-width only, stops propagation, navigates */}
               <button
                 className="inline-flex items-center gap-1 max-w-[55%] group/name text-left shrink overflow-hidden"
                 onClick={(e) => {
@@ -380,34 +360,34 @@ function SpendingBreakdown({
                 }}
                 title={`View ${grp.groupName} transactions`}
               >
-                <span className="text-sm font-medium text-foreground truncate group-hover/name:underline decoration-muted-foreground underline-offset-2">
+                <span className="text-[13px] font-medium text-foreground truncate group-hover/name:underline decoration-muted-foreground underline-offset-2">
                   {grp.groupName}
                 </span>
-                <ExternalLink className="size-3 shrink-0 text-muted-foreground/40 group-hover/name:text-muted-foreground transition-colors duration-150" />
+                <ExternalLink className="size-3 shrink-0 text-muted-foreground/30 group-hover/name:text-muted-foreground transition-colors duration-150" />
               </button>
 
-              {/* Spacer — fills the toggle zone between name and stats */}
               <div className="flex-1" />
 
-              {/* Stats */}
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs text-muted-foreground tabular-nums">{Math.round(percentage)}%</span>
-                <span className="text-sm font-semibold tabular-nums text-foreground">{currencyExact(grp.amount)}</span>
+                <span className="text-[11px] text-muted-foreground tabular-nums">{Math.round(percentage)}%</span>
+                <span className="text-[13px] font-semibold tabular-nums text-foreground">{currencyExact(grp.amount)}</span>
               </div>
 
-              {/* Chevron — far right, outside progress bar width */}
               <ChevronDown
                 className={cn(
-                  "size-3.5 shrink-0 transition-transform duration-200",
+                  "size-[13px] shrink-0 transition-transform duration-200",
                   hasCategories ? "text-muted-foreground/60" : "invisible",
                   isOpen && "rotate-180"
                 )}
               />
             </div>
 
-            {/* Progress bar — mr-7 so right edge aligns with amount, not chevron */}
+            {/* Progress bar — 3px matching preview */}
             <div
-              className={cn("h-1 rounded-full bg-primary/10 overflow-hidden mr-6", hasCategories && "cursor-pointer hover:bg-primary/20 transition-colors duration-150")}
+              className={cn(
+                "h-[3px] rounded-full bg-muted overflow-hidden mr-5",
+                hasCategories && "cursor-pointer hover:bg-muted/80 transition-colors duration-150"
+              )}
               onClick={() => hasCategories && toggle(grp.groupId)}
             >
               <div
@@ -416,38 +396,35 @@ function SpendingBreakdown({
               />
             </div>
 
-            {/* Category sub-rows — CSS height transition */}
+            {/* Category sub-rows */}
             <div
               className={cn(
                 "flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
                 isOpen && hasCategories ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
               )}
             >
-              <div className="flex flex-col gap-3 pt-2 pb-2 pl-2 pr-8 border-l-2 border-border/60">
+              <div className="flex flex-col gap-3 pt-3 pb-2 pl-2 pr-5 border-l-2 border-border/50 ml-0.5">
                 {grp.categories.map((cat) => {
                   const catPct = grp.amount > 0 ? (cat.amount / grp.amount) * 100 : 0
                   return (
-                    <div key={cat.categoryId} className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1.5">
-                        {/* Category name + link — unified group */}
+                    <div key={cat.categoryId}>
+                      <div className="flex items-center gap-2 mb-[3px]">
                         <button
                           className="flex items-center gap-1 min-w-0 flex-1 group/cat text-left"
-                          onClick={() =>
-                            onNavigate({ categoryId: cat.categoryId, startDate: monthStart, endDate: monthEnd })
-                          }
+                          onClick={() => onNavigate({ categoryId: cat.categoryId, startDate: monthStart, endDate: monthEnd })}
                           title={`View ${cat.name} transactions`}
                         >
                           <span className="text-xs text-muted-foreground truncate group-hover/cat:text-foreground group-hover/cat:underline decoration-muted-foreground underline-offset-2 transition-colors duration-150">
                             {cat.name}
                           </span>
-                          <ExternalLink className="size-2.5 shrink-0 text-muted-foreground/30 group-hover/cat:text-muted-foreground transition-colors duration-150" />
+                          <ExternalLink className="size-2.5 shrink-0 text-muted-foreground/20 group-hover/cat:text-muted-foreground transition-colors duration-150" />
                         </button>
                         <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                           <span className="text-[11px] text-muted-foreground/60 tabular-nums">{Math.round(catPct)}%</span>
                           <span className="text-xs tabular-nums font-medium text-foreground">{currencyExact(cat.amount)}</span>
                         </div>
                       </div>
-                      <div className="h-0.5 rounded-full bg-primary/10 overflow-hidden">
+                      <div className="h-[2px] rounded-full bg-muted overflow-hidden">
                         <div
                           className="h-full rounded-full bg-primary/50 transition-[width] duration-500 ease-out"
                           style={{ width: `${catPct}%` }}
@@ -477,7 +454,15 @@ export function MonthlyOverview({ stats, month, year, onMonthChange, onGoToToday
   const reimbursements = stats?.totalReimbursements ?? 0
   const expenses = Math.max(0, grossExpenses - reimbursements)
   const goals = stats?.totalGoals ?? 0
+  const unallocated = Math.max(0, income - expenses - goals)
   const isLoading = stats === undefined
+
+  const kpis = [
+    { label: "Income",      value: currency(income),      color: "text-emerald-600 dark:text-emerald-400" },
+    { label: "Expenses",    value: currency(expenses),    color: "text-red-600 dark:text-red-400" },
+    { label: "Goals",       value: currency(goals),       color: "text-blue-600 dark:text-blue-400" },
+    { label: "Unallocated", value: currency(unallocated), color: "text-foreground" },
+  ]
 
   function navigateToTransactions(params: Record<string, string>) {
     const qs = new URLSearchParams(params).toString()
@@ -487,28 +472,23 @@ export function MonthlyOverview({ stats, month, year, onMonthChange, onGoToToday
   return (
     <Card className="flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="font-semibold">Monthly Overview</CardTitle>
-        <div className="flex items-center gap-1">
+        <CardTitle className="text-sm font-semibold">Monthly overview</CardTitle>
+        <div className="flex items-center gap-1.5">
           {!isCurrentMonth && (
             <Button
               variant="outline"
               size="sm"
-              className="h-6 px-2 text-xs"
+              className="h-6 px-2 text-[11px]"
               onClick={onGoToToday}
             >
               Today
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6"
-            onClick={() => onMonthChange(-1)}
-          >
+          <Button variant="ghost" size="icon" className="size-6" onClick={() => onMonthChange(-1)}>
             <ChevronLeft className="size-3.5" />
             <span className="sr-only">Previous month</span>
           </Button>
-          <span className="w-[120px] text-center text-sm font-medium text-foreground tabular-nums">
+          <span className="w-[110px] text-center text-xs font-medium text-foreground tabular-nums">
             {monthNames[month]} {year}
           </span>
           <Button
@@ -524,91 +504,64 @@ export function MonthlyOverview({ stats, month, year, onMonthChange, onGoToToday
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex flex-col gap-6">
-          {/* KPI: Income / Expenses / Goals */}
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 text-muted-foreground">
-            <div className="flex flex-col gap-1 px-2 py-1.5 sm:px-4 sm:py-1.5 border-r border-border/50">
-              <span className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground">
-                {/* <TrendingUp className="size-3 shrink-0" /> */}
-                Income
-              </span>
-              <span className="text-xs sm:text-sm font-semibold tabular-nums text-emerald-700/90 dark:text-emerald-400/90">
-                {currency(income)}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1 px-2 py-1.5 sm:px-4 sm:py-1.5 text-right">
-              <span className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground justify-end">
-                Expenses
-              </span>
-              <span className="text-xs sm:text-sm font-semibold tabular-nums text-red-700/90 dark:text-red-400/90">
-                {currency(expenses)}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1 px-2 py-1.5 sm:px-4 sm:py-1.5 text-right">
-              <span className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground justify-end">
-                {/* <Target className="size-3 shrink-0" /> */}
-                Goals
-              </span>
-              <span className="text-xs sm:text-sm font-semibold tabular-nums text-blue-600/90 dark:text-blue-400/90">
-                {currency(goals)}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1 px-2 py-1.5 sm:px-4 sm:py-1.5 text-right">
-              <span className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground justify-end">
-                {/* <Target className="size-3 shrink-0" /> */}
-                Unallocated
-              </span>
-              <span className="text-xs sm:text-sm font-semibold tabular-nums text-foreground-600 dark:text-foreground-400">
-                {currency(Math.abs(income - expenses - goals))}
-              </span>
-            </div>
-          </div>
-
-          <Tabs defaultValue="category" className="w-full">
-            <TabsList className="h-8 w-full">
-              <TabsTrigger value="category" className="text-sm px-2.5 h-7">Category</TabsTrigger>
-              <TabsTrigger value="heatmap" className="text-sm px-2.5 h-7">Heatmap</TabsTrigger>
-            </TabsList>
-
-            {/* Category tab */}
-            <TabsContent value="category" className="mt-3">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-sm text-muted-foreground">Loading...</span>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-
-                  {/* Accordion spending breakdown */}
-                  <SpendingBreakdown
-                    groups={stats.topCategoryGroups}
-                    expenses={expenses}
-                    month={month}
-                    year={year}
-                    onNavigate={navigateToTransactions}
-                  />
-                </div>
+      <CardContent className="flex flex-col gap-4">
+        {/* KPI row — unified pill box matching preview */}
+        <div className="grid grid-cols-4 rounded-md overflow-hidden border border-border bg-muted/40">
+          {kpis.map((k, i) => (
+            <div
+              key={k.label}
+              className={cn(
+                "flex flex-col gap-1.5 px-3 py-2.5",
+                i < 3 && "border-r border-border"
               )}
-            </TabsContent>
-
-            {/* Heatmap tab */}
-            <TabsContent value="heatmap" className="mt-3">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="text-sm text-muted-foreground">Loading...</span>
-                </div>
-              ) : (
-                <HeatmapGrid
-                  year={year}
-                  month={month}
-                  dailyStats={stats.dailyStats ?? {}}
-                  onNavigate={navigateToTransactions}
-                />
-              )}
-            </TabsContent>
-          </Tabs>
+            >
+              <span className="text-[10px] text-muted-foreground lowercase">{k.label}</span>
+              <span className={cn("text-[13px] font-semibold tabular-nums tracking-tight", k.color)}>
+                {k.value}
+              </span>
+            </div>
+          ))}
         </div>
+
+        <Tabs defaultValue="category" className="w-full">
+          <TabsList className="h-8 w-full">
+            <TabsTrigger value="category" className="text-xs px-2.5 h-7">Category</TabsTrigger>
+            <TabsTrigger value="heatmap" className="text-xs px-2.5 h-7">Heatmap</TabsTrigger>
+          </TabsList>
+
+          {/* Category tab */}
+          <TabsContent value="category" className="mt-3">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              </div>
+            ) : (
+              <SpendingBreakdown
+                groups={stats.topCategoryGroups}
+                expenses={expenses}
+                month={month}
+                year={year}
+                onNavigate={navigateToTransactions}
+              />
+            )}
+          </TabsContent>
+
+          {/* Heatmap tab */}
+          <TabsContent value="heatmap" className="mt-3">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              </div>
+            ) : (
+              <HeatmapGrid
+                year={year}
+                month={month}
+                dailyStats={stats.dailyStats ?? {}}
+                onNavigate={navigateToTransactions}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   )

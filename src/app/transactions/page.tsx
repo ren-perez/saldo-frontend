@@ -9,7 +9,7 @@ import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import {
     Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus, Info,
-    CreditCard, ArrowUp, ArrowDown, ArrowUpDown, Link2, Pencil
+    ArrowUp, ArrowDown, ArrowUpDown, Link2, Pencil
 } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/CreateTransactionDialog";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -769,22 +769,6 @@ function TransactionsContent() {
 
                     {/* Header */}
                     <div className="flex flex-col gap-4 mb-6">
-
-                        {/* Title */}
-                        <div className="flex items-center gap-1.5">
-                            <h1 className="flex items-center gap-3 text-3xl font-bold text-foreground">
-                                <CreditCard className="h-8 w-8 text-primary" />
-                                Transactions
-                            </h1>
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>View and manage your imported transactions</TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
 
                         {/* CTAs */}
                         <div className="flex items-center gap-2 justify-end mb-6 flex-wrap">

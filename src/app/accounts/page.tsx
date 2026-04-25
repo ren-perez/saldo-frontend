@@ -49,7 +49,6 @@ import {
     Info,
     Target,
     FileText,
-    Landmark,
     ChevronDown,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -209,18 +208,6 @@ export default function AccountsPage() {
             <InitUser />
             <div className="flex flex-col gap-6 py-6 px-6">
                 <div>
-                    <div className="flex items-center gap-2 mb-6">
-                        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                            <Landmark className="h-8 w-8 text-primary" />
-                            Accounts
-                        </h1>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Info className="size-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>Manage your financial accounts.</TooltipContent>
-                        </Tooltip>
-                    </div>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center rounded-lg border p-1">
                             <Button

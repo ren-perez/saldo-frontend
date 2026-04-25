@@ -300,24 +300,6 @@ export default function CategoriesPage() {
       <InitUser />
       <div className="container mx-auto py-6 px-6">
 
-        {/* ── Header ── */}
-        <div className="flex items-center gap-3 mb-6">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Tag className="h-8 w-8 text-primary" />
-            Categories
-          </h1>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Organise your transactions with categories and groups</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-
         <Tabs defaultValue="categories" onValueChange={setActiveTab}>
           <div className="flex items-center mb-6">
             <TabsList>
