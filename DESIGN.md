@@ -77,8 +77,8 @@ Saldo uses the **Depth & Light** design language — surfaces appear as physical
 - No patterns, no noise texture, no illustration backgrounds.
 
 ### Cards
-- **Top highlight:** `1px solid oklch(100% 0 0 / 10%)` — simulates overhead light catch
-- **Side/bottom borders:** `0.5px solid var(--color-border)` — subtle structure
+<!-- - **Top highlight:** `1px solid oklch(100% 0 0 / 10%)` — simulates overhead light catch -->
+- **Side/top/bottom borders:** `0.5px solid var(--color-border)` — subtle structure
 - **Dual shadow:** proximity (sharp) + ambient (soft diffuse)
 - **Radius:** 12px (cards), 8px (buttons), 6px (inputs), pill for chips
 - Inner nested cards use `radius - 4px` = 8px

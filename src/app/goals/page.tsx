@@ -243,7 +243,7 @@ export default function GoalsPage() {
             </button>
             <div className={`grid transition-all duration-300 ease-in-out ${inProgressOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
               <div className="overflow-hidden">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-1">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 pb-1">
                   {activeGoals.map((goal: Goal) => (
                     <GoalCardItem
                       key={goal._id}

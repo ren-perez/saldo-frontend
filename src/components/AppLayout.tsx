@@ -66,9 +66,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     <main className="relative flex-1 overflow-y-auto">
                         <header className="sticky top-0 z-50 w-full flex h-16 shrink-0 items-center gap-2 border-b bg-background/60 backdrop-blur-xl">
                             <SidebarTrigger className="ml-3 mr-2" />
+
                             <Separator orientation="vertical" className="h-4" />
+
                             <div className="flex flex-1 items-center justify-between">
-                                <h1 className="text-lg font-semibold pl-4">{pageTitle}</h1>
+                                <h1 className="text-lg font-semibold pl-4 tracking-wide">{pageTitle}</h1>
+                                
                                 <div className="flex items-center gap-3 pr-4">
                                     <PendingActionsDropdown />
                                     <Separator orientation="vertical" className="h-4" />
@@ -77,11 +80,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                     </div>
                                 </div>
                             </div>
+
                         </header>
                         {children}
                     </main>
                 </SidebarInset>
             </SignedIn>
+
             <SignedOut>
                 <SidebarInset>
                     <div className="min-h-screen flex items-center justify-center bg-background">

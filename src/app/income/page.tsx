@@ -57,7 +57,7 @@ export default function IncomePage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {count > 0 && (
+            {/* {count > 0 && (
               <Button
                 variant="outline"
                 onClick={() => setUnmatchedOpen(true)}
@@ -67,7 +67,7 @@ export default function IncomePage() {
                 <span className="hidden sm:inline">Match Your Income</span>
                 <span className="inline sm:hidden">Match</span>
               </Button>
-            )}
+            )} */}
             <Button
               variant="outline"
               onClick={() => setAllocationRulesOpen(true)}
