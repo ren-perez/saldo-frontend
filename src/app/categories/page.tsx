@@ -24,29 +24,27 @@ import {
 } from "@dnd-kit/sortable";
 import { RulePreviewDialog, RuleDialogMode } from "@/components/RulePreviewDialog";
 
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Plus,
   Tag,
   FolderOpen,
-  Info,
   ChevronsUpDown,
   Zap,
   Lightbulb,
+  ChevronDown,
   ChevronRight,
 } from "lucide-react";
 
@@ -56,7 +54,42 @@ import { RuleRow } from "./_components/RuleRow";
 import { CategoryDialogs } from "./_components/CategoryDialogs";
 import { GroupDialogs } from "./_components/GroupDialogs";
 
-// ─── main page ─────────────────────────────────────────────────────────────────
+// ─── split add button ────────────────────────────────────────────────────────
+
+function AddCategoryButton({
+  onAddCategory,
+  onAddGroup,
+}: {
+  onAddCategory: () => void;
+  onAddGroup: () => void;
+}) {
+  return (
+    <div className="flex items-center">
+      <Button
+        className="gap-2 rounded-r-none border-r border-primary-foreground/20"
+        onClick={onAddCategory}
+      >
+        <Plus className="size-4" />
+        Add category
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button className="rounded-l-none px-2.5">
+            <ChevronDown className="size-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem onClick={onAddGroup} className="gap-2">
+            <FolderOpen className="size-3.5" />
+            Add group
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+// ─── main page ────────────────────────────────────────────────────────────────
 
 export default function CategoriesPage() {
   const { convexUser } = useConvexUser();
@@ -100,7 +133,6 @@ export default function CategoriesPage() {
   const [activeTab, setActiveTab] = useState("categories");
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
-  // RulePreviewDialog state — null = closed
   const [ruleDialogState, setRuleDialogState] = useState<RuleDialogMode | null>(null);
 
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -113,18 +145,13 @@ export default function CategoriesPage() {
   });
 
   const [groupForm, setGroupForm] = useState({ name: "" });
-
-  // Collapsed state for suggestions inbox
   const [suggestionsOpen, setSuggestionsOpen] = useState(true);
 
-  // dnd-kit sensors
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // ── accordion open state ──
-  // Keyed by group._id or "ungrouped". All closed by default.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const allExpanded = Object.values(openSections).some(Boolean);
 
@@ -147,7 +174,7 @@ export default function CategoriesPage() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">
-          <p className="text-lg">Sign in required</p>
+          <p className="text-sm text-muted-foreground">Sign in required</p>
         </div>
       </AppLayout>
     );
@@ -232,7 +259,6 @@ export default function CategoriesPage() {
     const activeRulesList = rules.filter((r) => r.isActive);
     const inactiveRulesList = rules.filter((r) => !r.isActive);
 
-    // Determine which list the drag happened in
     const activeIds = activeRulesList.map((r) => r._id);
     const inactiveIds = inactiveRulesList.map((r) => r._id);
 
@@ -251,7 +277,6 @@ export default function CategoriesPage() {
 
     if (!reorderedList) return;
 
-    // Assign descending priority integers based on new order
     const updates = reorderedList.map((rule, idx) => ({
       ruleId: rule._id,
       priority: reorderedList!.length - 1 - idx,
@@ -267,13 +292,9 @@ export default function CategoriesPage() {
   const openEditCategory = (cat: Category) => setEditingCategory(cat);
   const openEditGroup = (g: CategoryGroup) => setEditingGroup(g);
 
-  // ── derived data (sorted alphabetically) ──
-  const allCategories = [...(categories ?? [])].sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-  const allGroups = [...(categoryGroups ?? [])].sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  // ── derived data ──
+  const allCategories = [...(categories ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+  const allGroups = [...(categoryGroups ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 
   const groupedMap = new Map<string, Category[]>();
   allGroups.forEach((g) => groupedMap.set(g._id, []));
@@ -287,9 +308,7 @@ export default function CategoriesPage() {
     }
   });
 
-  // Build a categoryId → name lookup for rules display
   const categoryNameMap = new Map(allCategories.map((c) => [c._id as string, c.name]));
-
   const isLoading = categories === undefined || categoryGroups === undefined;
   const hasContent = allCategories.length > 0 || allGroups.length > 0;
   const activeRules = (rules ?? []).filter((r) => r.isActive);
@@ -298,328 +317,310 @@ export default function CategoriesPage() {
   return (
     <AppLayout>
       <InitUser />
-      <div className="container mx-auto py-6 px-6">
+      <div className="container flex flex-col">
+        <div className="flex flex-col gap-6 p-6">
 
-        <Tabs defaultValue="categories" onValueChange={setActiveTab}>
-          <div className="flex items-center mb-6">
-            <TabsList>
-              <TabsTrigger value="categories" className="gap-2">
-                <Tag className="h-3.5 w-3.5" />
-                Categories
-              </TabsTrigger>
-              <TabsTrigger value="rules" className="gap-2">
-                <Zap className="h-3.5 w-3.5" />
-                Auto-Rules
-                {(rules?.length ?? 0) > 0 && (
-                  <span className="ml-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-medium px-1.5 py-0.5">
-                    {rules?.length}
-                  </span>
+          <Tabs defaultValue="categories" onValueChange={setActiveTab}>
+            <div className="flex items-center mb-6">
+              <TabsList>
+                <TabsTrigger value="categories" className="gap-2">
+                  <Tag className="h-3.5 w-3.5" />
+                  Categories
+                </TabsTrigger>
+                <TabsTrigger value="rules" className="gap-2">
+                  <Zap className="h-3.5 w-3.5" />
+                  Auto-rules
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Per-tab CTAs */}
+              <div className="ml-auto flex items-center gap-2">
+                {activeTab === "categories" ? (
+                  <AddCategoryButton
+                    onAddCategory={() => setShowCategoryDialog(true)}
+                    onAddGroup={() => setShowGroupDialog(true)}
+                  />
+                ) : (
+                  <Button
+                    onClick={() => setRuleDialogState({ type: "new" })}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add rule
+                  </Button>
                 )}
-              </TabsTrigger>
-            </TabsList>
-
-            {/* ── Per-tab CTAs — always right-aligned ── */}
-            <div className="ml-auto flex items-center gap-2">
-              {activeTab === "categories" ? (
-                <>
-                  {hasContent && !isLoading && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleAll}
-                      className="gap-2 text-muted-foreground"
-                    >
-                      <ChevronsUpDown className="h-4 w-4" />
-                      {allExpanded ? "Collapse All" : "Expand All"}
-                    </Button>
-                  )}
-                  <Button onClick={() => setShowCategoryDialog(true)} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Category
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowGroupDialog(true)}
-                    className="gap-2"
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    Add Group
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  onClick={() => setRuleDialogState({ type: "new" })}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Rule
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* ══ Categories tab ══ */}
-          <TabsContent value="categories">
-            {/* ── Loading skeleton ── */}
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="h-14 rounded-xl bg-muted animate-pulse"
-                  />
-                ))}
               </div>
-            ) : !hasContent ? (
-              /* ── Empty state ── */
-              <Card className="p-12 text-center">
-                <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
-                  <Tag className="h-12 w-12 text-muted-foreground" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">No categories yet</h3>
-                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                  Create groups to organise your categories, then add categories to
-                  track your transactions.
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  <Button onClick={() => setShowCategoryDialog(true)} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Category
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowGroupDialog(true)}
-                    className="gap-2"
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    Add Group
-                  </Button>
-                </div>
-              </Card>
-            ) : (
-              /* ── Group accordion sections ── */
-              <div className="space-y-4">
-                {allGroups.map((group, idx) => (
-                  <GroupSection
-                    key={group._id}
-                    group={group}
-                    colorIndex={idx}
-                    categories={groupedMap.get(group._id) ?? []}
-                    onEditCategory={openEditCategory}
-                    onDeleteCategory={handleDeleteCategory}
-                    onEditGroup={openEditGroup}
-                    onDeleteGroup={handleDeleteGroup}
-                    open={openSections[group._id] ?? false}
-                    onOpenChange={(val) => setSectionOpen(group._id, val)}
-                  />
-                ))}
+            </div>
 
-                {ungrouped.length > 0 && (
-                  <>
-                    {allGroups.length > 0 && <Separator className="my-1" />}
+            {/* ══ Categories tab ══ */}
+            <TabsContent value="categories">
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-14 rounded-xl bg-muted animate-pulse" />
+                  ))}
+                </div>
+              ) : !hasContent ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                  <Tag className="size-8 text-muted-foreground/30" />
+                  <div>
+                    <p className="text-sm font-medium">No categories yet</p>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
+                      Create groups to organise your categories, then add categories to track your transactions.
+                    </p>
+                  </div>
+                  <div className="mt-2">
+                    <AddCategoryButton
+                      onAddCategory={() => setShowCategoryDialog(true)}
+                      onAddGroup={() => setShowGroupDialog(true)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {/* Groups list header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Groups</span>
+                      <span className="text-xs text-muted-foreground/50">
+                        ({allGroups.length + (ungrouped.length > 0 ? 1 : 0)})
+                      </span>
+                    </div>
+                    {/* <span className="flex-1 h-px bg-border" /> */}
+                    <button
+                      onClick={toggleAll}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ChevronsUpDown className="h-3.5 w-3.5" />
+                      {allExpanded ? "Collapse all" : "Expand all"}
+                    </button>
+                  </div>
+
+                  {allGroups.map((group, idx) => (
                     <GroupSection
-                      group={null}
-                      colorIndex={0}
-                      categories={ungrouped}
+                      key={group._id}
+                      group={group}
+                      colorIndex={idx}
+                      categories={groupedMap.get(group._id) ?? []}
                       onEditCategory={openEditCategory}
                       onDeleteCategory={handleDeleteCategory}
-                      onEditGroup={() => {}}
-                      onDeleteGroup={() => {}}
-                      open={openSections["ungrouped"] ?? false}
-                      onOpenChange={(val) => setSectionOpen("ungrouped", val)}
+                      onEditGroup={openEditGroup}
+                      onDeleteGroup={handleDeleteGroup}
+                      open={openSections[group._id] ?? false}
+                      onOpenChange={(val) => setSectionOpen(group._id, val)}
                     />
-                  </>
-                )}
-              </div>
-            )}
-          </TabsContent>
+                  ))}
 
-          {/* ══ Rules tab ══ */}
-          <TabsContent value="rules">
-            {rules === undefined ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />
-                ))}
-              </div>
-            ) : rules.length === 0 && (!suggestions || suggestions.length === 0) ? (
-              <Card className="p-12 text-center">
-                <div className="mx-auto w-20 h-20 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mb-5">
-                  <Zap className="h-10 w-10 text-amber-400" />
+                  {ungrouped.length > 0 && (
+                    <>
+                      {allGroups.length > 0 && <div className="h-px bg-border my-1" />}
+                      <GroupSection
+                        group={null}
+                        colorIndex={0}
+                        categories={ungrouped}
+                        onEditCategory={openEditCategory}
+                        onDeleteCategory={handleDeleteCategory}
+                        onEditGroup={() => { }}
+                        onDeleteGroup={() => { }}
+                        open={openSections["ungrouped"] ?? false}
+                        onOpenChange={(val) => setSectionOpen("ungrouped", val)}
+                      />
+                    </>
+                  )}
                 </div>
-                <h3 className="text-xl font-semibold mb-2">No auto-rules yet</h3>
-                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                  Rules automatically categorise new transactions when their description
-                  contains a keyword you define.
-                </p>
-                <Button
-                  onClick={() => setRuleDialogState({ type: "new" })}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Rule
-                </Button>
-              </Card>
-            ) : (
-              <div className="space-y-4">
+              )}
+            </TabsContent>
 
-                {/* ── Suggested Rules Inbox ── */}
-                {suggestions && suggestions.length > 0 && (
-                  <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-                    <button
-                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-900 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/70 transition-colors"
-                      onClick={() => setSuggestionsOpen((p) => !p)}
-                    >
-                      <Lightbulb className="h-3.5 w-3.5 text-yellow-500" />
-                      <span className="text-sm font-semibold flex-1 text-left">Suggested Rules</span>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                        {suggestions.length}
-                      </span>
-                      <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${suggestionsOpen ? "rotate-90" : ""}`} />
-                    </button>
-                    {suggestionsOpen && (
-                      <div className="bg-zinc-50 dark:bg-zinc-900 p-2 space-y-1">
-                        {suggestions.map((s, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-background border border-zinc-100 dark:border-zinc-800"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <Lightbulb className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
-                              <p className="text-sm">
-                                You often categorize{" "}
-                                <code className="font-mono bg-muted px-1 py-0.5 rounded text-xs">
-                                  {s.normalizedDescription.length > 30
-                                    ? s.normalizedDescription.slice(0, 30) + "…"
-                                    : s.normalizedDescription}
-                                </code>{" "}
-                                as{" "}
-                                <span className="font-medium">
-                                  {categoryNameMap.get(s.categoryId) ?? "Unknown"}
-                                </span>
-                                <span className="text-muted-foreground ml-1 text-xs">({s.count}×)</span>
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="shrink-0 ml-3 text-xs h-7"
-                              onClick={() => setRuleDialogState({
-                                type: "new",
-                                prefill: { pattern: s.normalizedDescription, categoryId: s.categoryId },
-                              })}
+            {/* ══ Rules tab ══ */}
+            <TabsContent value="rules">
+              {rules === undefined ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />
+                  ))}
+                </div>
+              ) : rules.length === 0 && (!suggestions || suggestions.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                  <Zap className="size-8 text-muted-foreground/30" />
+                  <div>
+                    <p className="text-sm font-medium">No auto-rules yet</p>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
+                      Rules automatically categorise new transactions when their description contains a keyword you define.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => setRuleDialogState({ type: "new" })}
+                    className="gap-2 mt-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add rule
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-8">
+
+                  {/* Suggested rules */}
+                  {suggestions && suggestions.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        className="flex w-full items-center gap-2 select-none"
+                        onClick={() => setSuggestionsOpen((p) => !p)}
+                      >
+                        <Lightbulb className="size-3.5 text-yellow-500" />
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Suggested rules
+                        </span>
+                        <span className="text-xs text-muted-foreground/50">({suggestions.length})</span>
+                        <span className="flex-1 h-px bg-border" />
+                        <ChevronRight
+                          className={`size-3.5 text-muted-foreground/50 transition-transform duration-200 ${suggestionsOpen ? "rotate-90" : ""}`}
+                        />
+                      </button>
+                      {suggestionsOpen && (
+                        <div className="flex flex-col gap-2">
+                          {suggestions.map((s, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-border/60 bg-card"
                             >
-                              Create Rule
-                            </Button>
-                          </div>
-                        ))}
+                              <div className="flex items-center gap-3 min-w-0">
+                                <p className="text-sm">
+                                  You often categorize{" "}
+                                  <code className="font-mono bg-muted px-1 py-0.5 rounded text-xs">
+                                    {s.normalizedDescription.length > 30
+                                      ? s.normalizedDescription.slice(0, 30) + "…"
+                                      : s.normalizedDescription}
+                                  </code>{" "}
+                                  as{" "}
+                                  <span className="font-medium">
+                                    {categoryNameMap.get(s.categoryId) ?? "Unknown"}
+                                  </span>
+                                  <span className="text-muted-foreground ml-1 text-xs">({s.count}×)</span>
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="shrink-0 ml-3 text-xs h-7"
+                                onClick={() => setRuleDialogState({
+                                  type: "new",
+                                  prefill: { pattern: s.normalizedDescription, categoryId: s.categoryId },
+                                })}
+                              >
+                                Create rule
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    {/* Active rules */}
+                    {activeRules.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <Zap className="size-3.5 text-amber-500" />
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Active rules
+                          </span>
+                          <span className="text-xs text-muted-foreground/50">({activeRules.length})</span>
+                          <span className="flex-1 h-px bg-border" />
+                          <span className="text-xs text-muted-foreground">drag to reorder</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <SortableContext items={activeRules.map((r) => r._id)} strategy={verticalListSortingStrategy}>
+                            {activeRules.map((rule) => (
+                              <RuleRow
+                                key={rule._id}
+                                rule={rule}
+                                categoryName={categoryNameMap.get(rule.categoryId as string) ?? "Unknown"}
+                                matchCount={matchCounts?.[rule._id as string] ?? 0}
+                                onEdit={(r) => setRuleDialogState({ type: "edit", rule: r })}
+                                onDelete={handleDeleteRule}
+                                onToggle={handleToggleRule}
+                              />
+                            ))}
+                          </SortableContext>
+                        </div>
                       </div>
                     )}
-                  </div>
-                )}
 
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  {/* Active rules */}
-                  {activeRules.length > 0 && (
-                    <div className="rounded-xl border border-amber-100 dark:border-amber-900/50 overflow-hidden">
-                      <div className="px-4 py-3 bg-amber-50 dark:bg-amber-950/40 flex items-center gap-3">
-                        <Zap className="h-3.5 w-3.5 text-amber-500" />
-                        <span className="text-sm font-semibold">Active Rules</span>
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
-                          {activeRules.length}
-                        </span>
-                        <span className="text-xs text-muted-foreground ml-auto">drag to reorder</span>
+                    {/* Paused rules */}
+                    {inactiveRules.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <Zap className="size-3.5 text-muted-foreground/30" />
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Paused rules
+                          </span>
+                          <span className="text-xs text-muted-foreground/50">({inactiveRules.length})</span>
+                          <span className="flex-1 h-px bg-border" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <SortableContext items={inactiveRules.map((r) => r._id)} strategy={verticalListSortingStrategy}>
+                            {inactiveRules.map((rule) => (
+                              <RuleRow
+                                key={rule._id}
+                                rule={rule}
+                                categoryName={categoryNameMap.get(rule.categoryId as string) ?? "Unknown"}
+                                matchCount={matchCounts?.[rule._id as string] ?? 0}
+                                onEdit={(r) => setRuleDialogState({ type: "edit", rule: r })}
+                                onDelete={handleDeleteRule}
+                                onToggle={handleToggleRule}
+                              />
+                            ))}
+                          </SortableContext>
+                        </div>
                       </div>
-                      <div className="bg-gray-50/50 dark:bg-card p-2 space-y-0.5">
-                        <SortableContext items={activeRules.map((r) => r._id)} strategy={verticalListSortingStrategy}>
-                          {activeRules.map((rule) => (
-                            <RuleRow
-                              key={rule._id}
-                              rule={rule}
-                              categoryName={categoryNameMap.get(rule.categoryId as string) ?? "Unknown"}
-                              matchCount={matchCounts?.[rule._id as string] ?? 0}
-                              onEdit={(r) => setRuleDialogState({ type: "edit", rule: r })}
-                              onDelete={handleDeleteRule}
-                              onToggle={handleToggleRule}
-                            />
-                          ))}
-                        </SortableContext>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </DndContext>
 
-                  {/* Inactive rules */}
-                  {inactiveRules.length > 0 && (
-                    <div className="rounded-xl border border-muted overflow-hidden">
-                      <div className="px-4 py-3 bg-muted/40 flex items-center gap-3">
-                        <Zap className="h-3.5 w-3.5 text-muted-foreground/40" />
-                        <span className="text-sm font-semibold text-muted-foreground">Paused Rules</span>
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                          {inactiveRules.length}
-                        </span>
-                      </div>
-                      <div className="bg-gray-50/50 dark:bg-card p-2 space-y-0.5">
-                        <SortableContext items={inactiveRules.map((r) => r._id)} strategy={verticalListSortingStrategy}>
-                          {inactiveRules.map((rule) => (
-                            <RuleRow
-                              key={rule._id}
-                              rule={rule}
-                              categoryName={categoryNameMap.get(rule.categoryId as string) ?? "Unknown"}
-                              matchCount={matchCounts?.[rule._id as string] ?? 0}
-                              onEdit={(r) => setRuleDialogState({ type: "edit", rule: r })}
-                              onDelete={handleDeleteRule}
-                              onToggle={handleToggleRule}
-                            />
-                          ))}
-                        </SortableContext>
-                      </div>
-                    </div>
-                  )}
-                </DndContext>
+                  <p className="text-xs text-muted-foreground">
+                    Rules are checked in priority order (top first). Drag rows to reorder.
+                    Manual overrides always take precedence.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
 
-                <p className="text-xs text-muted-foreground px-1">
-                  Rules are checked in priority order (top first). Drag rows to reorder.
-                  Manual overrides always take precedence.
-                </p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+          {/* Rule dialog */}
+          {ruleDialogState && convexUser && (
+            <RulePreviewDialog
+              mode={ruleDialogState}
+              userId={convexUser._id}
+              categories={allCategories}
+              onClose={() => setRuleDialogState(null)}
+            />
+          )}
 
-        {/* ── Rule Preview / Edit Dialog ── */}
-        {ruleDialogState && convexUser && (
-          <RulePreviewDialog
-            mode={ruleDialogState}
-            userId={convexUser._id}
-            categories={allCategories}
-            onClose={() => setRuleDialogState(null)}
+          {/* Category dialogs */}
+          <CategoryDialogs
+            showCategoryDialog={showCategoryDialog}
+            setShowCategoryDialog={setShowCategoryDialog}
+            editingCategory={editingCategory}
+            setEditingCategory={setEditingCategory}
+            categoryForm={categoryForm}
+            setCategoryForm={setCategoryForm}
+            allGroups={allGroups}
+            handleCreateCategory={handleCreateCategory}
+            handleUpdateCategory={handleUpdateCategory}
           />
-        )}
 
-        {/* ── Category Dialogs ── */}
-        <CategoryDialogs
-          showCategoryDialog={showCategoryDialog}
-          setShowCategoryDialog={setShowCategoryDialog}
-          editingCategory={editingCategory}
-          setEditingCategory={setEditingCategory}
-          categoryForm={categoryForm}
-          setCategoryForm={setCategoryForm}
-          allGroups={allGroups}
-          handleCreateCategory={handleCreateCategory}
-          handleUpdateCategory={handleUpdateCategory}
-        />
-
-        {/* ── Group Dialogs ── */}
-        <GroupDialogs
-          showGroupDialog={showGroupDialog}
-          setShowGroupDialog={setShowGroupDialog}
-          editingGroup={editingGroup}
-          setEditingGroup={setEditingGroup}
-          groupForm={groupForm}
-          setGroupForm={setGroupForm}
-          handleCreateGroup={handleCreateGroup}
-          handleUpdateGroup={handleUpdateGroup}
-        />
+          {/* Group dialogs */}
+          <GroupDialogs
+            showGroupDialog={showGroupDialog}
+            setShowGroupDialog={setShowGroupDialog}
+            editingGroup={editingGroup}
+            setEditingGroup={setEditingGroup}
+            groupForm={groupForm}
+            setGroupForm={setGroupForm}
+            handleCreateGroup={handleCreateGroup}
+            handleUpdateGroup={handleUpdateGroup}
+          />
+        </div>
       </div>
     </AppLayout>
   );

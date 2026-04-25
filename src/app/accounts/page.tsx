@@ -213,8 +213,9 @@ export default function AccountsPage() {
                                     <TableIcon className="size-3.5" /> Table
                                 </TabsTrigger>
                             </TabsList>
-                            <Button size="sm" className="gap-1.5" onClick={() => { setForm(BLANK_FORM); setShowAdd(true); }}>
-                                <Plus className="size-3.5" /> Add account
+                            <Button className="gap-2" onClick={() => { setForm(BLANK_FORM); setShowAdd(true); }}>
+                                <Plus className="size-4" /> 
+                                Add account
                             </Button>
                         </div>
 

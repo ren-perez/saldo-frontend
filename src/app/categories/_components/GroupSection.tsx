@@ -40,83 +40,66 @@ export function GroupSection({
 
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
-      <div className={`rounded-xl border ${color.border} overflow-hidden`}>
-        {/* Group header */}
+      <div className="group/section">
+        {/* Section header */}
         <CollapsibleTrigger asChild>
-          <button
-            className={`w-full flex items-center justify-between px-4 py-3 ${color.bg} ${color.trigger} transition-colors`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`h-2 w-2 rounded-full ${color.dot}`} />
-              <span className="text-sm font-semibold">
-                {group?.name ?? "Ungrouped"}
-              </span>
-              <span
-                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${color.badge}`}
-              >
-                {categories.length}
-              </span>
-            </div>
+          <button className="flex w-full items-center gap-2 py-2 px-1 select-none">
+            <div className={`h-2 w-2 rounded-full shrink-0 ${color.dot}`} />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              {group?.name ?? "Ungrouped"}
+            </span>
+            <span className="text-xs text-muted-foreground/50">({categories.length})</span>
+            <span className="flex-1 h-px bg-border" />
 
-            <div className="flex items-center gap-1">
-              {group && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <div
-                      role="button"
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                    >
-                      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-36">
-                    <DropdownMenuItem
-                      onClick={() => onEditGroup(group)}
-                      className="gap-2"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Rename
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onDeleteGroup(group._id)}
-                      className="gap-2 text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              <div className="h-7 w-7 flex items-center justify-center">
-                <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                    open ? "rotate-180" : ""
-                  }`}
-                />
-              </div>
-            </div>
+            {group && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div
+                    role="button"
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-muted transition-colors opacity-0 group-hover/section:opacity-100"
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-36">
+                  <DropdownMenuItem onClick={() => onEditGroup(group)} className="gap-2">
+                    <Pencil className="h-3.5 w-3.5" />
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onDeleteGroup(group._id)}
+                    className="gap-2 text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            <ChevronDown
+              className={`h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+            />
           </button>
         </CollapsibleTrigger>
 
         {/* Category list */}
         <CollapsibleContent>
-          <div className="bg-background/70 divide-y divide-border/50">
+          <div className="flex flex-col gap-2 pb-3">
             {categories.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-4 py-4 text-center bg-gray-50/50 dark:bg-card">
+              <p className="text-xs text-muted-foreground px-4 py-4 text-center">
                 No categories in this group yet.
               </p>
             ) : (
-              <div className="p-2 space-y-0.5 bg-gray-50/50 dark:bg-card">
-                {categories.map((cat) => (
-                  <CategoryRow
-                    key={cat._id}
-                    cat={cat}
-                    onEdit={onEditCategory}
-                    onDelete={onDeleteCategory}
-                  />
-                ))}
-              </div>
+              categories.map((cat) => (
+                <CategoryRow
+                  key={cat._id}
+                  cat={cat}
+                  onEdit={onEditCategory}
+                  onDelete={onDeleteCategory}
+                />
+              ))
             )}
           </div>
         </CollapsibleContent>

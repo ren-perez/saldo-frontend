@@ -319,8 +319,14 @@ export default function PresetsPage() {
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex items-center justify-between mb-6">
                         <TabsList>
-                            <TabsTrigger value="presets">Presets</TabsTrigger>
-                            <TabsTrigger value="history">Import History</TabsTrigger>
+                            <TabsTrigger value="presets" className="gap-2">
+                                <Settings2 className="h-3.5 w-3.5" />
+                                Presets
+                            </TabsTrigger>
+                            <TabsTrigger value="history" className="gap-2">
+                                <Clock className="h-3.5 w-3.5" />
+                                Import history
+                            </TabsTrigger>
                         </TabsList>
                         <div className="flex items-center gap-2">
                             <Button className="gap-2" asChild>
