@@ -66,10 +66,9 @@ Saldo uses the **Depth & Light** design language — surfaces appear as physical
 - Light theme also available (inverted surface stack, same primary).
 
 ### Typography
-- **Font:** Inter (primary sans-serif), JetBrains Mono (numeric/code display)
+- **Font:** Manrope (default for all text, including numbers and financial figures)
 - **Scale:** Display (48px/600) → H1 (32px) → H2 (24px) → H3 (18px) → Body (15px) → Small (13px) → Tiny (11px)
 - **Weight:** 400 body, 500 UI labels, 600 headings
-- Numbers and financial figures often rendered in JetBrains Mono for clarity
 
 ### Backgrounds
 - No images, gradients, or textures as page backgrounds.

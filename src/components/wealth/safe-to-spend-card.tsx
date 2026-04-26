@@ -4,16 +4,29 @@ import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
 import { format } from "date-fns"
-import { Wallet, ShieldCheck, Clock } from "lucide-react"
+import { Wallet } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { currencyExact } from "@/lib/format"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate()
 }
 
-export function SafeToSpendCard({ userId }: { userId: Id<"users"> }) {
+type PacingState = "on-track" | "warning" | "over"
+
+function getPacingState(spentPct: number, pacingPct: number, isOver: boolean): PacingState {
+  if (isOver) return "over"
+  if (spentPct > 0.78 && spentPct > pacingPct + 0.08) return "warning"
+  return "on-track"
+}
+
+export function SafeToSpendCard({
+  userId,
+  className,
+}: {
+  userId: Id<"users">
+  className?: string
+}) {
   const now = new Date()
   const monthKey = format(now, "yyyy-MM")
   const data = useQuery(api.allocations.getMonthlyBudgetContext, { userId, monthKey })
@@ -22,8 +35,14 @@ export function SafeToSpendCard({ userId }: { userId: Id<"users"> }) {
 
   if (data.totalPool === 0) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full border border-dashed border-border/80 bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
-        <Wallet className="size-3 shrink-0" />
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-xl border border-dashed bg-card px-4 py-3 text-sm text-muted-foreground",
+          "shadow-[0_1px_2px_0_oklch(0%_0_0_/_8%),_0_6px_20px_-4px_oklch(0%_0_0_/_16%)]",
+          className
+        )}
+      >
+        <Wallet className="size-3.5 shrink-0" />
         <span>No spending rule set</span>
       </div>
     )
@@ -33,98 +52,150 @@ export function SafeToSpendCard({ userId }: { userId: Id<"users"> }) {
   const month = now.getMonth() + 1
   const totalDays = daysInMonth(year, month)
   const daysPassed = now.getDate()
-  const pacingRate = daysPassed / totalDays
-  const spendRate = data.totalPool > 0 ? data.totalSpent / data.totalPool : 0
 
-  const isOverPacing = spendRate > pacingRate + 0.05
-  const isOverBudget = data.remaining < 0
-  const progressPct = Math.min(100, (data.totalSpent / data.totalPool) * 100)
+  const pacingPct = daysPassed / totalDays
+  const spentPct = data.totalPool > 0 ? data.totalSpent / data.totalPool : 0
+  const isOver = data.remaining < 0
 
-  const hasBreakdown = data.verifiedPool > 0 || data.reservedPool > 0
+  const pacing = getPacingState(spentPct, pacingPct, isOver)
+
+  const reservedPct = Math.min(100, (data.reservedPool / data.totalPool) * 100)
+  const verifiedPct = Math.min(100, (data.verifiedPool / data.totalPool) * 100)
+  const spentBarPct = Math.min(100, spentPct * 100)
+  const pacingBarPct = Math.min(100, pacingPct * 100)
+
+  const showBreakdown = data.verifiedPool > 0 || data.reservedPool > 0
+  const showDivider = data.verifiedPool > 0 && data.reservedPool > 0
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="inline-flex items-center gap-2.5 rounded-full border border-border/60 bg-card/50 px-3 py-1.5 shadow-sm cursor-default">
-          {/* Main stat */}
-          <div className="flex items-baseline gap-1.5">
-            <Wallet className="size-3.5 text-muted-foreground self-center hidden sm:block" />
-            <span className="text-sm font-medium text-muted-foreground hidden sm:inline">
-              Safe to spend:
-            </span>
-            <span
-              className={cn("text-sm font-semibold tabular-nums tracking-tight", {
-                "text-destructive": isOverBudget,
-                "text-foreground": !isOverBudget,
-              })}
-            >
-              {currencyExact(Math.abs(data.remaining))}
-            </span>
-            <span className="text-xs text-muted-foreground font-medium">
-              {isOverBudget ? "over" : "left"}
-            </span>
-          </div>
-
-          {/* Divider */}
-          <div className="w-px h-3.5 bg-border/80 hidden sm:block" />
-
-          {/* Progress bar */}
-          <div className="flex items-center gap-2">
-            <div className="relative h-1.5 w-16 sm:w-20 rounded-full bg-secondary overflow-hidden">
-              <div
-                className={cn("h-full rounded-full transition-all duration-500", {
-                  "bg-primary/80": !isOverPacing && !isOverBudget,
-                  "bg-amber-500/80": isOverPacing && !isOverBudget,
-                  "bg-destructive/80": isOverBudget,
-                })}
-                style={{ width: `${progressPct}%` }}
-              />
-              {/* Pacing marker */}
-              <div
-                className="absolute top-0 bottom-0 w-[1.5px] bg-background"
-                style={{ left: `${pacingRate * 100}%` }}
-              />
-            </div>
-            <span className="text-xs text-muted-foreground hidden md:inline">
-              of {currencyExact(data.totalPool)}
-            </span>
-          </div>
-        </div>
-      </TooltipTrigger>
-
-      {hasBreakdown && (
-        <TooltipContent side="bottom" className="flex flex-col gap-1.5 text-xs p-3 min-w-[200px]">
-          <p className="font-medium text-foreground mb-0.5">Pool breakdown</p>
-          {data.verifiedPool > 0 && (
-            <div className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-1.5 text-emerald-600">
-                <ShieldCheck className="size-3" />
-                Verified (transferred)
-              </span>
-              <span className="tabular-nums font-medium">{currencyExact(data.verifiedPool)}</span>
-            </div>
-          )}
-          {data.reservedPool > 0 && (
-            <div className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-1.5 text-sky-600">
-                <Clock className="size-3" />
-                Reserved (pending transfer)
-              </span>
-              <span className="tabular-nums font-medium">{currencyExact(data.reservedPool)}</span>
-            </div>
-          )}
-          {data.pendingPool > 0 && (
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Forecast</span>
-              <span className="tabular-nums font-medium">{currencyExact(data.pendingPool)}</span>
-            </div>
-          )}
-          <div className="border-t border-border/60 mt-0.5 pt-1.5 flex justify-between">
-            <span className="text-muted-foreground">Spent this month</span>
-            <span className="tabular-nums font-medium">{currencyExact(data.totalSpent)}</span>
-          </div>
-        </TooltipContent>
+    <div
+      className={cn(
+        "flex items-center w-full overflow-hidden",
+        "rounded-xl border bg-card",
+        "shadow-[0_1px_2px_0_oklch(0%_0_0_/_8%),_0_6px_20px_-4px_oklch(0%_0_0_/_16%)]",
+        className
       )}
-    </Tooltip>
+    >
+      {/* ── A: Remaining (hero number) ── */}
+      <div className="flex flex-col justify-center pl-5 pr-4 py-3.5 gap-0.5 shrink-0">
+        <span className="text-[10px] font-medium tracking-widest uppercase text-muted-foreground/60">
+          Safe to spend
+        </span>
+        <div className="flex items-baseline gap-1">
+          <span
+            className={cn(
+              "text-[17px] font-semibold tabular-nums tracking-tight leading-none transition-colors",
+              isOver ? "text-destructive" : "text-foreground"
+            )}
+          >
+            {currencyExact(Math.abs(data.remaining))}
+          </span>
+          <span
+            className={cn(
+              "text-[11px] font-medium leading-none",
+              isOver ? "text-destructive/60" : "text-muted-foreground"
+            )}
+          >
+            {isOver ? "over" : "left"}
+          </span>
+        </div>
+      </div>
+
+      {/* Separator */}
+      <div className="w-px h-8 bg-border shrink-0" />
+
+      {/* ── B: Bar + spend context ── */}
+      <div className="flex flex-col justify-center flex-1 px-4 py-3.5 gap-2 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs tabular-nums text-muted-foreground truncate">
+            {currencyExact(data.totalSpent)} spent
+            <span className="text-muted-foreground/30"> · </span>
+            <span className="text-muted-foreground/60">of {currencyExact(data.totalPool)}</span>
+          </span>
+          <PacingBadge state={pacing} />
+        </div>
+
+        {/* Progress bar */}
+        <div className="relative h-1.5 rounded-full bg-muted overflow-hidden">
+          {/* Reserved zone */}
+          <div
+            className="absolute left-0 top-0 h-full rounded-full bg-primary/20 transition-[width] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+            style={{ width: `${reservedPct}%` }}
+          />
+          {/* Verified zone */}
+          <div
+            className="absolute top-0 h-full rounded-full bg-primary/40 transition-[left,width] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+            style={{ left: `${reservedPct}%`, width: `${verifiedPct}%` }}
+          />
+          {/* Divider between reserved / verified */}
+          {showDivider && (
+            <div
+              className="absolute top-0 h-full w-px bg-card z-[3] transition-[left] duration-500"
+              style={{ left: `calc(${reservedPct}% - 0.5px)` }}
+            />
+          )}
+          {/* Spend fill */}
+          <div
+            className={cn(
+              "absolute left-0 top-0 h-full rounded-full z-[4] transition-[width] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]",
+              pacing === "over" ? "bg-destructive/70" : pacing === "warning" ? "bg-amber-500/60" : "bg-primary/70"
+            )}
+            style={{ width: `${spentBarPct}%` }}
+          />
+          {/* Pacing tick */}
+          <div
+            className={cn(
+              "absolute top-[-1px] bottom-[-1px] w-[2px] rounded-sm z-[5]",
+              pacing === "over" ? "bg-destructive" : pacing === "warning" ? "bg-amber-500" : "bg-primary"
+            )}
+            style={{ left: `calc(${pacingBarPct}% - 1px)` }}
+          />
+        </div>
+      </div>
+
+      {/* Separator + breakdown */}
+      {showBreakdown && (
+        <>
+          <div className="w-px h-8 bg-border shrink-0" />
+
+          {/* ── C: Pool breakdown ── */}
+          <div className="flex flex-col justify-center pr-5 pl-4 py-3.5 gap-1 shrink-0">
+            {data.verifiedPool > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0" />
+                <span className="text-[10px] text-muted-foreground flex-1">Verified</span>
+                <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                  {currencyExact(data.verifiedPool)}
+                </span>
+              </div>
+            )}
+            {data.reservedPool > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/25 shrink-0" />
+                <span className="text-[10px] text-muted-foreground flex-1">Reserved</span>
+                <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                  {currencyExact(data.reservedPool)}
+                </span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function PacingBadge({ state }: { state: PacingState }) {
+  return (
+    <span
+      className={cn(
+        "text-[10px] font-semibold px-2 py-0.5 rounded-full border tracking-wide shrink-0 transition-all duration-150",
+        state === "on-track" && "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30",
+        state === "warning"  && "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400 dark:border-amber-500/30",
+        state === "over"     && "bg-destructive/10 text-destructive border-destructive/20"
+      )}
+    >
+      {state === "on-track" ? "On track" : state === "warning" ? "Slow down" : "Over budget"}
+    </span>
   )
 }

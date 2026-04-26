@@ -50,12 +50,8 @@ export default function IncomePage() {
       <div className="flex flex-col gap-6 p-6">
 
         {/* Header + pill + actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
-            {userId && <SafeToSpendCard userId={userId} />}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {/* {count > 0 && (
               <Button
                 variant="outline"
@@ -82,10 +78,11 @@ export default function IncomePage() {
               <span className="inline sm:hidden">Add</span>
             </Button>
           </div>
+          {userId && <SafeToSpendCard userId={userId} />}
         </div>
 
         {/* Timeline */}
-        <div className="mt-2">
+        <div className="">
           <IncomeTimeline
             externalFormOpen={incomeFormOpen}
             onExternalFormOpenChange={setIncomeFormOpen}
