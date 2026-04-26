@@ -14,7 +14,6 @@ import DuplicateReview from "@/components/DuplicateReview";
 import { ImportAllocationStatus } from "@/components/goals/ImportAllocationStatus";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
     Dialog,
@@ -25,6 +24,23 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
     processTransactions,
     validateCsvHeaders,
     type PresetConfig,
@@ -32,7 +48,7 @@ import {
     type NormalizedTransaction,
 } from "@/utils/etl";
 import { PresetDisplay, PresetNotFound } from "@/components/PresetDisplay";
-import { Info, ChevronDown, FileText, RotateCcw, Upload, CheckCircle, Check, Import, Landmark } from "lucide-react";
+import { ChevronDown, FileText, RotateCcw, Upload, CheckCircle, Check, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
@@ -91,6 +107,35 @@ function StepIndicator({ currentPhase }: { currentPhase: string }) {
     );
 }
 
+function ValidationErrorList({ errors }: { errors: ValidationError[] }) {
+    return (
+        <div className="p-4 rounded-md border bg-destructive/10">
+            <h3 className="text-sm font-medium text-destructive">
+                Validation Errors ({errors.length})
+            </h3>
+            <div className="mt-2 max-h-48 overflow-y-auto">
+                {errors.slice(0, 20).map((error, i) => (
+                    <div key={i} className="text-sm text-destructive py-1">
+                        {error.row > 0 ? `Row ${error.row}: ` : ""}
+                        {error.column && `[${error.column}] `}
+                        {error.error}
+                        {error.value !== null && error.value !== undefined && (
+                            <span className="font-mono bg-destructive/20 px-1 ml-2">
+                                &quot;{String(error.value)}&quot;
+                            </span>
+                        )}
+                    </div>
+                ))}
+                {errors.length > 20 && (
+                    <div className="text-sm text-muted-foreground mt-2">
+                        ... and {errors.length - 20} more errors
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function CsvImporterPage() {
     const router = useRouter();
     const { convexUser } = useConvexUser();
@@ -111,8 +156,8 @@ export default function CsvImporterPage() {
     const [isCheckingSession, setIsCheckingSession] = useState(true);
     const [presetOpen, setPresetOpen] = useState(false);
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-    // Queries & Mutations
     const accounts = useQuery(
         api.accounts.listAccounts,
         convexUser ? { userId: convexUser._id } : "skip"
@@ -139,22 +184,16 @@ export default function CsvImporterPage() {
     const existingTransactions = useQuery(
         api.transactions.listTransactions,
         importSession && selectedAccount && convexUser
-            ? {
-                userId: convexUser._id,
-                accountId: selectedAccount,
-                limit: 1000
-            }
+            ? { userId: convexUser._id, accountId: selectedAccount, limit: 1000 }
             : "skip"
     );
 
-    // Check for existing session on load
     useEffect(() => {
         if (!convexUser) {
             setIsCheckingSession(false);
             return;
         }
-
-        const sessionId = localStorage.getItem('import_session_id');
+        const sessionId = localStorage.getItem("import_session_id");
         if (sessionId) {
             setCurrentSessionId(sessionId);
             setImportPhase("reviewing");
@@ -162,26 +201,13 @@ export default function CsvImporterPage() {
         setIsCheckingSession(false);
     }, [convexUser]);
 
-    // Set selectedAccount when session loads
     useEffect(() => {
-        if (importSession && importSession.accountId && !selectedAccount) {
+        if (importSession?.accountId && !selectedAccount) {
             setSelectedAccount(importSession.accountId);
         }
     }, [importSession, selectedAccount]);
 
-    const resetImportState = () => {
-        if (currentSessionId && importPhase === "reviewing") {
-            const confirmed = window.confirm(
-                "You have an unfinished import session with pending duplicate reviews. " +
-                "Starting a new import will abandon the current session and those transactions will not be imported. " +
-                "Are you sure you want to continue?"
-            );
-
-            if (!confirmed) {
-                return;
-            }
-        }
-
+    const doReset = () => {
         setFile(null);
         setPreviewTransactions([]);
         setValidationErrors([]);
@@ -189,7 +215,15 @@ export default function CsvImporterPage() {
         setCurrentSessionId(null);
         setCompletedImportId(null);
         setImportPhase("upload");
-        localStorage.removeItem('import_session_id');
+        localStorage.removeItem("import_session_id");
+    };
+
+    const handleStartOver = () => {
+        if (currentSessionId && importPhase === "reviewing") {
+            setShowResetConfirm(true);
+        } else {
+            doReset();
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,12 +236,8 @@ export default function CsvImporterPage() {
         }
     };
 
-    const parseFile = async (
-        file: File,
-        preset: PresetConfig
-    ): Promise<Record<string, unknown>[]> => {
+    const parseFile = async (file: File, preset: PresetConfig): Promise<Record<string, unknown>[]> => {
         const extension = file.name.split(".").pop()?.toLowerCase();
-
         return new Promise((resolve, reject) => {
             if (extension === "csv") {
                 Papa.parse(file, {
@@ -223,10 +253,8 @@ export default function CsvImporterPage() {
                     try {
                         const data = new Uint8Array(e.target?.result as ArrayBuffer);
                         const workbook = XLSX.read(data, { type: "array" });
-                        const sheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[sheetName];
-                        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "" });
-                        resolve(rows);
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        resolve(XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "" }));
                     } catch (err) {
                         reject(new Error(`XLSX parsing error: ${(err as Error).message}`));
                     }
@@ -240,33 +268,27 @@ export default function CsvImporterPage() {
 
     const handlePreview = async () => {
         if (!file || !preset) return;
-
         try {
             setIsProcessing(true);
-
             const rows = await parseFile(file, preset as PresetConfig);
             if (rows.length === 0) {
                 setValidationErrors([{ row: -1, column: "file", error: "No data rows found in file", value: null }]);
-                setIsProcessing(false);
                 return;
             }
-
             const headers = preset.hasHeader ? Object.keys(rows[0]) : [];
             const headerErrors = validateCsvHeaders(headers, preset as PresetConfig);
             if (headerErrors.length > 0) {
                 setValidationErrors(headerErrors);
-                setIsProcessing(false);
                 return;
             }
-
             const result = processTransactions(rows, preset as PresetConfig);
             setValidationErrors(result.errors);
             setPreviewTransactions(result.transactions.slice(0, 10));
             setProcessingStats(result.stats);
             setImportPhase("preview");
-            setIsProcessing(false);
         } catch (error) {
             setValidationErrors([{ row: -1, column: "file", error: (error as Error).message, value: null }]);
+        } finally {
             setIsProcessing(false);
         }
     };
@@ -274,45 +296,29 @@ export default function CsvImporterPage() {
     const handleImport = async () => {
         if (!convexUser || !selectedAccount || !preset || !file) return;
 
-        const existingSessionId = localStorage.getItem('import_session_id');
+        // Clear any stale session that doesn't match the current one
+        const existingSessionId = localStorage.getItem("import_session_id");
         if (existingSessionId && existingSessionId !== currentSessionId) {
-            const confirmed = window.confirm(
-                "Another import session is already in progress. " +
-                "Starting a new import will abandon that session and those transactions may not be imported. " +
-                "Are you sure you want to continue?"
-            );
-
-            if (!confirmed) {
-                return;
-            }
-
-            localStorage.removeItem('import_session_id');
+            localStorage.removeItem("import_session_id");
         }
 
         let importId: Id<"imports"> | null = null;
-
         try {
             setIsProcessing(true);
-
             const rows = await parseFile(file, preset as PresetConfig);
             if (rows.length === 0) {
                 setValidationErrors([{ row: -1, column: "file", error: "No data rows found in file", value: null }]);
-                setIsProcessing(false);
                 return;
             }
-
             const headers = preset.hasHeader ? Object.keys(rows[0]) : [];
             const headerErrors = validateCsvHeaders(headers, preset as PresetConfig);
             if (headerErrors.length > 0) {
                 setValidationErrors(headerErrors);
-                setIsProcessing(false);
                 return;
             }
-
             const result = processTransactions(rows, preset as PresetConfig);
             if (result.errors.length > 0) {
                 setValidationErrors(result.errors);
-                setIsProcessing(false);
                 return;
             }
 
@@ -321,7 +327,6 @@ export default function CsvImporterPage() {
                 fileName: file.name,
                 contentType: file.type || "application/octet-stream",
             });
-
             await fetch(uploadUrl, {
                 method: "PUT",
                 headers: { "Content-Type": file.type || "application/octet-stream" },
@@ -336,13 +341,8 @@ export default function CsvImporterPage() {
                 contentType: file.type || "application/octet-stream",
                 size: file.size,
             });
-
             importId = registerResult.importId;
-
-            await updateImportStatusMutation({
-                importId,
-                status: "processing",
-            });
+            await updateImportStatusMutation({ importId, status: "processing" });
 
             const sessionId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const transactionsForConvex = result.transactions.map((t, index) => ({
@@ -372,11 +372,8 @@ export default function CsvImporterPage() {
                 setImportPhase("completed");
                 setShowSuccessDialog(true);
             }
-
-            setIsProcessing(false);
         } catch (error) {
             console.error("Import error:", error);
-
             if (importId) {
                 await updateImportStatusMutation({
                     importId,
@@ -384,42 +381,31 @@ export default function CsvImporterPage() {
                     error: (error as Error).message,
                 });
             }
-
             setValidationErrors([{
                 row: -1,
                 column: "file",
                 error: `Import failed: ${(error as Error).message}`,
-                value: null
+                value: null,
             }]);
+        } finally {
             setIsProcessing(false);
         }
     };
 
     const handleSessionResolved = async () => {
         if (!currentSessionId || !convexUser) return;
-
         try {
-            await resolveImportSession({
-                sessionId: currentSessionId,
-                userId: convexUser._id,
-            });
-
+            await resolveImportSession({ sessionId: currentSessionId, userId: convexUser._id });
             if (importSession?.importId) {
                 const importId = importSession.importId as Id<"imports">;
                 setCompletedImportId(importId);
-
-                await updateImportStatusMutation({
-                    importId,
-                    status: "completed"
-                });
+                await updateImportStatusMutation({ importId, status: "completed" });
             }
-
-            localStorage.removeItem('import_session_id');
+            localStorage.removeItem("import_session_id");
             setImportPhase("completed");
             setShowSuccessDialog(true);
         } catch (error) {
             console.error("Failed to resolve session:", error);
-            alert("Failed to complete import");
         }
     };
 
@@ -435,7 +421,7 @@ export default function CsvImporterPage() {
         return (
             <AppLayout>
                 <div className="flex items-center justify-center h-64">
-                    <div className="text-lg">Please sign in to view transactions.</div>
+                    <p className="text-sm text-muted-foreground">Please sign in to continue.</p>
                 </div>
             </AppLayout>
         );
@@ -457,47 +443,18 @@ export default function CsvImporterPage() {
             <InitUser />
             <div className="container mx-auto py-6 px-6">
 
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-6">
-                    <h1 className="flex items-center gap-3 text-3xl font-bold text-foreground">
-                        <Import className="h-8 w-8 text-primary" />
-                        Import Transactions
-                    </h1>
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-xs">
-                                <div className="space-y-1 text-xs">
-                                    <p>1. Select the account to import transactions for</p>
-                                    <p>2. Make sure the account has a preset linked</p>
-                                    <p>3. Choose your CSV/XLSX file</p>
-                                    <p>4. Preview and validate the data</p>
-                                    <p>5. Confirm and import all transactions</p>
-                                </div>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                </div>
-
-                {/* ── CTAs ── */}
-                <div className="mb-8 flex items-center gap-2 justify-end">
-                    {importPhase !== "upload" && importPhase !== "completed" && (
-                        <Button
-                            onClick={resetImportState}
-                            variant="outline"
-                            className="ml-auto gap-2"
-                        >
-                            <RotateCcw className="size-4" />
-                            Start Over
-                        </Button>
-                    )}
-                </div>
-
-                {/* Step Indicator */}
                 {importPhase !== "completed" && (
-                    <StepIndicator currentPhase={importPhase} />
+                    <>
+                        {importPhase !== "upload" && (
+                            <div className="flex justify-end mb-4">
+                                <Button onClick={handleStartOver} variant="outline" size="sm" className="gap-2">
+                                    <RotateCcw className="size-3.5" />
+                                    Start Over
+                                </Button>
+                            </div>
+                        )}
+                        <StepIndicator currentPhase={importPhase} />
+                    </>
                 )}
 
                 {/* Duplicate Review Phase */}
@@ -509,27 +466,28 @@ export default function CsvImporterPage() {
                     />
                 )}
 
-                {/* Upload Phase - Step 1: Account + Preset + File */}
+                {/* Upload Phase */}
                 {importPhase === "upload" && (
                     <div className="space-y-5">
-                        {/* Account Selection */}
-                        <div>
-                            <label className="block text-sm font-medium mb-2">Select Account</label>
-                            <select
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-medium">Account</label>
+                            <Select
                                 value={selectedAccount || ""}
-                                onChange={(e) => setSelectedAccount(e.target.value ? e.target.value as Id<"accounts"> : null)}
-                                className="w-full p-2 border rounded-md bg-background text-foreground border-border"
+                                onValueChange={(v) => setSelectedAccount(v ? v as Id<"accounts"> : null)}
                             >
-                                <option value="">Choose an account...</option>
-                                {accounts?.map((account) => (
-                                    <option key={account._id} value={account._id}>
-                                        {account.name} ({account.bank})
-                                    </option>
-                                ))}
-                            </select>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Choose an account..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {accounts?.map((account) => (
+                                        <SelectItem key={account._id} value={account._id}>
+                                            {account.name} ({account.bank})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        {/* Preset Display as Collapsible */}
                         {selectedAccount && preset && (
                             <Collapsible open={presetOpen} onOpenChange={setPresetOpen}>
                                 <CollapsibleTrigger asChild>
@@ -538,115 +496,63 @@ export default function CsvImporterPage() {
                                             <span className="text-sm font-medium">Preset Mapping</span>
                                             <Badge variant="secondary" className="text-[10px]">{preset.name}</Badge>
                                         </div>
-                                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${presetOpen ? "rotate-180" : ""}`} />
+                                        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", presetOpen && "rotate-180")} />
                                     </button>
                                 </CollapsibleTrigger>
                                 <CollapsibleContent className="mt-2">
-                                    <PresetDisplay
-                                        preset={preset}
-                                        mode="detailed"
-                                        showHeader={false}
-                                        showAdvanced={true}
-                                    />
+                                    <PresetDisplay preset={preset} mode="detailed" showHeader={false} showAdvanced={true} />
                                 </CollapsibleContent>
                             </Collapsible>
                         )}
 
                         {selectedAccount && !preset && (
-                            <PresetNotFound
-                                accountName={selectedAccountName}
-                            />
+                            <PresetNotFound accountName={selectedAccountName} />
                         )}
 
-                        {/* File Upload */}
-                        <div>
-                            <label className="block text-sm font-medium mb-2">Select CSV or XLSX File</label>
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-medium">File</label>
                             <input
                                 type="file"
                                 accept=".csv,.xlsx,.xls"
                                 onChange={handleFileChange}
-                                className="w-full p-2 border rounded-md bg-background text-foreground border-border"
+                                className="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border file:text-xs file:font-medium file:bg-muted file:text-foreground hover:file:bg-muted/80 cursor-pointer"
                             />
                         </div>
 
-                        {/* Validation Errors (shown in upload phase too) */}
-                        {validationErrors.length > 0 && (
-                            <div className="p-4 rounded-md border bg-destructive/10">
-                                <h3 className="text-sm font-medium text-destructive">
-                                    Validation Errors ({validationErrors.length}):
-                                </h3>
-                                <div className="mt-2 max-h-48 overflow-y-auto">
-                                    {validationErrors.slice(0, 20).map((error, i) => (
-                                        <div key={i} className="text-sm text-destructive py-1">
-                                            {error.row > 0 ? `Row ${error.row}: ` : ""}
-                                            {error.column && `[${error.column}] `}
-                                            {error.error}
-                                            {error.value !== null && error.value !== undefined && (
-                                                <span className="font-mono bg-destructive/20 px-1 ml-2">
-                                                    &quot;{String(error.value)}&quot;
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {validationErrors.length > 20 && (
-                                        <div className="text-sm text-muted-foreground mt-2">
-                                            ... and {validationErrors.length - 20} more errors
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                        {validationErrors.length > 0 && <ValidationErrorList errors={validationErrors} />}
 
-                        {/* Preview Button */}
                         <Button
                             onClick={handlePreview}
                             disabled={!file || !preset || isProcessing}
                             className="gap-1.5"
                         >
-                            {isProcessing ? "Processing..." : "Preview CSV"}
+                            {isProcessing ? "Processing..." : "Preview"}
                         </Button>
                     </div>
                 )}
 
-                {/* Preview Phase - Step 2: Preview Table + Confirm */}
+                {/* Preview Phase */}
                 {importPhase === "preview" && (
                     <div className="space-y-6">
-                        {/* Context bar: account + file info */}
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between py-3 px-4 rounded-lg border bg-muted/50">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center py-3 px-4 rounded-lg border bg-muted/50">
                             <div className="flex flex-col gap-3 sm:flex-row sm:gap-8 text-sm">
                                 <div className="flex items-center gap-1.5">
                                     <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
                                     <span className="text-muted-foreground">Account:</span>
                                     <span className="font-medium">{selectedAccountName}</span>
                                     {selectedAccountBank && (
-                                        <Badge variant="outline" className="text-[10px]">
-                                            {selectedAccountBank}
-                                        </Badge>
+                                        <Badge variant="outline" className="text-[10px]">{selectedAccountBank}</Badge>
                                     )}
                                 </div>
-
                                 <div className="flex items-center gap-1.5">
                                     <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                                     <span className="text-muted-foreground">File:</span>
                                     <span className="font-medium">{file?.name}</span>
                                 </div>
                             </div>
-
-                            {/* <div className="text-right">
-                                <Button
-                                    variant="outline"
-                                    className="gap-2 text-muted-foreground self-start lg:self-auto"
-                                    onClick={resetImportState}
-                                >
-                                    <RotateCcw className="size-3" />
-                                    Reset
-                                </Button>
-                            </div> */}
                         </div>
 
-                        {/* Processing Stats */}
                         {processingStats && (
-                            // <div className="p-4 rounded-md border bg-muted">
                             <div>
                                 <h3 className="text-sm font-medium">Processing Summary</h3>
                                 <div className="mt-1.5 flex items-center gap-4 text-sm text-muted-foreground">
@@ -659,63 +565,32 @@ export default function CsvImporterPage() {
                             </div>
                         )}
 
-                        {/* Validation Errors */}
-                        {validationErrors.length > 0 && (
-                            <div className="p-4 rounded-md border bg-destructive/10">
-                                <h3 className="text-sm font-medium text-destructive">
-                                    Validation Errors ({validationErrors.length}):
-                                </h3>
-                                <div className="mt-2 max-h-48 overflow-y-auto">
-                                    {validationErrors.slice(0, 20).map((error, i) => (
-                                        <div key={i} className="text-sm text-destructive py-1">
-                                            {error.row > 0 ? `Row ${error.row}: ` : ""}
-                                            {error.column && `[${error.column}] `}
-                                            {error.error}
-                                            {error.value !== null && error.value !== undefined && (
-                                                <span className="font-mono bg-destructive/20 px-1 ml-2">
-                                                    &quot;{String(error.value)}&quot;
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {validationErrors.length > 20 && (
-                                        <div className="text-sm text-muted-foreground mt-2">
-                                            ... and {validationErrors.length - 20} more errors
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                        {validationErrors.length > 0 && <ValidationErrorList errors={validationErrors} />}
 
-                        {/* Preview Table */}
                         {previewTransactions.length > 0 && (
                             <div>
-                                <h3 className="text-sm font-medium mb-3">
-                                    Transaction Preview (first 10):
-                                </h3>
+                                <h3 className="text-sm font-medium mb-3">Transaction Preview (first 10)</h3>
                                 <div className="overflow-x-auto border rounded-md border-border">
                                     <table className="min-w-full divide-y divide-border">
                                         <thead className="bg-muted">
                                             <tr>
-                                                <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider">Date</th>
-                                                <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider">Amount</th>
-                                                <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider">Description</th>
-                                                <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider">Category</th>
-                                                <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider">Type</th>
+                                                {["Date", "Amount", "Description", "Category", "Type"].map((h) => (
+                                                    <th key={h} className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider">{h}</th>
+                                                ))}
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {previewTransactions.map((transaction, i) => (
+                                            {previewTransactions.map((t, i) => (
                                                 <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/50"}>
-                                                    <td className="px-4 py-2.5 text-sm">{transaction.date}</td>
+                                                    <td className="px-4 py-2.5 text-sm">{t.date}</td>
                                                     <td className="px-4 py-2.5 text-sm">
-                                                        <span className={transaction.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                                                            ${transaction.amount.toFixed(2)}
+                                                        <span className={t.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                                                            ${t.amount.toFixed(2)}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-2.5 text-sm max-w-xs truncate">{transaction.description}</td>
-                                                    <td className="px-4 py-2.5 text-sm text-muted-foreground">{transaction.category || "-"}</td>
-                                                    <td className="px-4 py-2.5 text-sm text-muted-foreground">{transaction.transactionType || "-"}</td>
+                                                    <td className="px-4 py-2.5 text-sm max-w-xs truncate">{t.description}</td>
+                                                    <td className="px-4 py-2.5 text-sm text-muted-foreground">{t.category || "—"}</td>
+                                                    <td className="px-4 py-2.5 text-sm text-muted-foreground">{t.transactionType || "—"}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -724,24 +599,35 @@ export default function CsvImporterPage() {
                             </div>
                         )}
 
-                        {/* Import Button */}
                         {previewTransactions.length > 0 && validationErrors.length === 0 && (
-                            <Button
-                                onClick={handleImport}
-                                disabled={isProcessing}
-                                className="gap-1.5"
-                            >
+                            <Button onClick={handleImport} disabled={isProcessing} className="gap-1.5">
                                 <Upload className="size-3.5" />
-                                {isProcessing ? "Importing..." : `Upload ${processingStats?.validRows || 0} Transactions`}
+                                {isProcessing ? "Importing..." : `Import ${processingStats?.validRows || 0} Transactions`}
                             </Button>
                         )}
                     </div>
                 )}
 
+                {/* Reset Confirmation */}
+                <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Abandon current import?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                You have an unfinished import session with pending duplicate reviews. Starting a new import will abandon it and those transactions will not be imported.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => { setShowResetConfirm(false); doReset(); }}>
+                                Start Over
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                 {/* Success Dialog */}
-                <Dialog open={showSuccessDialog} onOpenChange={(open) => {
-                    if (!open) handleSuccessDialogClose();
-                }}>
+                <Dialog open={showSuccessDialog} onOpenChange={(open) => { if (!open) handleSuccessDialogClose(); }}>
                     <DialogContent className="sm:max-w-lg">
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-2 text-green-700 dark:text-green-300">
@@ -753,24 +639,17 @@ export default function CsvImporterPage() {
                             </DialogDescription>
                         </DialogHeader>
 
-                        {/* Import Allocation Status */}
                         {completedImportId && (
                             <ImportAllocationStatus
                                 importId={completedImportId}
                                 formatCurrency={(amount: number) =>
-                                    new Intl.NumberFormat('en-US', {
-                                        style: 'currency',
-                                        currency: 'USD'
-                                    }).format(amount)
+                                    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount)
                                 }
                             />
                         )}
 
-                        <DialogFooter className="gap-2 sm:gap-0">
-                            <Button variant="outline" onClick={() => {
-                                setShowSuccessDialog(false);
-                                resetImportState();
-                            }}>
+                        <DialogFooter className="gap-2 mt-6">
+                            <Button variant="outline" onClick={() => { setShowSuccessDialog(false); doReset(); }}>
                                 Import Another File
                             </Button>
                             <Button onClick={handleSuccessDialogClose}>

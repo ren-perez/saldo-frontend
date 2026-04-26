@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Pencil, Trash2, Plus } from "lucide-react";
 import { Category, CategoryGroup } from "../types";
 import { getGroupColor, ungroupedColor } from "../constants";
 import { CategoryRow } from "./CategoryRow";
@@ -23,6 +23,7 @@ export function GroupSection({
   onDeleteCategory,
   onEditGroup,
   onDeleteGroup,
+  onAddCategory,
   open,
   onOpenChange,
 }: {
@@ -33,6 +34,7 @@ export function GroupSection({
   onDeleteCategory: (id: Id<"categories">) => void;
   onEditGroup: (g: CategoryGroup) => void;
   onDeleteGroup: (id: Id<"category_groups">) => void;
+  onAddCategory: (group: CategoryGroup | null) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -43,13 +45,25 @@ export function GroupSection({
       <div className="group/section">
         {/* Section header */}
         <CollapsibleTrigger asChild>
-          <button className="flex w-full items-center gap-2 py-2 px-1 select-none">
+          <div role="button" className="flex w-full items-center gap-2 py-2 px-1 select-none">
             <div className={`h-2 w-2 rounded-full shrink-0 ${color.dot}`} />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               {group?.name ?? "Ungrouped"}
             </span>
             <span className="text-xs text-muted-foreground/50">({categories.length})</span>
             <span className="flex-1 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddCategory(group);
+              }}
+              className="h-6 w-6 flex items-center justify-center rounded-md text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover/section:opacity-100"
+              aria-label={group ? `Add category to ${group.name}` : "Add category"}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
 
             {group && (
               <DropdownMenu>
@@ -81,7 +95,7 @@ export function GroupSection({
             <ChevronDown
               className={`h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
             />
-          </button>
+          </div>
         </CollapsibleTrigger>
 
         {/* Category list */}

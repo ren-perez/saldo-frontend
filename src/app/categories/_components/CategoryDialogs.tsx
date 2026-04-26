@@ -132,7 +132,7 @@ export function CategoryDialogs({
                 </Select>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-6">
               <Button
                 type="button"
                 variant="outline"

@@ -1038,7 +1038,14 @@ export const getImportAllocationStatus = query({
             .withIndex("by_import", (q) => q.eq("importId", importId))
             .collect();
 
-        // Check allocation status for each transaction
+        // Category name lookup
+        const allCategories = await ctx.db
+            .query("categories")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+        const categoryNameById = new Map(allCategories.map(c => [c._id.toString(), c.name]));
+
+        // Check allocation + categorization status for each transaction
         const allocationStatus = [];
         let totalAllocated = 0;
         let totalUnallocated = 0;
@@ -1058,6 +1065,7 @@ export const getImportAllocationStatus = query({
                 totalUnallocated++;
             }
 
+            const categoryId = (transaction as any).categoryId ?? null;
             allocationStatus.push({
                 transactionId: transaction._id,
                 amount: transaction.amount,
@@ -1065,6 +1073,9 @@ export const getImportAllocationStatus = query({
                 date: transaction.date,
                 isAllocated,
                 allocatedAmount,
+                categoryId,
+                categoryName: categoryId ? (categoryNameById.get(categoryId.toString()) ?? null) : null,
+                isAutoCategorized: (transaction as any).isAutoCategorized ?? false,
                 contributions: contributions.map(contrib => ({
                     goalId: contrib.goalId,
                     amount: contrib.amount,
@@ -1073,11 +1084,90 @@ export const getImportAllocationStatus = query({
             });
         }
 
-        // Get goals linked to the import account
+        const { autoCategorized, manuallyCategorized, uncategorized } = importedTransactions.reduce(
+            (acc, t) => {
+                const isCat = !!(t as any).categoryId;
+                const isAuto = !!(t as any).isAutoCategorized;
+                return {
+                    autoCategorized: acc.autoCategorized + (isAuto ? 1 : 0),
+                    manuallyCategorized: acc.manuallyCategorized + (isCat && !isAuto ? 1 : 0),
+                    uncategorized: acc.uncategorized + (!isCat ? 1 : 0),
+                };
+            },
+            { autoCategorized: 0, manuallyCategorized: 0, uncategorized: 0 }
+        );
+
+        const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
+        const unmatchedIncomePlans: Array<{
+            _id: Id<"income_plans">;
+            label: string;
+            expected_amount: number;
+            expected_date: string;
+            recurrence: string;
+        }> = [];
+
+        if (importedTransactions.length > 0) {
+            const dates = importedTransactions.map(t => t.date);
+            const minDate = dates.reduce((m, d) => Math.min(m, d), Infinity);
+            const maxDate = dates.reduce((m, d) => Math.max(m, d), -Infinity);
+            const windowStart = new Date(minDate - FOURTEEN_DAYS_MS).toISOString().split("T")[0];
+            const windowEnd = new Date(maxDate + FOURTEEN_DAYS_MS).toISOString().split("T")[0];
+
+            const allPlans = await ctx.db
+                .query("income_plans")
+                .withIndex("by_user", (q) => q.eq("userId", userId))
+                .collect();
+
+            for (const plan of allPlans) {
+                if (
+                    plan.status === "planned" &&
+                    plan.expected_date >= windowStart &&
+                    plan.expected_date <= windowEnd
+                ) {
+                    unmatchedIncomePlans.push({
+                        _id: plan._id,
+                        label: plan.label,
+                        expected_amount: plan.expected_amount,
+                        expected_date: plan.expected_date,
+                        recurrence: plan.recurrence,
+                    });
+                }
+            }
+        }
+
         const linkedGoals = await ctx.db
             .query("goals")
             .withIndex("by_account", (q) => q.eq("linked_account_id", (importRecord as any).accountId))
             .collect();
+
+        // Tag each positive transaction with the closest matching income plan (date ≤14 days,
+        // amount ≤20% off). Income-matched transactions must NOT be auto-allocated to goals —
+        // they belong to the Income Plan matching flow.
+        let isIncomeRelevant = false;
+        const allocationStatusWithPlans = allocationStatus.map(tx => {
+            if (tx.amount <= 0 || unmatchedIncomePlans.length === 0) {
+                return { ...tx, suggestedPlanId: null as Id<"income_plans"> | null, suggestedPlanLabel: null as string | null };
+            }
+            let bestMatch: typeof unmatchedIncomePlans[0] | null = null;
+            let bestAmountDiff = Infinity;
+            for (const plan of unmatchedIncomePlans) {
+                const planDate = new Date(plan.expected_date + "T12:00:00").getTime();
+                const dateDiff = Math.abs(tx.date - planDate);
+                const amountDiff = Math.abs(tx.amount - plan.expected_amount);
+                const amountRatio = plan.expected_amount > 0 ? amountDiff / plan.expected_amount : 1;
+                if (dateDiff <= FOURTEEN_DAYS_MS && amountRatio <= 0.2 && amountDiff < bestAmountDiff) {
+                    bestMatch = plan;
+                    bestAmountDiff = amountDiff;
+                }
+            }
+            if (bestMatch) isIncomeRelevant = true;
+            return {
+                ...tx,
+                suggestedPlanId: bestMatch?._id ?? null,
+                suggestedPlanLabel: bestMatch?.label ?? null,
+            };
+        });
 
         return {
             importId,
@@ -1085,15 +1175,21 @@ export const getImportAllocationStatus = query({
             totalTransactions: importedTransactions.length,
             totalAllocated,
             totalUnallocated,
-            canAutoAllocate: linkedGoals.length === 1,
-            linkedGoalCount: linkedGoals.length,
             linkedGoals: linkedGoals.map(goal => ({
                 _id: goal._id,
                 name: goal.name,
                 emoji: goal.emoji,
                 color: goal.color
             })),
-            transactions: allocationStatus
+            transactions: allocationStatusWithPlans,
+            categorizationHealth: {
+                autoCategorized,
+                manuallyCategorized,
+                uncategorized,
+                total: importedTransactions.length,
+            },
+            unmatchedIncomePlans,
+            isIncomeRelevant,
         };
     },
 });

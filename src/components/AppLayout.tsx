@@ -14,6 +14,7 @@ const NAV_LABELS: { href: string; label: string }[] = [
     { href: "/goals", label: "Goals" },
     { href: "/accounts", label: "Accounts" },
     { href: "/transactions", label: "Transactions" },
+    { href: "/import-csv", label: "Import CSV" },
     { href: "/categories", label: "Categories" },
     { href: "/presets", label: "Presets" },
     { href: "/history", label: "Chat History" },

@@ -291,6 +291,10 @@ export default function CategoriesPage() {
 
   const openEditCategory = (cat: Category) => setEditingCategory(cat);
   const openEditGroup = (g: CategoryGroup) => setEditingGroup(g);
+  const openAddCategory = (group: CategoryGroup | null) => {
+    setCategoryForm({ name: "", groupId: group?._id ?? "", transactionType: "" });
+    setShowCategoryDialog(true);
+  };
 
   // ── derived data ──
   const allCategories = [...(categories ?? [])].sort((a, b) => a.name.localeCompare(b.name));
@@ -406,6 +410,7 @@ export default function CategoriesPage() {
                       onDeleteCategory={handleDeleteCategory}
                       onEditGroup={openEditGroup}
                       onDeleteGroup={handleDeleteGroup}
+                      onAddCategory={openAddCategory}
                       open={openSections[group._id] ?? false}
                       onOpenChange={(val) => setSectionOpen(group._id, val)}
                     />
@@ -413,7 +418,7 @@ export default function CategoriesPage() {
 
                   {ungrouped.length > 0 && (
                     <>
-                      {allGroups.length > 0 && <div className="h-px bg-border my-1" />}
+                      {allGroups.length > 0 && <div className="h-px my-1" />}
                       <GroupSection
                         group={null}
                         colorIndex={0}
@@ -422,6 +427,7 @@ export default function CategoriesPage() {
                         onDeleteCategory={handleDeleteCategory}
                         onEditGroup={() => { }}
                         onDeleteGroup={() => { }}
+                        onAddCategory={openAddCategory}
                         open={openSections["ungrouped"] ?? false}
                         onOpenChange={(val) => setSectionOpen("ungrouped", val)}
                       />
