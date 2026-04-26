@@ -12,8 +12,7 @@ import {
     Sparkles, Tag, Wallet, TrendingUp, Info,
 } from "lucide-react"
 import { format } from "date-fns"
-import { toast } from "sonner"
-import { useMutation, useQuery } from "convex/react"
+import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { TransactionAllocationDialog } from "./TransactionAllocationDialog"
@@ -65,7 +64,6 @@ interface AllocationStatus {
     totalTransactions: number
     totalAllocated: number
     totalUnallocated: number
-    linkedGoalCount: number
     linkedGoals: LinkedGoal[]
     transactions: ImportedTx[]
     categorizationHealth: CategorizationHealth
@@ -97,11 +95,7 @@ export function ImportAllocationStatus({ importId, formatCurrency }: ImportAlloc
     if (!allocationStatus) {
         return (
             <div className="space-y-3 pt-1">
-                <div className="grid grid-cols-3 gap-2">
-                    <Skeleton className="h-16 rounded-lg" />
-                    <Skeleton className="h-16 rounded-lg" />
-                    <Skeleton className="h-16 rounded-lg" />
-                </div>
+                <Skeleton className="h-4 w-36 rounded" />
                 <Skeleton className="h-8 w-2/3 rounded" />
                 <Skeleton className="h-24 rounded-lg" />
             </div>
@@ -155,9 +149,9 @@ export function ImportAllocationStatus({ importId, formatCurrency }: ImportAlloc
 
     return (
         <>
-            <div className="grid grid-cols-3 gap-2">
-                <Stat label="Imported" value={totalTransactions} card />
-            </div>
+            <p className="text-foreground/85 font-bold">
+                {totalTransactions} transaction{totalTransactions !== 1 ? "s" : ""} imported
+            </p>
 
             {(hasGoalsTab || isIncomeRelevant) ? (
                 <Tabs defaultValue={isIncomeRelevant ? "income" : hasGoalsTab ? "goals" : "categories"} className="mt-4">
@@ -246,36 +240,16 @@ export function ImportAllocationStatus({ importId, formatCurrency }: ImportAlloc
     )
 }
 
-function Stat({
-    label, value, subtext, accent, card,
-}: {
-    label: string
-    value: number
-    subtext?: string
-    accent?: "success" | "warn"
-    card?: boolean
-}) {
-    const num = (
-        <div className={cn(
-            "text-xl font-bold",
-            accent === "success" && "text-green-600",
-            accent === "warn" && "text-amber-600"
-        )}>
-            {value}
-        </div>
-    )
-    if (card) {
-        return (
-            <div className="bg-muted/50 rounded-lg p-2.5 text-center">
-                {num}
-                <div className="text-xs font-medium">{label}</div>
-                {subtext && <div className="text-[10px] text-muted-foreground mt-0.5">{subtext}</div>}
-            </div>
-        )
-    }
+function Stat({ label, value, accent }: { label: string; value: number; accent?: "success" | "warn" }) {
     return (
         <div className="text-center">
-            {num}
+            <div className={cn(
+                "text-xl font-bold",
+                accent === "success" && "text-green-600",
+                accent === "warn" && "text-amber-600"
+            )}>
+                {value}
+            </div>
             <div className="text-[11px] text-muted-foreground">{label}</div>
         </div>
     )
@@ -475,14 +449,14 @@ function CategoriesContent({
             className={cn(
                 "w-full text-left rounded-lg border p-3 space-y-2 transition-colors hover:bg-muted/30",
                 allDone
-                    ? "border-green-200 dark:border-green-900"
-                    : "border-amber-200 dark:border-amber-900"
+                    ? "border-green-200/50 dark:border-green-900/50"
+                    : "border-amber-200/50 dark:border-amber-900/50"
             )}
         >
             {/* Header */}
             <div className="flex items-center gap-2">
-                <Tag className={cn("size-3.5 shrink-0", allDone ? "text-green-600" : "text-amber-600")} />
-                <span className="flex-1 text-xs font-medium">
+                <Tag className="size-3 shrink-0" />
+                <span className="flex-1 text-sm font-medium">
                     {allDone ? "All categorized" : "Categorize in Transactions"}
                 </span>
                 <ArrowRight className="size-3 text-muted-foreground shrink-0" />

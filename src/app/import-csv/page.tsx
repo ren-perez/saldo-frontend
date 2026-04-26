@@ -414,8 +414,10 @@ export default function CsvImporterPage() {
         router.push("/transactions");
     };
 
-    const selectedAccountName = accounts?.find(a => a._id === selectedAccount)?.name;
-    const selectedAccountBank = accounts?.find(a => a._id === selectedAccount)?.bank;
+    const selectedAccountData = accounts?.find(a => a._id === selectedAccount);
+    const selectedAccountName = selectedAccountData?.name;
+    const selectedAccountBank = selectedAccountData?.bank;
+    const selectedAccountType = selectedAccountData?.type;
 
     if (!convexUser) {
         return (
@@ -454,6 +456,16 @@ export default function CsvImporterPage() {
                             </div>
                         )}
                         <StepIndicator currentPhase={importPhase} />
+                        {selectedAccountName && importPhase !== "upload" && (
+                            <div className="flex justify-center -mt-4 mb-6">
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-muted/40 text-xs text-muted-foreground">
+                                    <Landmark className="size-3 shrink-0" />
+                                    <span className="font-medium text-foreground">{selectedAccountName}</span>
+                                    {selectedAccountBank && <span>· {selectedAccountBank}</span>}
+                                    {selectedAccountType && <span>· {selectedAccountType}</span>}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
 
@@ -534,22 +546,10 @@ export default function CsvImporterPage() {
                 {/* Preview Phase */}
                 {importPhase === "preview" && (
                     <div className="space-y-6">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center py-3 px-4 rounded-lg border bg-muted/50">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:gap-8 text-sm">
-                                <div className="flex items-center gap-1.5">
-                                    <Landmark className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <span className="text-muted-foreground">Account:</span>
-                                    <span className="font-medium">{selectedAccountName}</span>
-                                    {selectedAccountBank && (
-                                        <Badge variant="outline" className="text-[10px]">{selectedAccountBank}</Badge>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <span className="text-muted-foreground">File:</span>
-                                    <span className="font-medium">{file?.name}</span>
-                                </div>
-                            </div>
+                        <div className="flex items-center gap-1.5 py-2.5 px-3.5 rounded-lg border bg-muted/40 text-sm">
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-muted-foreground">File:</span>
+                            <span className="font-medium truncate">{file?.name}</span>
                         </div>
 
                         {processingStats && (

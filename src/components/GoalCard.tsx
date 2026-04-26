@@ -141,10 +141,9 @@ export function GoalCard({ goal }: GoalCardProps) {
 
             {/* Bottom stats */}
             <div className="flex items-center gap-6 text-white/95 drop-shadow text-xs">
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-1.5">
-                  <PiggyBank className="h-3 w-3 text-white/70 flex-shrink-0" />
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-white/70">
+                  <span className="text-[9px] font-medium uppercase tracking-wider text-white/70">
                     Saved
                   </span>
                 </div>
@@ -153,11 +152,10 @@ export function GoalCard({ goal }: GoalCardProps) {
                 </span>
               </div>
 
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-1.5">
-                  <Target className="h-3 w-3 text-white/70 flex-shrink-0" />
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-white/70">
-                    Target
+                  <span className="text-[9px] font-medium uppercase tracking-wider text-white/70">
+                    Monthly Target
                   </span>
                 </div>
                 <span className="font-semibold tabular-nums">

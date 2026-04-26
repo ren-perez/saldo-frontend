@@ -5,7 +5,19 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, AlertTriangle, XCircle, Check, X, Plus } from "lucide-react";
+import {
+  Check,
+  Plus,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -64,10 +76,8 @@ export default function DuplicateReview({
   const addAsNewTransaction = useMutation(api.transactions.addAsNewTransaction);
 
   const categories = useQuery(api.categories.listCategories, { userId: session.userId });
-  const accounts = useQuery(api.accounts.listAccounts, { userId: session.userId });
 
   const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString();
-
   const formatAmount = (amount: number) =>
     amount >= 0 ? `+$${amount.toFixed(2)}` : `-$${Math.abs(amount).toFixed(2)}`;
 
@@ -77,12 +87,6 @@ export default function DuplicateReview({
   const getCategoryName = (categoryId?: Id<"categories"> | null) => {
     if (!categoryId || !categories) return null;
     return categories.find(c => c._id === categoryId)?.name ?? null;
-  };
-
-  const getAccountName = (accountId: Id<"accounts">) => {
-    if (!accounts) return "Loading...";
-    const account = accounts.find(a => a._id === accountId);
-    return account ? `${account.name} (${account.bank})` : "Unknown Account";
   };
 
   const handleMerge = async (duplicateIndex: number) => {
@@ -121,7 +125,7 @@ export default function DuplicateReview({
       });
       setResolvedDuplicates((prev) => new Set(prev).add(duplicateIndex));
     } catch (error) {
-      toast.error(`Failed to add transaction: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(`Failed to add: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setResolvingDuplicates((prev) => {
         const next = new Set(prev);
@@ -134,141 +138,203 @@ export default function DuplicateReview({
   const unresolved = session.duplicates.filter((_, i) => !resolvedDuplicates.has(i));
 
   return (
-    <div className="space-y-6">
-      {/* Summary */}
-      <div className="p-4 rounded-md border bg-muted">
-        <h2 className="text-base font-semibold mb-2">Import Summary</h2>
-        <div className="text-sm text-muted-foreground space-y-1">
-          <div className="flex items-center gap-1.5">
-            <CheckCircle className="size-3.5 text-green-500 shrink-0" />
-            {session.summary.inserted} transactions imported successfully
-          </div>
-          {session.duplicates.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <AlertTriangle className="size-3.5 text-yellow-500 shrink-0" />
-              {session.duplicates.length} possible duplicates found
-            </div>
-          )}
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header summary */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-0.5">
+          <h2 className="text-base font-semibold">Review duplicates</h2>
+          <p className="text-sm text-muted-foreground">
+            {unresolved.length} possible {unresolved.length === 1 ? "duplicate" : "duplicates"} found during import.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="gap-1.5 px-2.5 py-1">
+            <CheckCircle className="size-3.5 text-primary" />
+            {session.summary.inserted} imported
+          </Badge>
           {session.errors.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <XCircle className="size-3.5 text-destructive shrink-0" />
-              {session.errors.length} rows skipped due to errors
-            </div>
+            <Badge variant="outline" className="gap-1.5 px-2.5 py-1 text-destructive border-destructive/30">
+              <XCircle className="size-3.5" />
+              {session.errors.length} errors
+            </Badge>
           )}
         </div>
       </div>
 
-      {/* Errors */}
-      {session.errors.length > 0 && (
-        <div className="p-4 rounded-md border bg-destructive/10">
-          <h3 className="flex items-center gap-1.5 text-sm font-medium text-destructive mb-2">
-            <AlertTriangle className="size-3.5 shrink-0" />
-            {session.errors.length} rows skipped due to errors
-          </h3>
-          <div className="max-h-40 overflow-y-auto space-y-1">
-            {session.errors.map((error, i) => (
-              <div key={i} className="text-sm text-destructive">
-                Row {error.rowIndex + 1}: {error.message}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Main list */}
+      <div className="space-y-4">
+        {session.duplicates.map((duplicate, i) => {
+          const existing = getExistingTransaction(duplicate.existingId);
+          const isResolving = resolvingDuplicates.has(i);
+          if (resolvedDuplicates.has(i)) return null;
 
-      {/* Duplicates */}
-      {session.duplicates.length > 0 && (
-        <div>
-          <h3 className="flex items-center gap-1.5 text-sm font-medium mb-4">
-            <AlertTriangle className="size-3.5 text-yellow-500 shrink-0" />
-            Possible duplicates — {unresolved.length} remaining
-          </h3>
+          const dateDiff = existing ? Math.abs(existing.date - duplicate.newTransaction.date) : 0;
+          const daysDiff = Math.floor(dateDiff / (1000 * 60 * 60 * 24));
+          const isDateMatch = daysDiff === 0;
+          const isDescMatch = existing?.description === duplicate.newTransaction.description;
+          const isAmountMatch = existing?.amount === duplicate.newTransaction.amount;
 
-          <div className="space-y-4">
-            {session.duplicates.map((duplicate, i) => {
-              const existing = getExistingTransaction(duplicate.existingId);
-              const isResolved = resolvedDuplicates.has(i);
-              const isResolving = resolvingDuplicates.has(i);
-
-              if (isResolved) return null;
-
-              return (
-                <div key={i} className="p-4 rounded-md border bg-background space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Existing</div>
-                      <div className="space-y-1 text-sm">
-                        <div><span className="font-medium">Date:</span> {existing ? formatDate(existing.date) : "N/A"}</div>
-                        <div>
-                          <span className="font-medium">Amount:</span>{" "}
-                          <span className={cn(existing && existing.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
-                            {existing ? formatAmount(existing.amount) : "N/A"}
-                          </span>
-                        </div>
-                        <div><span className="font-medium">Description:</span> {existing?.description || "N/A"}</div>
-                        <div>
-                          <span className="font-medium">Category:</span>{" "}
-                          {existing?.categoryId ? (
-                            <Badge variant="secondary">{getCategoryName(existing.categoryId) || "Unknown"}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">(uncategorized)</span>
-                          )}
-                        </div>
-                        <div><span className="font-medium">Account:</span> {existing ? getAccountName(existing.accountId) : "N/A"}</div>
+          return (
+            <div key={i} className="rounded-lg border bg-card shadow-sm overflow-hidden transition-shadow hover:shadow-md">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-muted/40 border-b border-border">
+                    <th className="w-1/4 px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Field</th>
+                    <th className="w-3/8 px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Existing</th>
+                    <th className="w-3/8 px-5 py-3 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Incoming</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  <tr>
+                    <td className="px-5 py-3.5 text-sm font-medium text-muted-foreground">Date</td>
+                    <td className="px-5 py-3.5 text-sm">{existing ? formatDate(existing.date) : "—"}</td>
+                    <td className={cn("px-5 py-3.5 text-sm font-medium", isDateMatch ? "text-primary" : "text-foreground")}>
+                      <div className="flex items-center gap-2">
+                        <span>{formatDate(duplicate.newTransaction.date)}</span>
+                        {isDateMatch
+                          ? <Check className="size-3 text-primary" />
+                          : <span className="text-[10px] text-muted-foreground font-normal">({daysDiff}d apart)</span>
+                        }
                       </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">New</div>
-                      <div className="space-y-1 text-sm">
-                        <div><span className="font-medium">Date:</span> {formatDate(duplicate.newTransaction.date)}</div>
-                        <div>
-                          <span className="font-medium">Amount:</span>{" "}
-                          <span className={cn(duplicate.newTransaction.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
-                            {formatAmount(duplicate.newTransaction.amount)}
-                          </span>
-                        </div>
-                        <div><span className="font-medium">Description:</span> {duplicate.newTransaction.description}</div>
-                        <div>
-                          <span className="font-medium">Type:</span>{" "}
-                          {duplicate.newTransaction.transactionType || <span className="text-muted-foreground">(none)</span>}
-                        </div>
-                        <div><span className="font-medium">Account:</span> {getAccountName(session.accountId)}</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 text-sm font-medium text-muted-foreground">Amount</td>
+                    <td className={cn("px-5 py-3.5 text-sm font-semibold tabular-nums", existing && existing.amount >= 0 ? "text-primary" : "text-foreground")}>
+                      {existing ? formatAmount(existing.amount) : "—"}
+                    </td>
+                    <td className={cn("px-5 py-3.5 text-sm font-semibold tabular-nums", isAmountMatch ? "text-primary" : "text-foreground")}>
+                      <div className="flex items-center gap-2">
+                        <span>{formatAmount(duplicate.newTransaction.amount)}</span>
+                        {isAmountMatch && <Check className="size-3 text-primary" />}
                       </div>
-                    </div>
-                  </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 text-sm font-medium text-muted-foreground">Description</td>
+                    <td className="px-5 py-3.5 text-sm truncate max-w-[200px]">{existing?.description || "—"}</td>
+                    <td className={cn("px-5 py-3.5 text-sm font-medium truncate max-w-[200px]", isDescMatch ? "text-primary" : "text-foreground")}>
+                      <div className="flex items-center gap-2">
+                        <span className="truncate">{duplicate.newTransaction.description}</span>
+                        {isDescMatch && <Check className="size-3 text-primary shrink-0" />}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 text-sm font-medium text-muted-foreground">Details</td>
+                    <td className="px-5 py-3.5">
+                      {existing?.categoryId ? (
+                        <Badge variant="secondary">{getCategoryName(existing.categoryId)}</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No category</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-muted-foreground">
+                      {duplicate.newTransaction.transactionType || "—"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
 
-                  <div className="flex gap-2 pt-2">
-                    <Button onClick={() => handleMerge(i)} disabled={isResolving} variant="default" size="sm" className="gap-1.5">
-                      <Check className="size-3.5" />
-                      {isResolving ? "Merging..." : "Merge"}
-                    </Button>
-                    <Button onClick={() => handleIgnore(i)} disabled={isResolving} variant="secondary" size="sm" className="gap-1.5">
-                      <X className="size-3.5" />
-                      Ignore
-                    </Button>
-                    <Button onClick={() => handleAddAsNew(i)} disabled={isResolving} variant="outline" size="sm" className="gap-1.5">
-                      <Plus className="size-3.5" />
-                      {isResolving ? "Adding..." : "Add as New"}
-                    </Button>
+              {/* Action footer */}
+              <div className="px-5 py-3.5 bg-muted/30 border-t border-border flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5">
+                    <div className="size-1.5 rounded-full bg-primary" />
+                    <span>Match</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    <strong>Merge:</strong> Update existing with new file data, keep user edits.{" "}
-                    <strong>Ignore:</strong> Keep existing, skip new transaction.{" "}
-                    <strong>Add as New:</strong> They are different transactions — add both.
+                  <div className="flex items-center gap-1.5">
+                    <div className="size-1.5 rounded-full bg-muted-foreground/40" />
+                    <span>Differs</span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
 
-          {unresolved.length === 0 && (
-            <div className="mt-6 p-4 rounded-md border bg-green-50 dark:bg-green-950/20">
-              <div className="text-sm text-green-700 dark:text-green-300 mb-3">
-                All duplicates have been reviewed. Click below to finish the import.
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isResolving}
+                    onClick={() => handleAddAsNew(i)}
+                    className="gap-1.5"
+                  >
+                    <Plus className="size-3.5" />
+                    Keep both
+                  </Button>
+
+                  <div className="flex items-center rounded-md overflow-hidden border border-primary shadow-sm">
+                    <Button
+                      size="sm"
+                      disabled={isResolving}
+                      onClick={() => handleMerge(i)}
+                      className="rounded-none border-none px-4"
+                    >
+                      {isResolving ? "Merging..." : (
+                        <>
+                          <Check className="size-3.5 mr-1.5" />
+                          Merge
+                        </>
+                      )}
+                    </Button>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild disabled={isResolving}>
+                        <Button size="sm" className="rounded-none border-l border-primary-foreground/20 px-2">
+                          <ChevronDown className="size-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-72 p-1.5">
+                        <DropdownMenuItem
+                          onClick={() => handleMerge(i)}
+                          className="flex flex-col items-start gap-0.5 p-3 cursor-pointer focus:bg-foreground/8"
+                        >
+                          <div className="flex items-center gap-2 font-semibold text-foreground">
+                            <CheckCircle className="size-3.5 text-primary" />
+                            <span>Merge</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground leading-relaxed">
+                            Update existing with latest file data, keep your edits.
+                          </span>
+                        </DropdownMenuItem>
+
+                        <div className="h-px bg-border my-1" />
+
+                        <DropdownMenuItem
+                          onClick={() => handleIgnore(i)}
+                          className="flex flex-col items-start gap-0.5 p-3 cursor-pointer focus:bg-foreground/8"
+                        >
+                          <div className="flex items-center gap-2 font-semibold text-foreground">
+                            <XCircle className="size-3.5 text-muted-foreground" />
+                            <span>Ignore incoming</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground leading-relaxed">
+                            Keep existing as-is, discard the imported row.
+                          </span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
               </div>
-              <Button onClick={onSessionResolved}>Finish Import</Button>
             </div>
-          )}
+          );
+        })}
+      </div>
+
+      {/* Completion state */}
+      {unresolved.length === 0 && (
+        <div className="rounded-lg border bg-card p-8 shadow-sm flex flex-col items-center text-center gap-4">
+          <div className="bg-primary/10 p-3 rounded-full">
+            <Check className="size-6 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold">Review complete</h3>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              All duplicates have been handled. Ready to finalize your import.
+            </p>
+          </div>
+          <Button onClick={onSessionResolved} className="px-8">
+            Finish import
+          </Button>
         </div>
       )}
     </div>

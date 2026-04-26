@@ -26,6 +26,9 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: 'Saldo',
   description: 'Plan and track your finances with ease.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({

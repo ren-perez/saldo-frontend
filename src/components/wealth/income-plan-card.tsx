@@ -548,13 +548,13 @@ export function IncomePlanCard({
         {/* ── Smart Match CTA ── */}
         {isPlanned && smartMatch && (
           <div className="border-t border-emerald-500/20 bg-emerald-500/[0.07] px-6 py-3">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 leading-snug">
-                  Found {formatCurrency(smartMatch.amount)} from {smartMatch.description}
+                  Found <strong>{formatCurrency(smartMatch.amount)}</strong> from {smartMatch.description}
                 </span>
                 <span className="text-[11px] text-emerald-600/80">
-                  {new Date(smartMatch.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · Is this it?
+                  {new Date(smartMatch.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0">

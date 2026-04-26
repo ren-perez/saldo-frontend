@@ -7,6 +7,8 @@ import { Separator } from "@/components/ui/separator"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { PendingActionsDropdown } from "./PendingActionsDropdown"
+import { ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
 const NAV_LABELS: { href: string; label: string }[] = [
     { href: "/dashboard", label: "Dashboard" },
@@ -14,12 +16,19 @@ const NAV_LABELS: { href: string; label: string }[] = [
     { href: "/goals", label: "Goals" },
     { href: "/accounts", label: "Accounts" },
     { href: "/transactions", label: "Transactions" },
+    { href: "/transfers-inbox", label: "Transfers Inbox" },
+    { href: "/transfers-manage", label: "Manage Transfers" },
     { href: "/import-csv", label: "Import CSV" },
     { href: "/categories", label: "Categories" },
     { href: "/presets", label: "Presets" },
     { href: "/history", label: "Chat History" },
     { href: "/settings", label: "Chat Settings" },
 ]
+
+const BACK_LINKS: Record<string, string> = {
+    "/transfers-inbox": "/transactions",
+    "/transfers-manage": "/transactions",
+}
 
 function getPageTitle(pathname: string): string {
     const match = NAV_LABELS.find((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
@@ -71,7 +80,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             <Separator orientation="vertical" className="h-4" />
 
                             <div className="flex flex-1 items-center justify-between">
-                                <h1 className="text-lg font-semibold pl-4 tracking-wide">{pageTitle}</h1>
+                                <div className="flex items-center gap-1 pl-4">
+                                    {BACK_LINKS[pathname] && (
+                                        <Link
+                                            href={BACK_LINKS[pathname]}
+                                            className="text-muted-foreground hover:text-foreground transition-colors mr-1"
+                                        >
+                                            <ArrowLeft className="h-4 w-4" />
+                                        </Link>
+                                    )}
+                                    <h1 className="text-lg font-semibold tracking-wide">{pageTitle}</h1>
+                                </div>
                                 
                                 <div className="flex items-center gap-3 pr-4">
                                     <PendingActionsDropdown />
