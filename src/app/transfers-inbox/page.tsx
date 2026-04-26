@@ -289,7 +289,7 @@ export default function TransfersPage() {
                     <CheckCircle className="h-10 w-10 text-muted-foreground/50 mx-auto mb-4 stroke-[1.5]" />
                     <h3 className="text-lg font-semibold mb-1">No paired transfers</h3>
                     <p className="text-sm text-muted-foreground mb-5">
-                      You haven't allocated any transfer movements yet.
+                      You haven&apos;t allocated any transfer movements yet.
                     </p>
                     <Button variant="outline" onClick={() => setActiveTab("pending")}>
                       Review pending transfers

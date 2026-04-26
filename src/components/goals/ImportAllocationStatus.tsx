@@ -131,7 +131,7 @@ export function ImportAllocationStatus({ importId, formatCurrency }: ImportAlloc
                     </div>
                 </div>
                 <div>
-                    <p className="font-semibold text-base">You're all set!</p>
+                    <p className="font-semibold text-base">You&apos;re all set!</p>
                     <p className="text-sm text-muted-foreground mt-0.5">
                         {totalTransactions} transaction{totalTransactions !== 1 ? "s" : ""} imported — categorized and allocated.
                     </p>
@@ -272,7 +272,7 @@ function IncomeContent({
                 <div>
                     <p className="text-xs font-medium">These transactions match your Income Plan</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Don't allocate them to goals here — match them on the Income page so your plan distributes them correctly.
+                        Don&apos;t allocate them to goals here — match them on the Income page so your plan distributes them correctly.
                     </p>
                 </div>
             </div>

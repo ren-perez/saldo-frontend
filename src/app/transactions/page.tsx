@@ -8,7 +8,7 @@ import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
 import {
-    Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus, Info,
+    Search, X, Download, Trash2, ArrowRightLeft, ChevronDown, Upload, Plus,
     ArrowUp, ArrowDown, ArrowUpDown, Link2, Pencil
 } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/CreateTransactionDialog";
@@ -613,7 +613,7 @@ function TransactionsContent() {
         setCurrentPage(1);
     };
 
-    const handleDeleteTransaction = async (transactionId: Id<"transactions">) => {
+    const _handleDeleteTransaction = async (transactionId: Id<"transactions">) => {
         try {
             await deleteTransaction({ transactionId });
         } catch (error) {

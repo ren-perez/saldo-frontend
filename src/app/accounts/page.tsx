@@ -7,7 +7,7 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { useConvexUser } from "@/hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -173,7 +173,7 @@ export default function AccountsPage() {
     );
 
     const toggle = (t: AccountType) =>
-        setCollapsed((prev) => { const s = new Set(prev); s.has(t) ? s.delete(t) : s.add(t); return s; });
+        setCollapsed((prev) => { const s = new Set(prev); if (s.has(t)) { s.delete(t); } else { s.add(t); } return s; });
 
     function openEdit(a: Account) {
         setForm({ bank: a.bank, name: a.name, number: a.number || "", type: toAccountType(a.type), balance: a.balance != null ? String(a.balance) : "" });

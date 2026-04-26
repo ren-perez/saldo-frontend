@@ -8,7 +8,6 @@ import {
   ToggleLeft,
   ToggleRight,
   Trash2,
-  Zap,
 } from "lucide-react";
 import { CategoryRule } from "../types";
 

@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import { PiggyBank, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { currencyExact } from "@/lib/format"
 

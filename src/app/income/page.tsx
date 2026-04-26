@@ -2,12 +2,11 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Inbox, Plus, Calendar, ArrowRight, Link2, DollarSign, Info, Undo2, SlidersHorizontal } from "lucide-react"
+import { Plus, Calendar, ArrowRight, Link2, DollarSign, Undo2, SlidersHorizontal } from "lucide-react"
 import { AllocationsView } from "@/components/allocation/allocations-view"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"
 import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -32,7 +31,7 @@ export default function IncomePage() {
   const { convexUser } = useConvexUser()
   const userId = convexUser?._id
 
-  const { count } = useUnmatchedIncomeCount(userId)
+  useUnmatchedIncomeCount(userId)
 
   const [unmatchedOpen, setUnmatchedOpen] = useState(false)
   const [matchingTx, setMatchingTx] = useState<UnmatchedTransaction | null>(null)
