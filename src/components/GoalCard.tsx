@@ -107,7 +107,7 @@ export function GoalCard({ goal }: GoalCardProps) {
                       {goal.note}
                     </p>
                     {/* Full note tooltip on hover */}
-                    <div
+                    {/* <div
                       className={cn(
                         "pointer-events-none absolute left-0 top-full z-20 mt-1.5",
                         "w-56 rounded-lg bg-black/80 px-2.5 py-1.5 text-xs text-white/95 shadow-xl backdrop-blur-sm",
@@ -116,7 +116,7 @@ export function GoalCard({ goal }: GoalCardProps) {
                       )}
                     >
                       {goal.note}
-                    </div>
+                    </div> */}
                   </div>
                 )}
               </div>
