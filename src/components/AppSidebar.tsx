@@ -93,7 +93,7 @@ export function AppSidebar() {
                 </div>
             </SidebarHeader>
 
-            <SidebarContent className="gap-4 px-2">
+            <SidebarContent className="gap-4 px-2 group-data-[collapsible=icon]:px-0">
                 {/* Planning Group */}
                 <SidebarGroup>
                     <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
