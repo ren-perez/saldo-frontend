@@ -13,7 +13,7 @@ function escapeCell(value: string): string {
 export function generateCSV(transactions: Transaction[], lookups: CSVLookups): string {
   const { accounts, categories, categoryGroups } = lookups;
 
-  const headers = ["Date", "Description", "Account", "Type", "Group", "Category", "Amount"];
+  const headers = ["Date", "Description", "Account", "Type", "Group", "Category", "Amount", "Transfer Pair ID"];
 
   const rows = transactions.map((tx) => {
     const account = accounts.find((a) => a._id === tx.accountId);
@@ -28,6 +28,7 @@ export function generateCSV(transactions: Transaction[], lookups: CSVLookups): s
       escapeCell(group?.name || ""),
       escapeCell(category?.name || ""),
       tx.amount.toString(),
+      tx.transfer_pair_id || "",
     ].join(",");
   });
 

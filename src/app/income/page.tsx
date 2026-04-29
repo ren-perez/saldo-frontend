@@ -68,7 +68,7 @@ export default function IncomePage() {
               onClick={() => setAllocationRulesOpen(true)}
               className="gap-2 text-muted-foreground hover:text-foreground"
             >
-              <SlidersHorizontal className="size-4" />
+              {/* <SlidersHorizontal className="size-4" /> */}
               <span className="hidden sm:inline">Allocation Rules</span>
               <span className="inline sm:hidden">Rules</span>
             </Button>

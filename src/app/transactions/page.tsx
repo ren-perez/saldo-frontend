@@ -7,7 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { ArrowRightLeft, ChevronDown, Upload, Plus, Link2 } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, Upload, Plus, Link2, Receipt } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/CreateTransactionDialog";
 import {
   DropdownMenu,
@@ -427,7 +427,7 @@ function TransactionsContent() {
             <Button variant="outline" size="sm" asChild>
               <Link href="/transfers-inbox">
                 <ArrowRightLeft className="h-4 w-4 mr-2" />
-                Transfers Inbox
+                Transfers inbox
               </Link>
             </Button>
 
@@ -439,7 +439,7 @@ function TransactionsContent() {
                 onClick={() => setShowCreateDialog(true)}
               >
                 <Plus className="h-4 w-4" />
-                Add Transaction
+                Add transaction
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -476,7 +476,7 @@ function TransactionsContent() {
           {!transactions || transactions.data.length === 0 ? (
             <Card>
               <CardContent className="p-6 sm:p-8 text-center">
-                <div className="text-3xl sm:text-4xl mb-4">💰</div>
+                <Receipt className="size-8 text-muted-foreground/30 mx-auto mb-4" />
                 <h3 className="text-base sm:text-lg font-medium mb-2">No transactions found</h3>
                 <p className="mb-4 text-muted-foreground text-sm sm:text-base">
                   {activeFiltersCount > 0
@@ -488,11 +488,14 @@ function TransactionsContent() {
                 <div className="flex flex-col sm:flex-row gap-2 justify-center">
                   {activeFiltersCount > 0 && (
                     <Button variant="outline" onClick={clearAllFilters} className="text-sm">
-                      Clear Filters
+                      Clear filters
                     </Button>
                   )}
-                  <Button asChild className="text-sm">
-                    <a href="/import-csv">Import CSV →</a>
+                  <Button asChild className="text-sm gap-2">
+                    <Link href="/import-csv">
+                      <Upload className="h-4 w-4" />
+                      Import CSV
+                    </Link>
                   </Button>
                 </div>
               </CardContent>
@@ -656,7 +659,7 @@ function TransactionsContent() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Link2 className="h-5 w-5 text-primary" />
-              Pair Transfer
+              Pair transfer
             </DialogTitle>
             <DialogDescription>
               Select the matching counterpart transaction for this transfer.
