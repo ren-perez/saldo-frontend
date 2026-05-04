@@ -1,6 +1,7 @@
 // src/components/Navigation.tsx
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./theme-toggle";
@@ -26,8 +27,9 @@ export default function Navigation() {
                     <div className="flex">
                         {/* Logo */}
                         <div className="flex-shrink-0 flex items-center">
-                            <Link href="/" className="text-xl font-bold text-primary">
-                                Saldo
+                            <Link href="/" className="inline-flex items-center gap-2 text-xl font-bold text-primary">
+                                <Image src="/logo.svg" alt="Saldo logo" width={32} height={32} className="h-8 w-8 rounded-md bg-background p-1" />
+                                <span>Saldo</span>
                             </Link>
                         </div>
 

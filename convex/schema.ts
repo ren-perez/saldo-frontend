@@ -37,6 +37,7 @@ export default defineSchema({
         amountColumns: v.array(v.string()),
         amountProcessing: v.any(),
         transactionTypeColumn: v.optional(v.string()),
+        transferPairIdColumn: v.optional(v.string()),
         createdAt: v.string(),
     }).index("by_user", ["userId"]),
 
@@ -189,7 +190,9 @@ export default defineSchema({
             amount: v.number(),
             description: v.string(),
             category: v.optional(v.string()),
+            categoryGroup: v.optional(v.string()),
             transactionType: v.optional(v.string()),
+            transfer_pair_id: v.optional(v.string()),
             rawData: v.any(),
         })),
         
@@ -285,11 +288,6 @@ export default defineSchema({
         verification_status: v.optional(v.string()),
         transfer_transaction_id: v.optional(v.id("transactions")),
         createdAt: v.number(),
-        // Deprecated pre-refactor fields — kept optional to avoid rejecting old documents
-        matched_amount: v.optional(v.number()),
-        status: v.optional(v.string()),
-        label: v.optional(v.string()),
-        matched_transaction_id: v.optional(v.id("transactions")),
     }).index("by_user", ["userId"])
         .index("by_income_plan", ["income_plan_id"])
         .index("by_account", ["accountId"]),

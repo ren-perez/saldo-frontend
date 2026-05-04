@@ -284,7 +284,7 @@ function IncomeContent({
                             <div className="min-w-0 flex-1">
                                 <p className="text-xs font-medium truncate">{tx.description}</p>
                                 <p className="text-[10px] text-muted-foreground">
-                                    {format(new Date(tx.date), "MMM d")}
+                                    {new Date(tx.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })}
                                     {tx.suggestedPlanLabel && (
                                         <span className="ml-1.5 text-primary">→ {tx.suggestedPlanLabel}</span>
                                     )}
@@ -406,7 +406,7 @@ function GoalsContent({
                     <div key={tx.transactionId} className="flex items-center justify-between gap-3 p-2.5 border rounded-lg hover:bg-muted/30 transition-colors">
                         <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium truncate">{tx.description}</p>
-                            <p className="text-[10px] text-muted-foreground">{format(new Date(tx.date), "MMM d, yyyy")}</p>
+                            <p className="text-[10px] text-muted-foreground">{new Date(tx.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                             <span className="text-xs font-semibold text-green-600">{formatCurrency(tx.amount)}</span>

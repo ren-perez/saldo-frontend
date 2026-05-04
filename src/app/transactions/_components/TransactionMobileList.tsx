@@ -3,7 +3,6 @@
 import { ArrowRightLeft, Link2, Pencil } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -13,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { currencyExact } from "@/lib/format";
+import { currencyExact, formatDate } from "@/lib/format";
 import { Transaction, Account, Category, CategoryGroup } from "../_types";
 import { TransactionSelectionState } from "../_hooks/useTransactionSelection";
 import { CategoryCombobox } from "./CategoryCombobox";
@@ -156,7 +155,7 @@ export function TransactionMobileList({
                 {/* Sub info */}
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-xs text-muted-foreground">
-                    {new Date(tx.date).toLocaleDateString()}
+                    {formatDate(tx.date)}
                   </span>
                   <Badge variant="outline" className="text-xs py-0 px-1.5 h-4">
                     {account?.name || "Unknown"}

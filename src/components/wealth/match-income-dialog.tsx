@@ -12,7 +12,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { format } from "date-fns"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
@@ -96,7 +95,7 @@ export function MatchIncomeDialog({
         amount: Math.round(a.amount * ratio * 100) / 100,
       }))
     )
-  }, [selectedTxId, hasDiff, allocations?.length])
+  }, [selectedTxId, hasDiff, allocations?.length, allocations, plan, selectedTx])
 
   const diffTotal = diffAllocations.reduce((s, a) => s + a.amount, 0)
   const actualAmount = selectedTx?.amount ?? 0
@@ -182,7 +181,7 @@ export function MatchIncomeDialog({
                   {tx.description}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {format(new Date(tx.date), "MMM d, yyyy")}
+                  {new Date(tx.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                   {tx.alreadyMatched && (
                     <span className="ml-2 text-warning">Already matched</span>
                   )}

@@ -66,7 +66,7 @@ export function CreateTransactionDialog({ open, onOpenChange, transaction }: Cre
                 setTransactionType("");
             }
         }
-    }, [open, transaction]);
+    }, [open, transaction, today]);
 
     const resetForm = () => {
         setAccountId("");

@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DollarSign, Plus, X, Target, Calendar, AlertCircle, Link as LinkIcon } from "lucide-react"
-import { format } from "date-fns"
 import { toast } from "sonner"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
@@ -150,7 +149,7 @@ export function TransactionAllocationDialog({
                                 <p className="font-medium">{transaction.description}</p>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <Calendar className="h-4 w-4" />
-                                    {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                    {new Date(transaction.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                                 </div>
                                 {transaction.account && (
                                     <Badge variant="outline" className="text-xs">

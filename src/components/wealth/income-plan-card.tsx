@@ -554,7 +554,7 @@ export function IncomePlanCard({
                   Found <strong>{formatCurrency(smartMatch.amount)}</strong> from {smartMatch.description}
                 </span>
                 <span className="text-[11px] text-emerald-600/80">
-                  {new Date(smartMatch.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {new Date(smartMatch.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })}
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0">

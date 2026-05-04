@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Plus, Calendar, ArrowRight, Link2, DollarSign, Undo2, SlidersHorizontal } from "lucide-react"
+import { Plus, Calendar, ArrowRight, Link2, DollarSign, Undo2 } from "lucide-react"
 import { AllocationsView } from "@/components/allocation/allocations-view"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"
@@ -295,7 +295,7 @@ function UnmatchedIncomeModal({
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                         <Calendar className="size-2.5" />
-                        {format(new Date(tx.date), "MMM d")}
+                        {new Date(tx.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })}
                       </span>
                       {tx.account && (
                         <Badge
@@ -375,7 +375,7 @@ function UnmatchedIncomeModal({
                   <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                     <Calendar className="size-2.5" />
                     {plan.date_received
-                      ? format(new Date(plan.date_received), "MMM d")
+                      ? new Date(plan.date_received).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })
                       : format(new Date(plan.expected_date), "MMM d")}
                   </span>
                 </div>

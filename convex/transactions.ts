@@ -22,11 +22,14 @@ export const importTransactions = mutation({
             amount: v.number(),
             description: v.string(),
             category: v.optional(v.string()),
+            categoryGroup: v.optional(v.string()),
             transactionType: v.optional(v.string()),
+            transfer_pair_id: v.optional(v.string()),
             rawData: v.any(),
         })),
         sessionId: v.string(),
-        importId: v.id("imports"), // ✅ Required, not optional
+        importId: v.id("imports"),
+        trustSource: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
         const { userId, accountId, transactions, sessionId, importId } = args;
@@ -71,9 +74,31 @@ export const importTransactions = mutation({
             existingTransactionKeys.set(key, existing);
         }
 
+        // Pre-load categories + groups for name-based lookup (CSV wins over rules engine)
+        const allCategories = await ctx.db
+            .query("categories")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+        const allGroups = await ctx.db
+            .query("category_groups")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .collect();
+        const groupNameById = new Map(allGroups.map((g) => [g._id as string, g.name]));
+        const categoryByName = new Map<string, Id<"categories">>();
+        const categoryByGroupAndName = new Map<string, Id<"categories">>();
+        for (const cat of allCategories) {
+            categoryByName.set(cat.name.toLowerCase(), cat._id);
+            const gName = cat.groupId ? (groupNameById.get(cat.groupId as string) ?? "") : "";
+            if (gName) {
+                categoryByGroupAndName.set(`${gName.toLowerCase()}|${cat.name.toLowerCase()}`, cat._id);
+            }
+        }
+
         const inserted: string[] = [];
         const possibleDuplicates = [];
         const errors: Array<{ rowIndex: number; message: string }> = [];
+        let autoSkippedDuplicates = 0;
+        let unrecognizedCategories = 0;
 
         // Process each transaction
         for (let i = 0; i < transactions.length; i++) {
@@ -101,7 +126,10 @@ export const importTransactions = mutation({
                 const existingTransaction = existingTransactionKeys.get(deduplicationKey);
 
                 if (existingTransaction) {
-                    // Possible duplicate found
+                    if (args.trustSource) {
+                        autoSkippedDuplicates++;
+                        continue;
+                    }
                     possibleDuplicates.push({
                         existingId: existingTransaction._id,
                         newTransaction: {
@@ -114,11 +142,45 @@ export const importTransactions = mutation({
                         },
                     });
                 } else {
-                    // No duplicate — apply rules engine for auto-categorization
-                    const ruleMatch = matchDescriptionWithRule(transaction.description, rules);
-                    const ruleCategoryType = ruleMatch
-                        ? await getCategoryType(ruleMatch.categoryId)
-                        : undefined;
+                    // Category resolution: CSV column wins, rules engine is fallback
+                    let resolvedCategoryId: Id<"categories"> | undefined;
+                    let isAutoCategorized: boolean | undefined;
+                    let appliedRuleId: Id<"category_rules"> | undefined;
+                    let resolvedTransactionType: string | undefined = transaction.transactionType;
+
+                    if (transaction.category) {
+                        const catName = transaction.category.toLowerCase();
+                        const groupName = (transaction.categoryGroup ?? "").toLowerCase();
+                        resolvedCategoryId =
+                            categoryByGroupAndName.get(`${groupName}|${catName}`) ??
+                            categoryByName.get(catName);
+
+                        if (resolvedCategoryId) {
+                            // Category found from CSV — also pull transactionType from the category record
+                            const catType = await getCategoryType(resolvedCategoryId);
+                            if (catType) resolvedTransactionType = catType;
+                        } else {
+                            // CSV category not found in DB — try rules engine
+                            const ruleMatch = matchDescriptionWithRule(transaction.description, rules);
+                            if (ruleMatch) {
+                                resolvedCategoryId = ruleMatch.categoryId;
+                                resolvedTransactionType = (await getCategoryType(ruleMatch.categoryId)) ?? resolvedTransactionType;
+                                isAutoCategorized = true;
+                                appliedRuleId = ruleMatch.ruleId;
+                            } else {
+                                unrecognizedCategories++;
+                            }
+                        }
+                    } else {
+                        // No CSV category — run rules engine as usual
+                        const ruleMatch = matchDescriptionWithRule(transaction.description, rules);
+                        if (ruleMatch) {
+                            resolvedCategoryId = ruleMatch.categoryId;
+                            resolvedTransactionType = (await getCategoryType(ruleMatch.categoryId)) ?? resolvedTransactionType;
+                            isAutoCategorized = true;
+                            appliedRuleId = ruleMatch.ruleId;
+                        }
+                    }
 
                     const insertedId = await ctx.db.insert("transactions", {
                         userId,
@@ -127,10 +189,11 @@ export const importTransactions = mutation({
                         amount: transaction.amount,
                         description: transaction.description,
                         importId: importId,
-                        transactionType: ruleCategoryType ?? transaction.transactionType,
-                        categoryId: ruleMatch?.categoryId ?? undefined,
-                        isAutoCategorized: ruleMatch ? true : undefined,
-                        appliedRuleId: ruleMatch?.ruleId ?? undefined,
+                        transactionType: resolvedTransactionType,
+                        categoryId: resolvedCategoryId,
+                        isAutoCategorized: isAutoCategorized ?? undefined,
+                        appliedRuleId: appliedRuleId,
+                        transfer_pair_id: transaction.transfer_pair_id ?? undefined,
                         createdAt: Date.now(),
                     });
                     inserted.push(insertedId);
@@ -169,138 +232,15 @@ export const importTransactions = mutation({
         return {
             inserted: inserted.length,
             skipped: possibleDuplicates.length,
+            autoSkippedDuplicates,
+            unrecognizedCategories,
             errors,
-            sessionId, // ✅ Always return sessionId
+            sessionId,
             hasDuplicates: possibleDuplicates.length > 0,
         };
     },
 });
 
-
-export const resolveDuplicates = mutation({
-    args: {
-        sessionId: v.string(),
-        userId: v.id("users"),
-        decisions: v.array(v.object({
-            existingId: v.id("transactions"),
-            action: v.union(v.literal("skip"), v.literal("import")),
-            newTransaction: v.optional(v.object({
-                date: v.number(),
-                amount: v.number(),
-                description: v.string(),
-                transactionType: v.optional(v.string()),
-                rawData: v.any(),
-            })),
-        })),
-    },
-    handler: async (ctx, args) => {
-        const { sessionId, userId, decisions } = args;
-
-        // Get session
-        const session = await ctx.db
-            .query("import_sessions")
-            .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-            .unique();
-
-        if (!session || session.userId !== userId) {
-            throw new Error("Session not found or unauthorized");
-        }
-
-        const { importId, accountId } = session;
-        let importedCount = session.summary.inserted;
-
-        // Fetch rules once for the whole batch (same pattern as importTransactions)
-        const rules = await ctx.db
-            .query("category_rules")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect() as CategoryRule[];
-
-        const categoryTypeCache = new Map<string, string | undefined>();
-        const getCategoryType = async (categoryId: Id<"categories">): Promise<string | undefined> => {
-            if (!categoryTypeCache.has(categoryId)) {
-                const cat = await ctx.db.get(categoryId);
-                categoryTypeCache.set(categoryId, cat?.transactionType);
-            }
-            return categoryTypeCache.get(categoryId);
-        };
-
-        // Process decisions
-        for (const decision of decisions) {
-            if (decision.action === "import" && decision.newTransaction) {
-                // Apply rules engine — same entry point as regular imports
-                const ruleMatch = matchDescriptionWithRule(decision.newTransaction.description, rules);
-                const ruleCategoryType = ruleMatch
-                    ? await getCategoryType(ruleMatch.categoryId)
-                    : undefined;
-
-                // Import the transaction
-                const insertedId = await ctx.db.insert("transactions", {
-                    userId,
-                    accountId,
-                    date: decision.newTransaction.date,
-                    amount: decision.newTransaction.amount,
-                    description: decision.newTransaction.description,
-                    transactionType: ruleCategoryType ?? decision.newTransaction.transactionType,
-                    categoryId: ruleMatch?.categoryId ?? undefined,
-                    isAutoCategorized: ruleMatch ? true : undefined,
-                    appliedRuleId: ruleMatch?.ruleId ?? undefined,
-                    importId,
-                    createdAt: Date.now(),
-                });
-
-                importedCount++;
-
-                // Record resolution
-                await ctx.db.insert("import_duplicate_resolutions", {
-                    sessionId,
-                    importId,
-                    userId,
-                    existingTransactionId: decision.existingId,
-                    action: "import",
-                    newTransactionId: insertedId,
-                    resolvedAt: Date.now(),
-                });
-            } else {
-                // Skip - record decision
-                await ctx.db.insert("import_duplicate_resolutions", {
-                    sessionId,
-                    importId,
-                    userId,
-                    existingTransactionId: decision.existingId,
-                    action: "skip",
-                    resolvedAt: Date.now(),
-                });
-            }
-        }
-
-        // Observer: sweep goal allocations for this account after duplicate resolution
-        await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
-
-        // Update session status
-        await ctx.db.patch(session._id, {
-            status: "completed",
-            resolvedAt: Date.now(),
-            summary: {
-                ...session.summary,
-                inserted: importedCount,
-            },
-        });
-
-        // Update import record
-        await ctx.db.patch(importId, {
-            status: "completed",
-            processedAt: Date.now(),
-            importedCount,
-            skippedCount: session.summary.skipped - (importedCount - session.summary.inserted),
-            updatedAt: Date.now(),
-        });
-
-        return {
-            success: true,
-            totalImported: importedCount,
-        };
-    },
-});
 
 export const listTransactionsPaginated = query({
     args: {
@@ -740,109 +680,6 @@ export const updateTransactionByGroup = mutation({
         return { success: true };
     },
 });
-
-// Helper query to get transactions in a date range (useful for debugging/admin)
-export const getTransactionsInDateRange = query({
-    args: {
-        userId: v.id("users"),
-        accountId: v.id("accounts"),
-        startDate: v.number(),
-        endDate: v.number(),
-    },
-    handler: async (ctx, args) => {
-        const { userId, accountId, startDate, endDate } = args;
-
-        const transactions = await ctx.db
-            .query("transactions")
-            .withIndex("by_account", (q) => q.eq("accountId", accountId))
-            .filter((q) =>
-                q.and(
-                    q.eq(q.field("userId"), userId),
-                    q.gte(q.field("date"), startDate),
-                    q.lte(q.field("date"), endDate)
-                )
-            )
-            .collect();
-
-        // Categorize transactions
-        const userEdited = transactions.filter(t => t.categoryId !== undefined);
-        const unmodified = transactions.filter(t => t.categoryId === undefined);
-
-        return {
-            total: transactions.length,
-            userEdited: userEdited.length,
-            unmodified: unmodified.length,
-            transactions,
-        };
-    },
-});
-
-// Cleanup mutation for development
-export const deleteAllTransactions = mutation({
-    args: { userId: v.id("users") },
-    handler: async (ctx, { userId }) => {
-        // Get all transactions for the user
-        const transactions = await ctx.db
-            .query("transactions")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        // Delete each transaction
-        for (const transaction of transactions) {
-            await ctx.db.delete(transaction._id);
-        }
-
-        return {
-            success: true,
-            deletedCount: transactions.length,
-        };
-    },
-});
-
-// export const mergeTransaction = mutation({
-//     args: {
-//         existingTransactionId: v.id("transactions"),
-//         newTransactionData: v.object({
-//             date: v.number(),
-//             amount: v.number(),
-//             description: v.string(),
-//             transactionType: v.optional(v.string()),
-//             rawData: v.any(), // Raw CSV data - keeping v.any() for Convex compatibility
-//         }),
-//         userId: v.id("users"),
-//     },
-//     handler: async (ctx, args) => {
-//         const { existingTransactionId, newTransactionData, userId } = args;
-
-//         // Get the existing transaction
-//         const existingTransaction = await ctx.db.get(existingTransactionId);
-//         if (!existingTransaction) {
-//             throw new Error("Transaction not found");
-//         }
-
-//         // Verify the transaction belongs to the user
-//         if (existingTransaction.userId !== userId) {
-//             throw new Error("Transaction not owned by user");
-//         }
-
-//         // Merge: preserve user edits (category, type if manually set) but update file-driven values
-//         const mergedTransaction = {
-//             ...existingTransaction,
-//             date: newTransactionData.date,
-//             amount: newTransactionData.amount,
-//             description: newTransactionData.description,
-//             // Only update transactionType if user hasn't manually set one (preserve user edits)
-//             transactionType: existingTransaction.updatedAt
-//                 ? existingTransaction.transactionType // Keep existing if user edited
-//                 : newTransactionData.transactionType, // Use new if never edited
-//             updatedAt: Date.now(),
-//         };
-
-//         await ctx.db.replace(existingTransactionId, mergedTransaction);
-
-//         return { success: true };
-//     },
-// });
 
 export const mergeTransaction = mutation({
     args: {

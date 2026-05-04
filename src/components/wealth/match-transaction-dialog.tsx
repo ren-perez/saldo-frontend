@@ -11,7 +11,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { format } from "date-fns"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
@@ -96,7 +95,7 @@ export function MatchTransactionDialog({
                 {transaction.description}
               </p>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{format(new Date(transaction.date), "MMM d, yyyy")}</span>
+                <span>{new Date(transaction.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}</span>
                 {transaction.account && (
                   <span className="text-muted-foreground/60">
                     {transaction.account.name}

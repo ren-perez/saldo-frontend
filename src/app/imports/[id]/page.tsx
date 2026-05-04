@@ -256,7 +256,7 @@ export default function ImportDetailPage() {
                                                     <div className="flex items-center justify-between mt-2">
                                                         <span className="text-xs text-muted-foreground">
                                                             {resolution.existingTransaction?.date &&
-                                                                format(new Date(resolution.existingTransaction.date), 'MMM d, yyyy')}
+                                                                new Date(resolution.existingTransaction.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                                                         </span>
                                                         <span className={`text-sm font-medium ${
                                                             (resolution.existingTransaction?.amount ?? 0) >= 0
@@ -280,7 +280,7 @@ export default function ImportDetailPage() {
                                                 <div className="flex items-center justify-between mt-2">
                                                     <span className="text-xs text-muted-foreground">
                                                         {resolution.newTransaction?.date &&
-                                                            format(new Date(resolution.newTransaction.date), 'MMM d, yyyy')}
+                                                            new Date(resolution.newTransaction.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                                                     </span>
                                                     <span className={`text-sm font-medium ${
                                                         (resolution.newTransaction?.amount ?? 0) >= 0
@@ -326,7 +326,7 @@ export default function ImportDetailPage() {
                                         {importDetails.transactions.slice(0, 20).map((transaction) => (
                                             <tr key={transaction._id} className="border-b hover:bg-muted/30">
                                                 <td className="py-3 text-sm">
-                                                    {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                                    {new Date(transaction.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                                                 </td>
                                                 <td className="py-3 text-sm">{transaction.description}</td>
                                                 <td className="py-3 text-sm">

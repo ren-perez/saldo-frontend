@@ -153,7 +153,7 @@ export function TransactionTable({
   return (
     <Card className="hidden lg:block">
       {/* Toolbar: count info + page size */}
-      <div className="px-6 py-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+      <div className="px-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div className="text-xs sm:text-sm text-muted-foreground">
           {totalCount === 0
             ? "Showing 0 transactions"

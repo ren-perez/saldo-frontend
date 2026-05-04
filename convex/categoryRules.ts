@@ -46,38 +46,6 @@ export const getMatchCountForRules = query({
 });
 
 /**
- * Live preview: how many of the user's transactions would a given pattern match?
- * Returns count + up to 5 sample descriptions for immediate feedback in the UI.
- * The pattern is matched the same way the rules engine does (smart normalizer).
- */
-export const previewRulePattern = query({
-    args: {
-        userId: v.id("users"),
-        pattern: v.string(),
-    },
-    handler: async (ctx, { userId, pattern }) => {
-        const trimmed = pattern.trim();
-        if (!trimmed) return { count: 0, samples: [] as string[] };
-
-        const normalizedPattern = trimmed.toLowerCase();
-
-        const transactions = await ctx.db
-            .query("transactions")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        const matches = transactions.filter((t) =>
-            normalizeForMatching(t.description).includes(normalizedPattern)
-        );
-
-        return {
-            count: matches.length,
-            samples: matches.slice(0, 5).map((t) => t.description),
-        };
-    },
-});
-
-/**
  * Rich preview for the Rule Preview/Edit dialog.
  *
  * Groups matching transactions into four buckets so the user can see exactly

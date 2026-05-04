@@ -29,6 +29,7 @@ interface Preset {
     amountColumns: string[];
     amountProcessing: Record<string, unknown>;
     transactionTypeColumn?: string;
+    transferPairIdColumn?: string;
 }
 
 interface EditPresetDialogProps {
@@ -56,6 +57,7 @@ export function EditPresetDialog({ open, onClose, onSave, preset }: EditPresetDi
         amountColumns: [""],
         amountProcessing: {},
         transactionTypeColumn: "",
+        transferPairIdColumn: "",
     });
 
     const [activeTab, setActiveTab] = useState("basic");
@@ -80,6 +82,7 @@ export function EditPresetDialog({ open, onClose, onSave, preset }: EditPresetDi
                 amountColumns: preset.amountColumns.length ? preset.amountColumns : [""],
                 amountProcessing: preset.amountProcessing || {},
                 transactionTypeColumn: preset.transactionTypeColumn || "",
+                transferPairIdColumn: preset.transferPairIdColumn || "",
             });
         } else {
             setFormState(prev => ({ ...prev, _id: "", amountColumns: [""] }));
@@ -295,6 +298,15 @@ export function EditPresetDialog({ open, onClose, onSave, preset }: EditPresetDi
                                                 value={formState.categoryGroupColumn}
                                                 onChange={(e) => updateField("categoryGroupColumn", e.target.value)}
                                                 placeholder="e.g., Category Group"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="transferPairIdColumn">Transfer Pair ID Column</Label>
+                                            <Input
+                                                id="transferPairIdColumn"
+                                                value={formState.transferPairIdColumn}
+                                                onChange={(e) => updateField("transferPairIdColumn", e.target.value)}
+                                                placeholder="e.g., Transfer Pair ID"
                                             />
                                         </div>
                                     </div>

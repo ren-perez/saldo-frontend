@@ -139,7 +139,7 @@ export function ManualMatchDialog({ open, onOpenChange }: ManualMatchDialogProps
                                     </p>
                                     <p className="text-muted-foreground text-xs mt-0.5 truncate">{account.name}</p>
                                     <p className="text-muted-foreground text-xs">
-                                        {new Date(transaction.date).toLocaleDateString()}
+                                        {new Date(transaction.date).toLocaleDateString("en-US", { timeZone: "UTC" })}
                                     </p>
                                 </button>
                             ))}
@@ -193,7 +193,7 @@ export function ManualMatchDialog({ open, onOpenChange }: ManualMatchDialogProps
                                     </p>
                                     <p className="text-muted-foreground text-xs mt-0.5 truncate">{account.name}</p>
                                     <p className="text-muted-foreground text-xs">
-                                        {new Date(transaction.date).toLocaleDateString()}
+                                        {new Date(transaction.date).toLocaleDateString("en-US", { timeZone: "UTC" })}
                                     </p>
                                 </button>
                             ))}

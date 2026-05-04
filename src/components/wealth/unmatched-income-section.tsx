@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { format } from "date-fns"
 import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { Id } from "../../../convex/_generated/dataModel"
@@ -204,7 +203,7 @@ export function UnmatchedIncomeSection({
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         <span className="flex items-center gap-1">
                           <Calendar className="size-3" />
-                          {format(new Date(tx.date), "MMM d, yyyy")}
+                          {new Date(tx.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                         </span>
                         {suggestion && (
                           <span className="flex items-center gap-1 text-amber-600">

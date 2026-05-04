@@ -90,51 +90,6 @@ async function transactionBelongsToUser(
     return tx !== null && tx.userId === userId;
 }
 
-// ─── Story 4: getAccountsForUser ─────────────────────────
-
-export const getAccountsForUser = query({
-    args: { telegramUserId: v.string() },
-    handler: async (ctx, { telegramUserId }) => {
-        const userId = await resolveUserFromTelegram(ctx.db, telegramUserId);
-        if (!userId) return fail("USER_NOT_LINKED", "No active Telegram connection found");
-
-        const accounts = await ctx.db
-            .query("accounts")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        return ok("ACCOUNTS_FETCHED", `Found ${accounts.length} account(s)`, accounts.map((a) => ({
-            id: a._id,
-            name: a.name,
-            bank: a.bank,
-            type: a.type,
-            balance: a.balance ?? null,
-        })));
-    },
-});
-
-// ─── Story 5: getCategoriesForUser ───────────────────────
-
-export const getCategoriesForUser = query({
-    args: { telegramUserId: v.string() },
-    handler: async (ctx, { telegramUserId }) => {
-        const userId = await resolveUserFromTelegram(ctx.db, telegramUserId);
-        if (!userId) return fail("USER_NOT_LINKED", "No active Telegram connection found");
-
-        const categories = await ctx.db
-            .query("categories")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        return ok("CATEGORIES_FETCHED", `Found ${categories.length} category(ies)`, categories.map((c) => ({
-            id: c._id,
-            name: c.name,
-            groupId: c.groupId ?? null,
-            transactionType: c.transactionType ?? null,
-        })));
-    },
-});
-
 // ─── Story 6: getBalance ─────────────────────────────────
 
 /**
@@ -438,65 +393,6 @@ export const createTransactionFromChat = mutation({
             categoryId: categoryId ?? null,
             weeklyInsight,
         });
-    },
-});
-
-// ─── Story 10: updateTransactionFromChat ─────────────────
-
-/**
- * Chat-scoped editable fields: description, categoryId, transactionType.
- * Amount and date edits are deferred to reduce risk of unintended changes.
- */
-export const updateTransactionFromChat = mutation({
-    args: {
-        telegramUserId: v.string(),
-        transactionId: v.id("transactions"),
-        updates: v.object({
-            description: v.optional(v.string()),
-            categoryId: v.optional(v.id("categories")),
-            transactionType: v.optional(v.string()),
-        }),
-        sourceTelegramMessageId: v.optional(v.string()),
-    },
-    handler: async (ctx, args) => {
-        const { telegramUserId, transactionId, updates, sourceTelegramMessageId } = args;
-
-        const userId = await resolveUserFromTelegram(ctx.db, telegramUserId);
-        if (!userId) return fail("USER_NOT_LINKED", "No active Telegram connection found");
-
-        const txOwned = await transactionBelongsToUser(ctx.db, transactionId, userId);
-        if (!txOwned) return fail("TRANSACTION_NOT_FOUND", "Transaction not found or does not belong to this user");
-
-        if (updates.categoryId) {
-            const catOwned = await categoryBelongsToUser(ctx.db, updates.categoryId, userId);
-            if (!catOwned) return fail("CATEGORY_NOT_FOUND", "Category not found or does not belong to this user");
-        }
-
-        const patch: Record<string, unknown> = { updatedAt: Date.now() };
-        if (updates.description !== undefined) patch.description = updates.description;
-        if (updates.categoryId !== undefined) patch.categoryId = updates.categoryId;
-        if (updates.transactionType !== undefined) patch.transactionType = updates.transactionType;
-
-        await ctx.db.patch(transactionId, patch);
-
-        // Audit trail (Story 14)
-        await ctx.db.insert("actions", {
-            userId,
-            channel: "telegram",
-            actionType: "update_transaction",
-            status: "completed",
-            inputJson: {
-                telegramUserId,
-                transactionId,
-                updates,
-                sourceTelegramMessageId,
-            },
-            resultJson: { transactionId },
-            createdAt: Date.now(),
-            completedAt: Date.now(),
-        });
-
-        return ok("TRANSACTION_UPDATED", "Transaction updated successfully", { transactionId });
     },
 });
 

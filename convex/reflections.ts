@@ -356,52 +356,6 @@ export const getCategoryTrend = query({
     },
 });
 
-// Helper query to get spending by transaction type
-export const getTransactionTypeBreakdown = query({
-    args: {
-        userId: v.id("users"),
-        startDate: v.number(),
-        endDate: v.number(),
-    },
-    handler: async (ctx, args) => {
-        const { userId, startDate, endDate } = args;
-
-        const transactions = await ctx.db
-            .query("transactions")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .filter((q) =>
-                q.and(
-                    q.gte(q.field("date"), startDate),
-                    q.lte(q.field("date"), endDate)
-                )
-            )
-            .collect();
-
-        const typeBreakdown = new Map<string, { name: string; amount: number; count: number }>();
-
-        for (const transaction of transactions) {
-            const type = transaction.transactionType || "untyped";
-            const typeName = type === "untyped" ? "Untyped" : type;
-            const amount = Math.abs(transaction.amount);
-
-            if (typeBreakdown.has(type)) {
-                const existing = typeBreakdown.get(type)!;
-                existing.amount += amount;
-                existing.count += 1;
-            } else {
-                typeBreakdown.set(type, {
-                    name: typeName,
-                    amount: amount,
-                    count: 1,
-                });
-            }
-        }
-
-        return Array.from(typeBreakdown.values())
-            .sort((a, b) => b.amount - a.amount);
-    },
-});
-
 // Get time-based breakdown for specific category or group
 export const getTimeBasedBreakdown = query({
     args: {

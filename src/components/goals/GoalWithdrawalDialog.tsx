@@ -12,7 +12,6 @@ import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { Goal } from "@/types/goals"
 import { Id } from "../../../convex/_generated/dataModel"
-import { format } from "date-fns"
 
 interface GoalWithdrawalDialogProps {
     goal: Goal | null
@@ -231,7 +230,7 @@ export function GoalWithdrawalDialog({ goal, open, onOpenChange, formatCurrency 
                                                             <div className="min-w-0">
                                                                 <p className="truncate font-medium">{tx.description || "Transaction"}</p>
                                                                 <p className="text-xs text-muted-foreground">
-                                                                    {format(new Date(tx.date), 'MMM d, yyyy')}
+                                                                    {new Date(tx.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                                                                     {tx.alreadyLinked && <span className="ml-2 text-amber-600">· already linked</span>}
                                                                 </p>
                                                             </div>

@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, DollarSign, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react"
-import { format } from "date-fns"
 import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
@@ -169,7 +168,7 @@ export function UnallocatedTransactions({ formatCurrency }: UnallocatedTransacti
                                             </div>
                                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                                 <Calendar className="h-3 w-3" />
-                                                {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                                {new Date(transaction.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                                             </div>
                                         </div>
 

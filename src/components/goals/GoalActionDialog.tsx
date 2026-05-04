@@ -16,7 +16,6 @@ import {
     HandCoins, CreditCard, AlertCircle, Link as LinkIcon,
     Pencil, ChevronLeft,
 } from "lucide-react"
-import { format } from "date-fns"
 import { toast } from "sonner"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
@@ -518,7 +517,7 @@ function WithdrawForm({ goal, formatCurrency, onSuccess }: {
                                                     <div className="min-w-0">
                                                         <p className="truncate font-medium">{tx.description || "Transaction"}</p>
                                                         <p className="text-xs text-muted-foreground">
-                                                            {format(new Date(tx.date), "MMM d, yyyy")}
+                                                            {new Date(tx.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
                                                             {tx.alreadyLinked && <span className="ml-2 text-amber-600">· already linked</span>}
                                                         </p>
                                                     </div>

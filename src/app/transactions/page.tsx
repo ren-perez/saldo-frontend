@@ -676,7 +676,7 @@ function TransactionsContent() {
                       {pairDialogTx.description}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(pairDialogTx.date).toLocaleDateString()} ·{" "}
+                      {new Date(pairDialogTx.date).toLocaleDateString("en-US", { timeZone: "UTC" })} ·{" "}
                       {accounts?.find((a) => a._id === pairDialogTx.accountId)?.name || "Unknown"}
                     </div>
                   </div>
@@ -721,7 +721,7 @@ function TransactionsContent() {
                           <div className="flex-1 min-w-0">
                             <div className="text-sm truncate">{suggestion.description}</div>
                             <div className="text-xs text-muted-foreground">
-                              {new Date(suggestion.date).toLocaleDateString()} ·{" "}
+                              {new Date(suggestion.date).toLocaleDateString("en-US", { timeZone: "UTC" })} ·{" "}
                               {suggAccount?.name || "Unknown"}
                               {isExactMatch && (
                                 <span className="ml-2 text-green-600 font-medium">

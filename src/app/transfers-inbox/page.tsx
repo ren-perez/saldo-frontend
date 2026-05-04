@@ -249,7 +249,7 @@ export default function TransfersPage() {
                             <div className="flex justify-between items-center mt-1">
                               <p className="text-xs text-muted-foreground truncate max-w-[120px]">{transfer.outgoingAccount.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(transfer.outgoingTransaction.date).toLocaleDateString()}
+                                {new Date(transfer.outgoingTransaction.date).toLocaleDateString("en-US", { timeZone: "UTC" })}
                               </p>
                             </div>
                           </div>
@@ -269,7 +269,7 @@ export default function TransfersPage() {
                             <div className="flex justify-between items-center mt-1">
                               <p className="text-xs text-muted-foreground truncate max-w-[120px]">{transfer.incomingAccount.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(transfer.incomingTransaction.date).toLocaleDateString()}
+                                {new Date(transfer.incomingTransaction.date).toLocaleDateString("en-US", { timeZone: "UTC" })}
                               </p>
                             </div>
                           </div>
@@ -351,7 +351,7 @@ export default function TransfersPage() {
                             <div className="flex justify-between items-center mt-1">
                               <p className="text-xs text-muted-foreground truncate max-w-[120px]">Account {pair.outgoingTransaction.accountId}</p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(pair.outgoingTransaction.date).toLocaleDateString()}
+                                {new Date(pair.outgoingTransaction.date).toLocaleDateString("en-US", { timeZone: "UTC" })}
                               </p>
                             </div>
                           </div>
@@ -373,7 +373,7 @@ export default function TransfersPage() {
                             <div className="flex justify-between items-center mt-1">
                               <p className="text-xs text-muted-foreground truncate max-w-[120px]">Account {pair.incomingTransaction.accountId}</p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(pair.incomingTransaction.date).toLocaleDateString()}
+                                {new Date(pair.incomingTransaction.date).toLocaleDateString("en-US", { timeZone: "UTC" })}
                               </p>
                             </div>
                           </div>
@@ -436,7 +436,7 @@ export default function TransfersPage() {
                             <div className="flex justify-between items-center mt-1">
                               <p className="text-xs text-muted-foreground truncate max-w-[120px]">{ignored.outgoingAccount?.name || "Unknown Account"}</p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(ignored.outgoingTransaction.date).toLocaleDateString()}
+                                {new Date(ignored.outgoingTransaction.date).toLocaleDateString("en-US", { timeZone: "UTC" })}
                               </p>
                             </div>
                         </div>
@@ -456,7 +456,7 @@ export default function TransfersPage() {
                             <div className="flex justify-between items-center mt-1">
                               <p className="text-xs text-muted-foreground truncate max-w-[120px]">{ignored.incomingAccount?.name || "Unknown Account"}</p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(ignored.incomingTransaction.date).toLocaleDateString()}
+                                {new Date(ignored.incomingTransaction.date).toLocaleDateString("en-US", { timeZone: "UTC" })}
                               </p>
                             </div>
                         </div>

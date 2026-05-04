@@ -1,5 +1,5 @@
 // convex/imports.ts
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
 
@@ -326,5 +326,22 @@ export const getImportStats = query({
         };
 
         return stats;
+    },
+});
+
+// Marks import_sessions that have been stuck in "awaiting_review" for over 48 hours as "abandoned".
+// Called daily by the cron job in crons.ts.
+export const cleanStaleImportSessions = internalMutation({
+    handler: async (ctx) => {
+        const cutoffMs = Date.now() - 48 * 60 * 60 * 1000;
+        const staleSessions = await ctx.db
+            .query("import_sessions")
+            .withIndex("by_status", q => q.eq("status", "awaiting_review"))
+            .filter(q => q.lt(q.field("createdAt"), cutoffMs))
+            .collect();
+        await Promise.all(
+            staleSessions.map(s => ctx.db.patch(s._id, { status: "abandoned", resolvedAt: Date.now() }))
+        );
+        return { cleaned: staleSessions.length };
     },
 });

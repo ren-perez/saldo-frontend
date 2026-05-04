@@ -27,10 +27,16 @@ export const createPreset = mutation({
         amountColumns: v.array(v.string()),
         amountProcessing: v.any(),
         transactionTypeColumn: v.optional(v.string()),
+        transferPairIdColumn: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         return await ctx.db.insert("presets", { ...args, createdAt: new Date().toISOString() });
     },
+});
+
+export const getPreset = query({
+    args: { presetId: v.id("presets") },
+    handler: async (ctx, { presetId }) => ctx.db.get(presetId),
 });
 
 export const listPresets = query({
@@ -41,30 +47,47 @@ export const listPresets = query({
 });
 
 export const deletePreset = mutation({
-    args: { presetId: v.id("presets") },
-    handler: async (ctx, args) => {
-        await ctx.db.delete(args.presetId);
+    args: { presetId: v.id("presets"), userId: v.id("users") },
+    handler: async (ctx, { presetId, userId }) => {
+        const preset = await ctx.db.get(presetId);
+        if (!preset || preset.userId !== userId) {
+            throw new Error("Preset not found or not owned by user");
+        }
+        await ctx.db.delete(presetId);
     },
 });
 
 export const linkPresetToAccount = mutation({
-    args: { presetId: v.id("presets"), accountId: v.id("accounts") },
-    handler: async (ctx, args) => {
+    args: { presetId: v.id("presets"), accountId: v.id("accounts"), userId: v.id("users") },
+    handler: async (ctx, { presetId, accountId, userId }) => {
+        const preset = await ctx.db.get(presetId);
+        if (!preset || preset.userId !== userId) {
+            throw new Error("Preset not found or not owned by user");
+        }
+        const account = await ctx.db.get(accountId);
+        if (!account || account.userId !== userId) {
+            throw new Error("Account not found or not owned by user");
+        }
         const existing = await ctx.db
             .query("presetAccounts")
-            .withIndex("by_preset", (q) => q.eq("presetId", args.presetId))
+            .withIndex("by_preset", (q) => q.eq("presetId", presetId))
             .first();
-        if (existing?.accountId === args.accountId) return;
-        await ctx.db.insert("presetAccounts", args);
+        if (existing?.accountId === accountId) return;
+        await ctx.db.insert("presetAccounts", { presetId, accountId });
     },
 });
 
 export const unlinkPresetFromAccount = mutation({
-    args: { presetId: v.id("presets"), accountId: v.id("accounts") },
-    handler: async (ctx, args) => {
+    args: { presetId: v.id("presets"), accountId: v.id("accounts"), userId: v.id("users") },
+    handler: async (ctx, { presetId, accountId, userId }) => {
+        const preset = await ctx.db.get(presetId);
+        if (!preset || preset.userId !== userId) {
+            throw new Error("Preset not found or not owned by user");
+        }
         const existing = await ctx.db
             .query("presetAccounts")
-            .withIndex("by_preset", (q) => q.eq("presetId", args.presetId))
+            .withIndex("by_preset", (q) => q.eq("presetId", presetId))
+            .filter(q => q.eq(q.field("accountId"), accountId))
             .first();
         if (existing) await ctx.db.delete(existing._id);
     },
@@ -95,6 +118,7 @@ export const isAccountLinked = query({
 export const updatePreset = mutation({
     args: {
         presetId: v.id("presets"),
+        userId: v.id("users"),
         updates: v.object({
             name: v.optional(v.string()),
             description: v.optional(v.string()),
@@ -111,9 +135,14 @@ export const updatePreset = mutation({
             amountColumns: v.optional(v.array(v.string())),
             amountProcessing: v.optional(v.any()),
             transactionTypeColumn: v.optional(v.string()),
+            transferPairIdColumn: v.optional(v.string()),
         }),
     },
-    handler: async (ctx, { presetId, updates }) => {
+    handler: async (ctx, { presetId, userId, updates }) => {
+        const preset = await ctx.db.get(presetId);
+        if (!preset || preset.userId !== userId) {
+            throw new Error("Preset not found or not owned by user");
+        }
         await ctx.db.patch(presetId, updates);
         return await ctx.db.get(presetId);
     },

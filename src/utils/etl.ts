@@ -31,6 +31,7 @@ export interface PresetConfig {
     amountColumns: string[];
     amountProcessing: AmountProcessing; // Keep the complex JSON structure
     transactionTypeColumn?: string;
+    transferPairIdColumn?: string;
     createdAt: string;
 }
 
@@ -42,6 +43,7 @@ export interface NormalizedTransaction {
     categoryGroup?: string;
     transactionType?: string;
     account?: string;
+    transferPairId?: string;
     rawData: Record<string, unknown>; // Keep original row for debugging
 }
 
@@ -282,6 +284,13 @@ export function extractAccount(row: Record<string, unknown>, accountColumn?: str
     return account ? String(account).trim() : undefined;
 }
 
+export function extractTransferPairId(row: Record<string, unknown>, transferPairIdColumn?: string): string | undefined {
+    if (!transferPairIdColumn) return undefined;
+    const val = row[transferPairIdColumn];
+    if (typeof val !== "string" || val.trim() === "") return undefined;
+    return val.trim();
+}
+
 /**
  * Normalize a single transaction row using preset rules
  */
@@ -347,6 +356,7 @@ export function normalizeTransaction(
         categoryGroup: extractCategoryGroup(row, preset.categoryGroupColumn),
         transactionType: extractTransactionType(row, preset.transactionTypeColumn),
         account: extractAccount(row, preset.accountColumn),
+        transferPairId: extractTransferPairId(row, preset.transferPairIdColumn),
         rawData: { ...row } // Keep original data for debugging
     };
 
@@ -498,6 +508,7 @@ export function validateCsvHeaders(
     if (preset.categoryColumn) requiredColumns.push(preset.categoryColumn);
     if (preset.categoryGroupColumn) requiredColumns.push(preset.categoryGroupColumn);
     if (preset.accountColumn) requiredColumns.push(preset.accountColumn);
+    if (preset.transferPairIdColumn) requiredColumns.push(preset.transferPairIdColumn);
 
     // Check for missing columns
     requiredColumns.forEach(column => {
@@ -512,6 +523,19 @@ export function validateCsvHeaders(
     });
 
     return errors;
+}
+
+/**
+ * Returns the sorted, deduplicated set of non-empty account identifier strings
+ * found in a batch of normalized transactions. Used to build the account-mapping
+ * UI when the preset has an accountColumn defined.
+ */
+export function extractUniqueAccountIdentifiers(transactions: NormalizedTransaction[]): string[] {
+    const seen = new Set<string>();
+    for (const t of transactions) {
+        if (t.account) seen.add(t.account);
+    }
+    return Array.from(seen).sort();
 }
 
 /**

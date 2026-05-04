@@ -1,7 +1,7 @@
 // convex/transfers.ts
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 
 export const pairTransfers = mutation({
     args: {
@@ -531,5 +531,87 @@ export const listIgnoredTransferPairs = query({
         }
 
         return detailedIgnoredPairs.sort((a, b) => b.ignoredAt - a.ignoredAt);
+    },
+});
+
+// Auto-pair transfers after a multi-account import.
+// Phase 1: link transactions that already share an explicit transfer_pair_id from the CSV.
+// Phase 2: detect cross-account amount matches for transactions without an explicit ID.
+export const autoLinkTransferPairs = mutation({
+    args: {
+        userId: v.id("users"),
+        importIds: v.array(v.id("imports")),
+    },
+    handler: async (ctx, { userId, importIds }) => {
+        if (importIds.length === 0) return { paired: 0, ambiguous: 0, skipped: 0 };
+
+        // Collect all transactions from these imports
+        const allTxns: Doc<"transactions">[] = [];
+        for (const importId of importIds) {
+            const batch = await ctx.db
+                .query("transactions")
+                .withIndex("by_import", (q) => q.eq("importId", importId))
+                .collect();
+            // Safety: only process transactions belonging to this user
+            allTxns.push(...batch.filter((t) => t.userId === userId));
+        }
+
+        let paired = 0;
+        let ambiguous = 0;
+        let skipped = 0;
+
+        // ── Phase 1: explicit transfer_pair_id from CSV ──────────────────────
+        const byPairId = new Map<string, Doc<"transactions">[]>();
+        for (const tx of allTxns) {
+            if (!tx.transfer_pair_id) continue;
+            if (!byPairId.has(tx.transfer_pair_id)) byPairId.set(tx.transfer_pair_id, []);
+            byPairId.get(tx.transfer_pair_id)!.push(tx);
+        }
+
+        for (const [, txns] of byPairId) {
+            if (txns.length !== 2) {
+                ambiguous++;
+                continue;
+            }
+            const [a, b] = txns;
+            if (a.accountId === b.accountId) {
+                skipped++;
+                continue;
+            }
+            // Ensure transactionType is "transfer" on both (CSV may already have this)
+            for (const tx of [a, b]) {
+                if (tx.transactionType !== "transfer") {
+                    await ctx.db.patch(tx._id, { transactionType: "transfer" });
+                }
+            }
+            paired++;
+        }
+
+        // ── Phase 2: auto-detect unpaired cross-account amount matches ───────
+        const alreadyPairedIds = new Set(allTxns.filter((t) => t.transfer_pair_id).map((t) => t._id));
+        const unpaired = allTxns.filter((t) => !alreadyPairedIds.has(t._id));
+        const negatives = unpaired.filter((t) => t.amount < 0);
+        const positives = unpaired.filter((t) => t.amount >= 0);
+        const usedIds = new Set<string>();
+
+        for (const neg of negatives) {
+            if (usedIds.has(neg._id)) continue;
+            for (const pos of positives) {
+                if (usedIds.has(pos._id)) continue;
+                if (pos.accountId === neg.accountId) continue;
+                if (Math.abs(Math.abs(neg.amount) - pos.amount) > 0.01) continue;
+                const daysDiff = Math.abs(neg.date - pos.date) / 86_400_000;
+                if (daysDiff > 2) continue;
+                const newPairId = `transfer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                await ctx.db.patch(neg._id, { transfer_pair_id: newPairId, transactionType: "transfer" });
+                await ctx.db.patch(pos._id, { transfer_pair_id: newPairId, transactionType: "transfer" });
+                usedIds.add(neg._id);
+                usedIds.add(pos._id);
+                paired++;
+                break;
+            }
+        }
+
+        return { paired, ambiguous, skipped };
     },
 });

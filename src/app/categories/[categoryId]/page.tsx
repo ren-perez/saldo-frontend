@@ -25,7 +25,6 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import Link from "next/link";
-import { format } from "date-fns";
 
 export default function CategoryTransactionsPage() {
   const { convexUser } = useConvexUser();
@@ -78,7 +77,7 @@ export default function CategoryTransactionsPage() {
   };
 
   const formatDate = (timestamp: number) => {
-    return format(new Date(timestamp), "MMM d, yyyy");
+    return new Date(timestamp).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
   };
 
   const getAccountName = (accountId: string) => {

@@ -208,89 +208,6 @@ export const getAllocationsForPlan = query({
     },
 });
 
-// Get monthly forecast based on planned income + rules
-export const getMonthlyForecast = query({
-    args: {
-        userId: v.id("users"),
-        months: v.optional(v.number()),
-    },
-    handler: async (ctx, { userId, months = 3 }) => {
-        const plans = await ctx.db
-            .query("income_plans")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        const rules = await ctx.db
-            .query("allocation_rules")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        const now = new Date();
-        const forecast: Array<{
-            month: string;
-            totalIncome: number;
-            totalSavings: number;
-            totalInvesting: number;
-            totalSpending: number;
-            totalDebt: number;
-            planCount: number;
-        }> = [];
-
-        for (let i = 0; i < months; i++) {
-            const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
-            const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-
-            const monthPlans = plans.filter((p) => p.expected_date.startsWith(monthStr));
-
-            let totalIncome = 0;
-            let totalSavings = 0;
-            let totalInvesting = 0;
-            let totalSpending = 0;
-            let totalDebt = 0;
-
-            for (const plan of monthPlans) {
-                // Use actual allocation records for matched/completed plans; re-calculate for planned
-                if (plan.status === "matched" || plan.status === "completed") {
-                    const records = await ctx.db
-                        .query("allocation_records")
-                        .withIndex("by_income_plan", (q) => q.eq("income_plan_id", plan._id))
-                        .collect();
-                    const amount = plan.actual_amount ?? plan.expected_amount;
-                    totalIncome += amount;
-                    for (const record of records) {
-                        if (record.category === "savings") totalSavings += record.amount;
-                        else if (record.category === "investing") totalInvesting += record.amount;
-                        else if (record.category === "spending") totalSpending += record.amount;
-                        else if (record.category === "debt") totalDebt += record.amount;
-                    }
-                } else {
-                    const amount = plan.expected_amount;
-                    totalIncome += amount;
-                    const allocations = calculateAllocations(amount, rules);
-                    for (const alloc of allocations) {
-                        if (alloc.category === "savings") totalSavings += alloc.amount;
-                        else if (alloc.category === "investing") totalInvesting += alloc.amount;
-                        else if (alloc.category === "spending") totalSpending += alloc.amount;
-                        else if (alloc.category === "debt") totalDebt += alloc.amount;
-                    }
-                }
-            }
-
-            forecast.push({
-                month: monthStr,
-                totalIncome: Math.round(totalIncome),
-                totalSavings: Math.round(totalSavings),
-                totalInvesting: Math.round(totalInvesting),
-                totalSpending: Math.round(totalSpending),
-                totalDebt: Math.round(totalDebt),
-                planCount: monthPlans.length,
-            });
-        }
-
-        return forecast;
-    },
-});
-
 // Add a single allocation record to an income plan.
 // Gap 4: Prefers the refill-scoped rule for the target account to ensure budget pool inclusion.
 export const addAllocationRecord = mutation({
@@ -511,27 +428,6 @@ export const getMonthlyBudgetContext = query({
             totalSpent: Math.round(totalSpent * 100) / 100,
             remaining: Math.round((totalPool - totalSpent) * 100) / 100,
         };
-    },
-});
-
-// One-time migration: strip deprecated pre-refactor fields from allocation_records
-export const migrateStripDeprecatedFields = mutation({
-    args: {},
-    handler: async (ctx) => {
-        const records = await ctx.db.query("allocation_records").collect();
-        let patched = 0;
-        for (const record of records) {
-            if (record.matched_amount !== undefined || record.status !== undefined || record.label !== undefined || record.matched_transaction_id !== undefined) {
-                await ctx.db.patch(record._id, {
-                    matched_amount: undefined,
-                    status: undefined,
-                    label: undefined,
-                    matched_transaction_id: undefined,
-                });
-                patched++;
-            }
-        }
-        return { patched };
     },
 });
 
