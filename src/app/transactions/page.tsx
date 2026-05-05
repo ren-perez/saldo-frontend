@@ -7,7 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexUser } from "../../hooks/useConvexUser";
 import AppLayout from "@/components/AppLayout";
 import InitUser from "@/components/InitUser";
-import { ArrowRightLeft, ChevronDown, Upload, Plus, Link2, Receipt } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, Upload, Plus, Link2, Receipt, Loader2 } from "lucide-react";
 import { CreateTransactionDialog } from "@/components/CreateTransactionDialog";
 import {
   DropdownMenu,
@@ -108,11 +108,12 @@ function TransactionsContent() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const updateTransaction = useMutation(api.transactions.updateTransaction);
   const updateTransactionByGroup = useMutation(api.transactions.updateTransactionByGroup);
-  const deleteTransaction = useMutation(api.transactions.deleteTransaction);
+  const bulkDeleteTransactions = useMutation(api.transactions.bulkDeleteTransactions);
   const updateTransactionAndCreateRule = useMutation(api.transactions.updateTransactionAndCreateRule);
   const pairTransfersMutation = useMutation(api.transfers.pairTransfers);
 
@@ -345,28 +346,30 @@ function TransactionsContent() {
 
   // ── Bulk delete ───────────────────────────────────────────────────────────
   const handleBulkDelete = async () => {
-    const idsToDelete = selection.isAllGlobalSelected
-      ? // Fetch all matching IDs then delete (best effort; re-uses current filter)
-      await convex
-        .query(api.transactions.listTransactions, {
-          userId: convexUser!._id,
-          accountId: filters.selectedAccount || undefined,
-          transactionType: filters.typeFilter || undefined,
-          searchTerm: filters.search || undefined,
-          startDate: startTimestamp,
-          endDate: endTimestamp,
-          limit: 10000,
-        })
-        .then((res) => (res as Transaction[]).map((t) => t._id))
-      : Array.from(selection.selectedIds);
+    setIsBulkDeleting(true);
+    try {
+      const idsToDelete = selection.isAllGlobalSelected
+        ? await convex
+            .query(api.transactions.listTransactions, {
+              userId: convexUser!._id,
+              accountId: filters.selectedAccount || undefined,
+              transactionType: filters.typeFilter || undefined,
+              searchTerm: filters.search || undefined,
+              startDate: startTimestamp,
+              endDate: endTimestamp,
+              limit: 10000,
+            })
+            .then((res) => (res as Transaction[]).map((t) => t._id))
+        : Array.from(selection.selectedIds);
 
-    const count = idsToDelete.length;
-    for (const id of idsToDelete) {
-      await deleteTransaction({ transactionId: id });
+      const count = idsToDelete.length;
+      await bulkDeleteTransactions({ transactionIds: idsToDelete });
+      selection.clearSelection();
+      setShowBulkDeleteDialog(false);
+      toast.success(`Deleted ${count} transaction${count !== 1 ? "s" : ""}`);
+    } finally {
+      setIsBulkDeleting(false);
     }
-    selection.clearSelection();
-    setShowBulkDeleteDialog(false);
-    toast.success(`Deleted ${count} transaction${count !== 1 ? "s" : ""}`);
   };
 
   // ── Pair transfer ─────────────────────────────────────────────────────────
@@ -639,12 +642,20 @@ function TransactionsContent() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isBulkDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
               className="bg-destructive hover:bg-destructive/90"
             >
-              Delete {deleteCount}
+              {isBulkDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                `Delete ${deleteCount}`
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

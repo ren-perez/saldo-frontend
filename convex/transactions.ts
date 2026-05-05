@@ -95,6 +95,7 @@ export const importTransactions = mutation({
         }
 
         const inserted: string[] = [];
+        let insertedDelta = 0;
         const possibleDuplicates = [];
         const errors: Array<{ rowIndex: number; message: string }> = [];
         let autoSkippedDuplicates = 0;
@@ -197,6 +198,7 @@ export const importTransactions = mutation({
                         createdAt: Date.now(),
                     });
                     inserted.push(insertedId);
+                    insertedDelta += transaction.amount;
                 }
             } catch (error) {
                 errors.push({
@@ -206,9 +208,10 @@ export const importTransactions = mutation({
             }
         }
 
-        // Observer: if any transactions were inserted, sweep goal allocations for this account
+        // Observer: if any transactions were inserted, sweep goal allocations and update balance
         if (inserted.length > 0) {
             await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
+            await ctx.db.patch(accountId, { balance: (account.balance ?? 0) + insertedDelta });
         }
 
         // ✅ ALWAYS create import session (no conditional)
@@ -493,6 +496,53 @@ export const deleteTransaction = mutation({
     },
 });
 
+export const bulkDeleteTransactions = mutation({
+    args: { transactionIds: v.array(v.id("transactions")) },
+    handler: async (ctx, { transactionIds }) => {
+        const accountsToVerify = new Set<Id<"accounts">>();
+
+        for (const transactionId of transactionIds) {
+            const transaction = await ctx.db.get(transactionId);
+            if (!transaction) continue;
+
+            const affectedRecords = await ctx.db
+                .query("allocation_records")
+                .withIndex("by_user", (q) => q.eq("userId", transaction.userId))
+                .collect()
+                .then((records) => records.filter((r) => r.transfer_transaction_id === transactionId));
+
+            const affectedPlanIds = new Set<Id<"income_plans">>();
+            for (const record of affectedRecords) {
+                await ctx.db.patch(record._id, {
+                    verification_status: "reserved",
+                    transfer_transaction_id: undefined,
+                });
+                affectedPlanIds.add(record.income_plan_id);
+            }
+
+            for (const planId of affectedPlanIds) {
+                const plan = await ctx.db.get(planId);
+                if (plan?.status === "completed") {
+                    await ctx.db.patch(planId, { status: "matched" });
+                }
+            }
+
+            await ctx.db.delete(transactionId);
+
+            if (transaction.amount > 0) {
+                accountsToVerify.add(transaction.accountId);
+            }
+        }
+
+        for (const accountId of accountsToVerify) {
+            await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, {
+                accountId,
+            });
+        }
+
+        return { deleted: transactionIds.length };
+    },
+});
 
 export const updateTransaction = mutation({
     args: {
@@ -775,6 +825,8 @@ export const addAsNewTransaction = mutation({
             importId: newTransactionData.importId,
         });
 
+        await ctx.db.patch(accountId, { balance: (account.balance ?? 0) + newTransactionData.amount });
+
         if (newTransactionData.amount > 0) {
             await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
         }
@@ -873,6 +925,8 @@ export const createManualTransaction = mutation({
             appliedRuleId: ruleMatch?.ruleId ?? undefined,
             createdAt: Date.now(),
         });
+
+        await ctx.db.patch(accountId, { balance: (account.balance ?? 0) + amount });
 
         if (amount > 0) {
             await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });

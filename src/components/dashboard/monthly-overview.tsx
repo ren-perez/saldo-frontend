@@ -525,7 +525,7 @@ export function MonthlyOverview({ stats, month, year, onMonthChange, onGoToToday
 
         <Tabs defaultValue="category" className="w-full">
           <TabsList className="h-8 w-full">
-            <TabsTrigger value="category" className="text-xs px-2.5 h-7">Category</TabsTrigger>
+            <TabsTrigger value="category" className="text-xs px-2.5 h-7">Waterfall</TabsTrigger>
             <TabsTrigger value="heatmap" className="text-xs px-2.5 h-7">Heatmap</TabsTrigger>
           </TabsList>
 
