@@ -38,7 +38,7 @@ const ICON_BTN = "flex h-7 w-7 items-center justify-center rounded-md text-muted
 
 type Goal    = { _id: string; name: string; emoji?: string; current_amount?: number; total_amount: number; is_completed?: boolean };
 type Import  = { fileName: string; uploadedAt: number };
-type Account = { _id: Id<"accounts">; name: string; bank: string; number?: string; type: string; balance?: number; linkedGoals: Goal[]; recentImports: Import[] };
+type Account = { _id: Id<"accounts">; name: string; bank: string; number?: string; type: string; balance?: number; starting_balance?: number; linkedGoals: Goal[]; recentImports: Import[] };
 
 // ─── Section header ───────────────────────────────────────────────────────────
 
@@ -135,7 +135,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const BLANK_FORM = { bank: "", name: "", number: "", type: "checking" as AccountType, balance: "" };
+const BLANK_FORM = { bank: "", name: "", number: "", type: "checking" as AccountType, starting_balance: "" };
 
 export default function AccountsPage() {
     const { convexUser } = useConvexUser();
@@ -176,7 +176,7 @@ export default function AccountsPage() {
         setCollapsed((prev) => { const s = new Set(prev); if (s.has(t)) { s.delete(t); } else { s.add(t); } return s; });
 
     function openEdit(a: Account) {
-        setForm({ bank: a.bank, name: a.name, number: a.number || "", type: toAccountType(a.type), balance: a.balance != null ? String(a.balance) : "" });
+        setForm({ bank: a.bank, name: a.name, number: a.number || "", type: toAccountType(a.type), starting_balance: a.starting_balance != null ? String(a.starting_balance) : "" });
         setEditing(a);
     }
 
@@ -184,12 +184,12 @@ export default function AccountsPage() {
 
     async function handleSubmit() {
         if (!convexUser) return;
-        const bal = form.balance !== "" ? parseFloat(form.balance) : 0;
+        const bal = form.starting_balance !== "" ? parseFloat(form.starting_balance) : 0;
         if (editing) {
-            await updateAccountMut({ accountId: editing._id, name: form.name, bank: form.bank, number: form.number, type: form.type, balance: bal });
+            await updateAccountMut({ accountId: editing._id, name: form.name, bank: form.bank, number: form.number, type: form.type, starting_balance: bal });
         } else {
             if (!form.name || !form.bank) return;
-            await createAccount({ userId: convexUser._id, name: form.name, bank: form.bank, number: form.number, type: form.type, balance: bal });
+            await createAccount({ userId: convexUser._id, name: form.name, bank: form.bank, number: form.number, type: form.type, starting_balance: bal });
         }
         closeDialog();
         setForm(BLANK_FORM);
@@ -364,7 +364,7 @@ export default function AccountsPage() {
                                         </Select>
                                     </Field>
                                 </div>
-                                <Field label="Balance"><Input type="number" placeholder="e.g. 1500.00" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} /></Field>
+                                <Field label="Starting balance"><Input type="number" placeholder="e.g. 1500.00" value={form.starting_balance} onChange={(e) => setForm({ ...form, starting_balance: e.target.value })} /></Field>
                             </div>
                             <DialogFooter className="mt-6">
                                 <Button variant="outline" onClick={closeDialog}>Cancel</Button>

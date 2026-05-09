@@ -17,7 +17,8 @@ export default defineSchema({
         type: v.string(),
         bank: v.string(),
         createdAt: v.string(),
-        balance: v.optional(v.number()),
+        balance: v.optional(v.number()),         // legacy — no longer written; kept for backward compat
+        starting_balance: v.optional(v.number()), // manual anchor: balance = starting_balance + sum(transactions)
     }).index("by_user", ["userId"]),
 
     presets: defineTable({

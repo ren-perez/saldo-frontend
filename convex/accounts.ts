@@ -2,7 +2,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-// List all accounts for a user, enriched with last import, recent imports, and linked goals
+// List all accounts for a user, enriched with last import, recent imports, linked goals, and computed balance
 export const listAccounts = query({
     args: { userId: v.id("users") },
     handler: async (ctx, { userId }) => {
@@ -10,7 +10,7 @@ export const listAccounts = query({
 
         const enriched = await Promise.all(
             accounts.map(async (account) => {
-                const [lastImport, recentImports, linkedGoals] = await Promise.all([
+                const [lastImport, recentImports, linkedGoals, transactions] = await Promise.all([
                     ctx.db
                         .query("imports")
                         .withIndex("by_account", q => q.eq("accountId", account._id))
@@ -25,9 +25,19 @@ export const listAccounts = query({
                         .query("goals")
                         .withIndex("by_account", q => q.eq("linked_account_id", account._id))
                         .collect(),
+                    ctx.db
+                        .query("transactions")
+                        .withIndex("by_account", q => q.eq("accountId", account._id))
+                        .collect(),
                 ]);
+
+                const txSum = transactions.reduce((s, t) => s + t.amount, 0);
+                const computedBalance = (account.starting_balance ?? 0) + txSum;
+
                 return {
                     ...account,
+                    balance: computedBalance,
+                    starting_balance: account.starting_balance ?? 0,
                     lastUploadedAt: lastImport?.uploadedAt ?? null,
                     recentImports: recentImports.map(i => ({
                         _id: i._id,
@@ -59,17 +69,19 @@ export const createAccount = mutation({
         bank: v.string(),
         number: v.optional(v.string()),
         type: v.string(),
-        balance: v.optional(v.number()),
+        balance: v.optional(v.number()),          // legacy alias — maps to starting_balance
+        starting_balance: v.optional(v.number()),
     },
-    handler: async (ctx, args) => {
+    handler: async (ctx, { balance, starting_balance, ...rest }) => {
         return await ctx.db.insert("accounts", {
-            ...args,
+            ...rest,
+            starting_balance: starting_balance ?? balance,
             createdAt: new Date().toISOString(),
         });
     },
 });
 
-// Update an existing account's details, including optional balance override
+// Update an existing account's details. Use starting_balance to set the manual balance anchor.
 export const updateAccount = mutation({
     args: {
         accountId: v.id("accounts"),
@@ -77,9 +89,13 @@ export const updateAccount = mutation({
         bank: v.optional(v.string()),
         number: v.optional(v.string()),
         type: v.optional(v.string()),
-        balance: v.optional(v.number()),
+        balance: v.optional(v.number()),          // legacy alias — maps to starting_balance
+        starting_balance: v.optional(v.number()),
     },
-    handler: async (ctx, { accountId, ...updates }) => {
+    handler: async (ctx, { accountId, balance, starting_balance, ...rest }) => {
+        const updates: Record<string, unknown> = { ...rest };
+        const sb = starting_balance ?? balance;
+        if (sb !== undefined) updates.starting_balance = sb;
         await ctx.db.patch(accountId, updates);
     },
 });

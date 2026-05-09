@@ -482,18 +482,11 @@ export const getGoalsForAllocation = query({
             return !goal.linked_account_id || goal.linked_account_id === args.accountId;
         });
 
-        // Add current balance and account info to each goal
         const goalsWithBalance = await Promise.all(
             availableGoals.map(async (goal) => {
-                const contributions = await ctx.db
-                    .query("goal_contributions")
-                    .withIndex("by_goal", (q) => q.eq("goalId", goal._id))
-                    .collect();
-
-                const currentAmount = contributions.reduce((sum, contrib) => sum + contrib.amount, 0);
-
-                // Get account info if linked
+                let currentAmount: number;
                 let account = null;
+
                 if (goal.linked_account_id) {
                     const accountData = await ctx.db.get(goal.linked_account_id);
                     if (accountData) {
@@ -502,7 +495,28 @@ export const getGoalsForAllocation = query({
                             name: (accountData as any).name,
                             type: (accountData as any).type,
                         };
+                        if (goal.tracking_type === "LINKED_ACCOUNT") {
+                            const txns = await ctx.db
+                                .query("transactions")
+                                .withIndex("by_account", (q) => q.eq("accountId", goal.linked_account_id!))
+                                .collect();
+                            currentAmount = ((accountData as any).starting_balance ?? 0) + txns.reduce((s, t) => s + t.amount, 0);
+                        } else {
+                            const contributions = await ctx.db
+                                .query("goal_contributions")
+                                .withIndex("by_goal", (q) => q.eq("goalId", goal._id))
+                                .collect();
+                            currentAmount = contributions.reduce((sum, contrib) => sum + contrib.amount, 0);
+                        }
+                    } else {
+                        currentAmount = 0;
                     }
+                } else {
+                    const contributions = await ctx.db
+                        .query("goal_contributions")
+                        .withIndex("by_goal", (q) => q.eq("goalId", goal._id))
+                        .collect();
+                    currentAmount = contributions.reduce((sum, contrib) => sum + contrib.amount, 0);
                 }
 
                 return {

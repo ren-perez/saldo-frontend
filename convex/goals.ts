@@ -3,8 +3,20 @@ import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
-// Helper function to calculate current amount based on contributions
+// Helper: compute goal's current balance.
+// LINKED_ACCOUNT goals use the linked account's balance (starting_balance + sum of transactions).
+// MANUAL goals sum their goal_contributions records.
 async function calculateCurrentAmount(ctx: any, goal: any): Promise<number> {
+    if (goal.tracking_type === "LINKED_ACCOUNT" && goal.linked_account_id) {
+        const account = await ctx.db.get(goal.linked_account_id);
+        if (account) {
+            const txns = await ctx.db
+                .query("transactions")
+                .withIndex("by_account", (q: any) => q.eq("accountId", goal.linked_account_id))
+                .collect();
+            return ((account as any).starting_balance ?? 0) + txns.reduce((s: number, t: any) => s + t.amount, 0);
+        }
+    }
     const contributions = await ctx.db
         .query("goal_contributions")
         .withIndex("by_goal", (q: any) => q.eq("goalId", goal._id))
@@ -119,11 +131,18 @@ export const getGoalAccounts = query({
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect();
 
-        return accounts.map((account) => ({
-            _id: account._id, // Keep as _id to match Convex format
-            name: account.name,
-            account_type: account.type,
-            balance: 0,
+        return await Promise.all(accounts.map(async (account) => {
+            const txns = await ctx.db
+                .query("transactions")
+                .withIndex("by_account", (q) => q.eq("accountId", account._id))
+                .collect();
+            const computedBalance = (account.starting_balance ?? 0) + txns.reduce((s, t) => s + t.amount, 0);
+            return {
+                _id: account._id,
+                name: account.name,
+                account_type: account.type,
+                balance: computedBalance,
+            };
         }));
     },
 });

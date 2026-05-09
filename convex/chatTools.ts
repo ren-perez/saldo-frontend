@@ -92,13 +92,6 @@ async function transactionBelongsToUser(
 
 // ─── Story 6: getBalance ─────────────────────────────────
 
-/**
- * Balance rule:
- *   - Source of truth is accounts.balance (set manually or via CSV import).
- *   - Accounts without a balance field are listed but excluded from the total.
- *   - hasPartialData is true when at least one account has no stored balance.
- *   - Computing balance from transaction history is deferred to a future story.
- */
 export const getBalance = query({
     args: { telegramUserId: v.string() },
     handler: async (ctx, { telegramUserId }) => {
@@ -110,20 +103,27 @@ export const getBalance = query({
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect();
 
-        const accountBalances = accounts.map((a) => ({
-            id: a._id,
-            name: a.name,
-            bank: a.bank,
-            balance: a.balance ?? null,
-        }));
+        const accountBalances = await Promise.all(
+            accounts.map(async (a) => {
+                const txns = await ctx.db
+                    .query("transactions")
+                    .withIndex("by_account", (q) => q.eq("accountId", a._id))
+                    .collect();
+                return {
+                    id: a._id,
+                    name: a.name,
+                    bank: a.bank,
+                    balance: (a.starting_balance ?? 0) + txns.reduce((s, t) => s + t.amount, 0),
+                };
+            })
+        );
 
-        const known = accountBalances.filter((a) => a.balance !== null);
-        const totalKnownBalance = known.reduce((sum, a) => sum + (a.balance as number), 0);
+        const totalKnownBalance = accountBalances.reduce((sum, a) => sum + a.balance, 0);
 
         return ok("BALANCE_FETCHED", "Balance retrieved", {
             accounts: accountBalances,
             totalKnownBalance,
-            hasPartialData: known.length < accountBalances.length,
+            hasPartialData: false,
         });
     },
 });
