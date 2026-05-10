@@ -143,7 +143,7 @@ export function Affordability({ accounts = [], dashboardStats, budgetContext, in
   function balanceChart(balanceHistory: Array<{ date: string; balance: number }>, color: string) {
     if (!balanceHistory.length) return <span className="text-[10px] text-muted-foreground/60 px-1">No history</span>
     const w = 172, h = 42, pad = 4
-    const values = balanceHistory.map((p) => p.value ?? p.balance)
+    const values = balanceHistory.map((p) => p.balance)
     const min = Math.min(...values)
     const max = Math.max(...values)
     const span = Math.max(1, max - min)
@@ -155,7 +155,7 @@ export function Affordability({ accounts = [], dashboardStats, budgetContext, in
     if (values.length <= 3) {
       const barW = Math.max(3, (w - pad * 2) / values.length - 2)
       const bars = balanceHistory.map((p, i) => {
-        const val = p.value ?? p.balance
+        const val = p.balance
         const bh = Math.max(3, ((val - min) / span) * (h - 12) + 3)
         const x = pad + i * ((w - pad * 2) / values.length)
         const y = h - pad - bh

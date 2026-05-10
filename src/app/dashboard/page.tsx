@@ -11,10 +11,7 @@ import { DashboardProvider, useDashboard } from "@/components/dashboard/dashboar
 // Dashboard Modules
 import { TimeToolbar } from "@/components/dashboard/time-toolbar"
 import { CommandHUD } from "@/components/dashboard/command-hud"
-import { ActionCards } from "@/components/dashboard/action-cards"
-import { GoalsProgress } from "@/components/dashboard/goals-progress"
 import { MoneyFlow } from "@/components/dashboard/money-flow"
-import { AccountsSnapshot } from "@/components/dashboard/accounts-snapshot"
 import { CashflowCommand } from "@/components/dashboard/cashflow-command"
 import { Affordability } from "@/components/dashboard/affordability"
 import { SpendingRhythm } from "@/components/dashboard/spending-rhythm"
@@ -49,11 +46,6 @@ function DashboardContent() {
     convexUser ? { userId: convexUser._id } : "skip"
   )
 
-  const potentialTransfers = useQuery(
-    convexUser ? api.transfers.getPotentialTransfers : ("skip" as never),
-    convexUser ? { userId: convexUser._id } : "skip"
-  )
-
   const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`
   const budgetContext = useQuery(
     convexUser ? api.allocations.getMonthlyBudgetContext : ("skip" as never),
@@ -83,10 +75,6 @@ function DashboardContent() {
       return d >= startDate && d <= endDate
     })
   }, [allPlans, startDate, endDate])
-
-  const unmatchedIncomeCount = incomeSummary?.thisMonth?.plannedCount ?? 0
-  const pendingTransferCount = potentialTransfers?.length ?? 0
-  const activeGoalCount = (goals ?? []).filter((g) => !g.is_completed).length
 
   const isInitialLoad =
     accounts === undefined ||

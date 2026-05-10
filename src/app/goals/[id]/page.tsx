@@ -60,7 +60,7 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
         try {
             await deleteGoalMutation({ userId: convexUser._id, goalId: goal._id })
             toast.success("Goal deleted successfully")
-        } catch (error) {
+        } catch {
             toast.error("Failed to delete goal. Please try again.")
         }
     }
@@ -291,7 +291,7 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
                                         auto: "Auto",
                                     }
 
-                                    return Object.entries(groups).map(([monthKey, items], groupIdx) => {
+                                    return Object.entries(groups).map(([monthKey, items], _groupIdx) => {
                                         const date = new Date(monthKey + "-01")
                                         const monthLabel = format(date, "MMMM yyyy")
 

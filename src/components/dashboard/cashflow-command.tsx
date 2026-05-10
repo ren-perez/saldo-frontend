@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
-import { currency, currencyExact } from "@/lib/format"
+import { currency } from "@/lib/format"
 import { useDashboard } from "./dashboard-context"
 import type { GoalData } from "../GoalCard"
 import {
@@ -51,22 +51,14 @@ interface CashflowCommandProps {
   goals?: GoalData[] | null
 }
 
-export function CashflowCommand({ stats, incomeSummary, goals }: CashflowCommandProps) {
-  const { month, year } = useDashboard()
+export function CashflowCommand({ stats, incomeSummary: _incomeSummary, goals }: CashflowCommandProps) {
+  const { month: _month, year: _year } = useDashboard()
 
   const income = stats?.totalIncome ?? 0
   const expenses = stats?.totalExpenses ?? 0
   const goalsTotal = stats?.totalGoals ?? 0
-  const dailyStats = stats?.dailyStats ?? {}
+  const _dailyStats = stats?.dailyStats ?? {}
   const topGroups = stats?.topCategoryGroups ?? []
-  const activeDays = Object.keys(dailyStats).length
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const habitDensity = daysInMonth > 0 ? Math.round((activeDays / daysInMonth) * 100) : 0
-
-  const matchedTotal = incomeSummary?.thisMonth?.totalMatched ?? 0
-  const plannedTotal = incomeSummary?.thisMonth?.totalPlanned ?? 0
-  const upcomingIncome = incomeSummary?.upcoming ?? []
-  const avgMonthly = incomeSummary?.avgMonthlyIncome ?? 0
 
   // --- Cashflow Score (0-99) ---
   const unallocated = Math.max(0, income - expenses - goalsTotal)
@@ -74,28 +66,18 @@ export function CashflowCommand({ stats, incomeSummary, goals }: CashflowCommand
   const expenseLoadPct = income > 0 ? (expenses / income) * 100 : 0
   const rothGoal = goals?.find((g) => /roth|ira|retirement/i.test(g.name))
   const rothAutomated = rothGoal ? (rothGoal.monthly_contribution ?? 0) > 0 : false
-  const rawScore = Math.round(
+  const _rawScore = Math.round(
     Math.min(1, unallocatedPct / 100) * 40 +
     Math.max(0, 1 - expenseLoadPct / 100) * 40 +
     (rothAutomated ? 20 : 0)
   )
-  const cashflowScore = Math.min(99, Math.max(0, rawScore))
 
   // --- Top Pressure and Next Lever ---
-  const topPressure = topGroups[0]?.groupName ?? null
-  const nextLever = topGroups[1]?.groupName ?? null
 
   // --- Fundamental vs Flexible (Flow Summary) ---
-  const fundamentalKeywords = ["Rent", "Insurance", "Phone", "Transportation", "Fuel", "Utilities", "Mortgage"]
-  const fundamentalExpenses = topGroups
-    .filter((g) => fundamentalKeywords.some((k) => g.groupName.toLowerCase().includes(k.toLowerCase())))
-    .reduce((s, g) => s + g.amount, 0)
-  const flexibleExpenses = expenses - fundamentalExpenses
+  const _fundamentalKeywords = ["Rent", "Insurance", "Phone", "Transportation", "Fuel", "Utilities", "Mortgage"]
 
   // --- Commitment Preview ---
-  const commitmentGoals = (goals ?? [])
-    .filter((g) => !g.is_completed && (g.monthly_contribution ?? 0) > 0)
-    .slice(0, 5)
 
   // --- Category Intelligence Tabs ---
   const categoryTabs: Array<{ id: string; label: string; icon: React.ReactNode; groupIndex?: number }> = [

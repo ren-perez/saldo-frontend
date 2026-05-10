@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { currencyExact as currency } from "@/lib/format";
 import { format } from "date-fns";
-import { Plus, Trash2, Pencil, CreditCard, PiggyBank, TrendingUp, Wallet, LayoutGrid, Table as TableIcon, Target, FileText, ChevronDown, MoreVertical, Edit } from "lucide-react";
+import { Plus, Trash2, CreditCard, PiggyBank, TrendingUp, Wallet, LayoutGrid, Table as TableIcon, Target, FileText, ChevronDown, MoreVertical, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type AccountType = "checking" | "savings" | "investment" | "credit";

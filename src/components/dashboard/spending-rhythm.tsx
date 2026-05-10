@@ -183,7 +183,7 @@ export function SpendingRhythm({ stats, goals, plannedIncomes }: { stats: any; g
   const activeGoals = (goals ?? []).filter((g) => !g.is_completed)
 
   const plannedMap = useMemo(() => {
-    const map: Record<string, { total: number; items: Array<{ label: string; amount: number }> }> = {}
+    const map: Record<string, { total: number; items: Array<{ _id: string; label: string; amount: number }> }> = {}
     for (const p of plannedIncomes ?? []) {
       if (!map[p.expected_date]) map[p.expected_date] = { total: 0, items: [] }
       map[p.expected_date].total += p.expected_amount
@@ -452,7 +452,7 @@ function RightPane({ displayDate, displayStats, isPreview, month, plannedItems }
             {plannedItems && plannedItems.length > 0 && (
               <>
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Planned Income</p>
-                {plannedItems.map((item, idx) => (
+                {plannedItems.map((item, _idx) => (
                   <div key={item._id} className="border border-cyan-400/20 bg-cyan-400/5 rounded-lg px-3 py-2">
                     <div className="flex justify-between items-baseline gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">

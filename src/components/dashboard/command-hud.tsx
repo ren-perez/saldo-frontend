@@ -96,20 +96,12 @@ export function CommandHUD({ stats, accounts: _accounts, goals, incomeSummary }:
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const topGroup = stats?.topCategoryGroups?.[0]
   const topCategory = topGroup?.categories?.[0]
-  const matchedTotal = incomeSummary?.thisMonth?.totalMatched ?? 0
-  const plannedTotal = incomeSummary?.thisMonth?.totalPlanned ?? 0
   const upcomingIncome = incomeSummary?.upcoming ?? []
   const avgMonthly = incomeSummary?.avgMonthlyIncome ?? 0
 
   const topCatAmount = topCategory?.amount ?? 0
 
-  const dailyBridge = activeDays > 0 ? (income - goalsTotal) / activeDays : 0
-  const runwayBody = `Income is a timing problem more than an earning problem: the current bridge supports ${currency(Math.round(dailyBridge))}/day.`
-
   const rothGoal = goals?.find((g) => /roth|ira|retirement/i.test(g.name))
-  const rothBody = rothGoal
-    ? `Roth contributed ${currency(rothGoal.monthly_contribution)} this month; year progress is ${Math.round(((rothGoal.current_amount + rothGoal.monthly_contribution) / rothGoal.total_amount) * 100)}% toward the ${currency(rothGoal.total_amount)} limit.`
-    : `Net flow of ${currency(Math.abs(netFlow))} ${netFlow >= 0 ? "surplus" : "deficit"} this period.`
 
   // --- Period Signals ---
   const habitDensity = daysInMonth > 0 ? Math.round((activeDays / daysInMonth) * 100) : 0
@@ -153,7 +145,7 @@ export function CommandHUD({ stats, accounts: _accounts, goals, incomeSummary }:
       tone: "red" as const,
       title: "Pressure",
       body: topCategory
-        ? `${topCategory.name} is the largest pressure point at ${currency(topCatAmount)}${topGroup && topGroup.categories.length > 1 ? ` \u2014 ${topGroup.categories.slice(1, 3).map((c) => c.name).join(", ")}` : ""}.`
+        ? `${topCategory.name} is the largest pressure point at ${currency(topCatAmount)}${topGroup && topGroup.categories.length > 1 ? ` \u2014 ${topGroup.categories.slice(1, 3).map((c: { name: string }) => c.name).join(", ")}` : ""}.`
         : "No tracked spending categories yet.",
     },
     {

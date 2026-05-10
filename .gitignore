@@ -42,3 +42,8 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+public/apollo/dashboard.html
+public/apollo/src/app.js
+public/apollo/src/styles.css
+.gitignore
+public/apollo/src/template.html
