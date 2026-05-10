@@ -1,7 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Wallet, ArrowLeftRight } from "lucide-react"
+import { MoreHorizontal, Wallet, ArrowLeftRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
 
 interface ActionCardsProps {
   unmatchedIncomeCount: number
@@ -16,55 +23,33 @@ export function ActionCards({
   activeGoalCount: _activeGoalCount,
   pendingDistributionCount: _pendingDistributionCount = 0,
 }: ActionCardsProps) {
-  const actions = [
-    {
-      id: "income-match",
-      title: `${unmatchedIncomeCount} income to match`,
-      href: "/income",
-      icon: Wallet,
-      accent: "bg-blue-500/15 text-blue-500",
-      show: true,
-    },
-    {
-      id: "pending-transfers",
-      title: `${pendingTransferCount} pending transfers`,
-      href: "/transfers-inbox",
-      icon: ArrowLeftRight,
-      accent: "bg-blue-500/15 text-blue-500",
-      show: true,
-    },
-  ].filter((a) => a.show)
-
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-      {actions.map((action) => (
-        <Link
-          key={action.id}
-          href={action.href}
-          className="group flex items-center gap-2.5 rounded-lg border border-blue-800/30 bg-blue-600/10 px-3.5 py-2 transition-colors hover:border-foreground/40 hover:bg-foreground/20 sm:w-auto"
-        >
-          {/* Icon wrapper */}
-          <div
-            className={`
-              flex size-7 shrink-0 items-center justify-center rounded-md
-              ${action.accent}
-              transition-colors
-              group-hover:bg-foreground/70
-              group-hover:text-background
-            `}
-          >
-            <action.icon className="size-3.5" />
-          </div>
-
-          {/* Title */}
-          <span className="text-sm font-medium text-foreground/85">
-            {action.title}
-          </span>
-
-          {/* Arrow */}
-          <ArrowRight className="ml-auto size-4 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:text-foreground sm:ml-0" />
-        </Link>
-      ))}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-8">
+          <MoreHorizontal className="size-5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuItem asChild>
+          <Link href="/income" className="flex items-center justify-between w-full">
+            <span className="flex items-center gap-2">
+              <Wallet className="size-4" />
+              Income match
+            </span>
+            <span className="text-xs text-muted-foreground tabular-nums">{unmatchedIncomeCount}</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/transfers-inbox" className="flex items-center justify-between w-full">
+            <span className="flex items-center gap-2">
+              <ArrowLeftRight className="size-4" />
+              Pending transfers
+            </span>
+            <span className="text-xs text-muted-foreground tabular-nums">{pendingTransferCount}</span>
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

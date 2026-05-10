@@ -1,6 +1,7 @@
 // convex/accounts.ts
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { updateGoalCompletionStatus } from "./contributions";
 
 // List all accounts for a user, enriched with last import, recent imports, linked goals, and computed balance
 export const listAccounts = query({
@@ -50,7 +51,6 @@ export const listAccounts = query({
                         name: g.name,
                         emoji: g.emoji,
                         total_amount: g.total_amount,
-                        current_amount: g.current_amount,
                         is_completed: g.is_completed,
                     })),
                 };
@@ -97,6 +97,53 @@ export const updateAccount = mutation({
         const sb = starting_balance ?? balance;
         if (sb !== undefined) updates.starting_balance = sb;
         await ctx.db.patch(accountId, updates);
+
+        // Sync the "Initial account balance" goal contributions for LINKED_ACCOUNT goals
+        if (sb !== undefined) {
+            const linkedGoals = await ctx.db
+                .query("goals")
+                .withIndex("by_account", (q: any) => q.eq("linked_account_id", accountId))
+                .collect();
+
+            const activeGoals = (linkedGoals as any[]).filter(
+                (g: any) => g.tracking_type === "LINKED_ACCOUNT"
+            );
+
+            for (const goal of activeGoals) {
+                const existing = await ctx.db
+                    .query("goal_contributions")
+                    .withIndex("by_goal", (q: any) => q.eq("goalId", goal._id))
+                    .filter((q: any) =>
+                        q.and(
+                            q.eq(q.field("source"), "auto"),
+                            q.eq(q.field("note"), "Initial account balance"),
+                        )
+                    )
+                    .first();
+
+                if (existing) {
+                    if (sb === 0) {
+                        await ctx.db.delete(existing._id);
+                    } else {
+                        await ctx.db.patch(existing._id, { amount: sb });
+                    }
+                } else if (sb !== 0) {
+                    const account = await ctx.db.get(accountId);
+                    await ctx.db.insert("goal_contributions", {
+                        userId: goal.userId,
+                        goalId: goal._id,
+                        amount: sb,
+                        contribution_date: (account as any)?.createdAt || new Date().toISOString().split('T')[0],
+                        source: "auto",
+                        is_withdrawal: false,
+                        note: "Initial account balance",
+                        createdAt: Date.now(),
+                    });
+                }
+
+                await updateGoalCompletionStatus(ctx, goal._id);
+            }
+        }
     },
 });
 
@@ -120,6 +167,49 @@ export const getAccountPreset = query({
         if (!link) return null;
 
         return await ctx.db.get(link.presetId);
+    },
+});
+
+// Get daily balance history for all accounts (used for sparklines in affordability/accounts)
+export const getAccountBalanceHistories = query({
+    args: { userId: v.id("users") },
+    handler: async (ctx, { userId }) => {
+        const accounts = await ctx.db.query("accounts").withIndex("by_user", q => q.eq("userId", userId)).collect();
+        if (accounts.length === 0) return {};
+
+        const allTx = await ctx.db
+            .query("transactions")
+            .withIndex("by_user", q => q.eq("userId", userId))
+            .collect();
+
+        // Group transactions by account, then by date
+        const byAccount = new Map<string, Map<string, number>>();
+        for (const tx of allTx) {
+            const aid = tx.accountId.toString();
+            if (!byAccount.has(aid)) byAccount.set(aid, new Map());
+            const dateKey = new Date(tx.date).toISOString().split("T")[0];
+            const dateMap = byAccount.get(aid)!;
+            dateMap.set(dateKey, (dateMap.get(dateKey) ?? 0) + tx.amount);
+        }
+
+        const results: Record<string, Array<{ date: string; balance: number }>> = {};
+
+        for (const account of accounts) {
+            const aid = account._id.toString();
+            const dateMap = byAccount.get(aid) ?? new Map();
+            const sortedDates = Array.from(dateMap.keys()).sort();
+            const series: Array<{ date: string; balance: number }> = [];
+            let running = account.starting_balance ?? 0;
+
+            for (const date of sortedDates) {
+                running += dateMap.get(date) ?? 0;
+                series.push({ date, balance: Math.round(running * 100) / 100 });
+            }
+
+            results[aid] = series;
+        }
+
+        return results;
     },
 });
 

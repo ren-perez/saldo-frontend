@@ -1,12 +1,17 @@
 // convex/goals.ts
 import { mutation, query } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
+import { updateGoalCompletionStatus } from "./contributions";
+
+function getPriorityLabel(priority: number): string {
+    return priority === 1 ? "High" : priority === 2 ? "Medium" : "Low";
+}
 
 // Helper: compute goal's current balance.
 // LINKED_ACCOUNT goals use the linked account's balance (starting_balance + sum of transactions).
 // MANUAL goals sum their goal_contributions records.
-async function calculateCurrentAmount(ctx: any, goal: any): Promise<number> {
+async function calculateCurrentAmount(ctx: any, goal: Doc<"goals">): Promise<number> {
     if (goal.tracking_type === "LINKED_ACCOUNT" && goal.linked_account_id) {
         const account = await ctx.db.get(goal.linked_account_id);
         if (account) {
@@ -49,12 +54,6 @@ export const getGoals = query({
                     }
                 }
 
-                // Get monthly plans for this goal
-                const monthly_plans = await ctx.db
-                    .query("goal_monthly_plans")
-                    .withIndex("by_goal", (q) => q.eq("goalId", goal._id))
-                    .collect();
-
                 // Calculate current amount based on tracking type
                 const current_amount = await calculateCurrentAmount(ctx, goal);
 
@@ -73,13 +72,6 @@ export const getGoals = query({
                     tracking_type: goal.tracking_type,
                     calculation_type: goal.calculation_type,
                     linked_account,
-                    monthly_plans: monthly_plans.map((plan) => ({
-                        _id: plan._id,  // Changed from 'id' to '_id'
-                        name: plan.name,
-                        month: plan.month,
-                        year: plan.year,
-                        allocated_amount: plan.allocated_amount,
-                    })),
                     image_url: goal.image_url,
                     is_completed: goal.is_completed || false,
                     createdAt: goal.createdAt,
@@ -101,22 +93,11 @@ export const getFilterOptions = query({
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .collect();
 
-        const monthly_plans = await ctx.db
-            .query("goal_monthly_plans")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
         return {
             accounts: accounts.map((account) => ({
                 _id: account._id,  // Changed from 'id' to '_id'
                 name: account.name,
                 account_type: account.type,
-            })),
-            monthly_plans: monthly_plans.map((plan) => ({
-                _id: plan._id,  // Changed from 'id' to '_id'
-                name: plan.name,
-                month: plan.month,
-                year: plan.year,
             })),
         };
     },
@@ -177,7 +158,7 @@ export const createGoal = mutation({
         emoji: v.string(),
         priority: v.union(v.string(), v.number()),
         priority_label: v.optional(v.string()),
-        image_url: v.optional(v.any()),
+        image_url: v.optional(v.string()),
         imageChanged: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
@@ -196,6 +177,13 @@ export const createGoal = mutation({
             ? parseInt(args.priority)
             : args.priority;
 
+        if (total_amount <= 0) {
+            throw new Error("Total amount must be greater than 0");
+        }
+        if (monthly_contribution <= 0) {
+            throw new Error("Monthly contribution must be greater than 0");
+        }
+
         // Handle linked account ID based on tracking type
         let linked_account_id = undefined;
         if (args.tracking_type === "LINKED_ACCOUNT" && args.linked_account_id && args.linked_account_id !== null) {
@@ -213,14 +201,13 @@ export const createGoal = mutation({
             userId,
             name: args.name,
             total_amount,
-            current_amount: 0,
             monthly_contribution,
             due_date: args.due_date,
             color: args.color,
             emoji: args.emoji,
             note: args.note,
             priority,
-            priority_label: priority === 1 ? "High" : priority === 2 ? "Medium" : "Low",
+            priority_label: getPriorityLabel(priority),
             tracking_type: args.tracking_type,
             calculation_type: args.calculation_type,
             image_url: undefined,
@@ -238,6 +225,55 @@ export const createGoal = mutation({
         }
 
         const goalId = await ctx.db.insert("goals", goalData);
+
+        // If linked to an account, create retroactive contributions for existing transactions
+        if (linked_account_id !== undefined) {
+            const account = await ctx.db.get(linked_account_id);
+            if (account) {
+                const transactions = await ctx.db
+                    .query("transactions")
+                    .withIndex("by_account", (q: any) => q.eq("accountId", linked_account_id))
+                    .order("asc")
+                    .collect();
+
+                const now = new Date().toISOString().split('T')[0];
+
+                // Create contribution for starting_balance if non-zero
+                const startingBalance = (account as any).starting_balance ?? 0;
+                if (startingBalance !== 0) {
+                    await ctx.db.insert("goal_contributions", {
+                        userId,
+                        goalId,
+                        amount: startingBalance,
+                        contribution_date: (account as any).createdAt || now,
+                        source: "auto",
+                        is_withdrawal: false,
+                        note: "Initial account balance",
+                        createdAt: Date.now(),
+                    });
+                }
+
+                // Create contributions for each transaction
+                for (const tx of transactions) {
+                    const txAmount = tx.amount;
+                    const txDate = new Date(tx.date).toISOString().split('T')[0];
+
+                    await ctx.db.insert("goal_contributions", {
+                        userId,
+                        goalId,
+                        transactionId: tx._id,
+                        amount: txAmount,
+                        contribution_date: txDate,
+                        source: "auto",
+                        is_withdrawal: txAmount < 0,
+                        note: tx.description || undefined,
+                        createdAt: Date.now(),
+                    });
+                }
+
+                await updateGoalCompletionStatus(ctx, goalId);
+            }
+        }
 
         return { _id: goalId, ...args };
     },
@@ -259,7 +295,7 @@ export const updateGoal = mutation({
         color: v.optional(v.string()),
         emoji: v.optional(v.string()),
         priority: v.optional(v.union(v.string(), v.number())),
-        image_url: v.optional(v.any()),
+        image_url: v.optional(v.string()),
         imageChanged: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
@@ -272,7 +308,6 @@ export const updateGoal = mutation({
             throw new Error("Goal not found");
         }
 
-        // Type assertion to ensure this is a goal document
         const goal = existingGoal as any;
         if (goal.userId !== userId) {
             throw new Error("Not authorized");
@@ -287,14 +322,14 @@ export const updateGoal = mutation({
         if (args.name !== undefined) updateData.name = args.name;
         if (args.note !== undefined) updateData.note = args.note;
         if (args.total_amount !== undefined) {
-            updateData.total_amount = typeof args.total_amount === "string"
-                ? parseFloat(args.total_amount)
-                : args.total_amount;
+            const val = typeof args.total_amount === "string" ? parseFloat(args.total_amount) : args.total_amount;
+            if (val <= 0) throw new Error("Total amount must be greater than 0");
+            updateData.total_amount = val;
         }
         if (args.monthly_contribution !== undefined) {
-            updateData.monthly_contribution = typeof args.monthly_contribution === "string"
-                ? parseFloat(args.monthly_contribution)
-                : args.monthly_contribution;
+            const val = typeof args.monthly_contribution === "string" ? parseFloat(args.monthly_contribution) : args.monthly_contribution;
+            if (val <= 0) throw new Error("Monthly contribution must be greater than 0");
+            updateData.monthly_contribution = val;
         }
         if (args.due_date !== undefined) updateData.due_date = args.due_date;
         if (args.calculation_type !== undefined) updateData.calculation_type = args.calculation_type;
@@ -305,12 +340,11 @@ export const updateGoal = mutation({
         if (args.priority !== undefined) {
             const priority = typeof args.priority === "string" ? parseInt(args.priority) : args.priority;
             updateData.priority = priority;
-            updateData.priority_label = priority === 1 ? "High" : priority === 2 ? "Medium" : "Low";
+            updateData.priority_label = getPriorityLabel(priority);
         }
 
         if (args.linked_account_id !== undefined) {
             if (args.tracking_type === "LINKED_ACCOUNT" && args.linked_account_id) {
-                // Validate the account ID
                 const accountIdStr = args.linked_account_id.toString();
                 const account = await ctx.db.get(accountIdStr as any);
                 if (account && (account as any).userId === userId) {
@@ -319,7 +353,6 @@ export const updateGoal = mutation({
                     throw new Error("Invalid account ID or account not found");
                 }
             } else if (args.tracking_type === "MANUAL") {
-                // For manual tracking, remove the linked account
                 updateData.linked_account_id = undefined;
             }
         }
@@ -330,7 +363,7 @@ export const updateGoal = mutation({
 
         await ctx.db.patch(goalId, updateData);
 
-        return { _id: goalId, id: parseInt(goalId), ...updateData };
+        return { _id: goalId, ...updateData };
     },
 });
 

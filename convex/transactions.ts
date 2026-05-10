@@ -1,9 +1,11 @@
 // convex/transactions.ts
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
-import { matchDescription, matchDescriptionWithRule, CategoryRule } from "./rulesEngine";
 import { internal } from "./_generated/api";
+import { Doc, Id } from "./_generated/dataModel";
+import { computeFlowRows } from "./engine/snapshot";
+import { updateGoalCompletionStatus } from "./contributions";
+import { CategoryRule, matchDescriptionWithRule } from "./rulesEngine";
 
 const normalizeDescription = (description: string): string => {
     return description.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -12,6 +14,93 @@ const normalizeDescription = (description: string): string => {
 const createDeduplicationKey = (accountId: string, amount: number, description: string): string => {
     return `${accountId}:${amount}:${normalizeDescription(description)}`;
 };
+
+// ─── Goal Contribution Sync Helpers ───────────────────────────────────────────
+
+async function createContributionsForTransaction(
+    ctx: any,
+    userId: Id<"users">,
+    accountId: Id<"accounts">,
+    transactionId: Id<"transactions">,
+    amount: number,
+    date: number,
+    description: string,
+) {
+    const linkedGoals = await ctx.db
+        .query("goals")
+        .withIndex("by_account", (q: any) => q.eq("linked_account_id", accountId))
+        .collect();
+
+    const activeGoals = (linkedGoals as any[]).filter(
+        (g: any) => g.tracking_type === "LINKED_ACCOUNT" && !g.is_completed
+    );
+    if (activeGoals.length === 0) return;
+
+    const dateStr = new Date(date).toISOString().split('T')[0];
+
+    for (const goal of activeGoals) {
+        await ctx.db.insert("goal_contributions", {
+            userId,
+            goalId: goal._id,
+            transactionId,
+            amount,
+            contribution_date: dateStr,
+            source: "auto",
+            is_withdrawal: amount < 0,
+            note: description || undefined,
+            createdAt: Date.now(),
+        });
+    }
+}
+
+async function deleteContributionsForTransaction(ctx: any, transactionId: Id<"transactions">) {
+    const contributions = await ctx.db
+        .query("goal_contributions")
+        .withIndex("by_transaction", (q: any) => q.eq("transactionId", transactionId))
+        .collect();
+
+    const affectedGoalIds = new Set<any>();
+    for (const c of contributions) {
+        affectedGoalIds.add(c.goalId);
+        await ctx.db.delete(c._id);
+    }
+
+    for (const goalId of affectedGoalIds) {
+        await updateGoalCompletionStatus(ctx, goalId);
+    }
+}
+
+async function updateContributionsForTransaction(
+    ctx: any,
+    transactionId: Id<"transactions">,
+    amount: number,
+    date: number,
+    description: string,
+) {
+    const contributions = await ctx.db
+        .query("goal_contributions")
+        .withIndex("by_transaction", (q: any) => q.eq("transactionId", transactionId))
+        .collect();
+
+    if (contributions.length === 0) return;
+
+    const dateStr = new Date(date).toISOString().split('T')[0];
+
+    const affectedGoalIds = new Set<any>();
+    for (const c of contributions) {
+        affectedGoalIds.add(c.goalId);
+        await ctx.db.patch(c._id, {
+            amount,
+            contribution_date: dateStr,
+            is_withdrawal: amount < 0,
+            note: description || undefined,
+        });
+    }
+
+    for (const goalId of affectedGoalIds) {
+        await updateGoalCompletionStatus(ctx, goalId);
+    }
+}
 
 export const importTransactions = mutation({
     args: {
@@ -208,6 +297,16 @@ export const importTransactions = mutation({
 
         if (inserted.length > 0) {
             await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
+
+            // Auto-create goal contributions for LINKED_ACCOUNT goals on this account
+            for (const insertedId of inserted) {
+                const tx = await ctx.db.get(insertedId as any) as any;
+                if (!tx) continue;
+                await createContributionsForTransaction(
+                    ctx, userId, accountId, insertedId as any,
+                    tx.amount, tx.date, tx.description,
+                );
+            }
         }
 
         // ✅ ALWAYS create import session (no conditional)
@@ -479,6 +578,8 @@ export const deleteTransaction = mutation({
             }
         }
 
+        await deleteContributionsForTransaction(ctx, transactionId);
+
         await ctx.db.delete(transactionId);
 
         // Re-trigger passive verification for the account in case other inflows can substitute
@@ -522,6 +623,8 @@ export const bulkDeleteTransactions = mutation({
                     await ctx.db.patch(planId, { status: "matched" });
                 }
             }
+
+            await deleteContributionsForTransaction(ctx, transactionId);
 
             await ctx.db.delete(transactionId);
 
@@ -649,6 +752,12 @@ export const updateTransaction = mutation({
             await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, {
                 accountId: transaction.accountId,
             });
+
+            // Sync goal contributions for LINKED_ACCOUNT goals
+            const newAmount = updates.amount ?? transaction.amount;
+            const newDate = updates.date ?? transaction.date;
+            const newDescription = updates.description ?? transaction.description;
+            await updateContributionsForTransaction(ctx, transactionId, newAmount, newDate, newDescription);
         }
 
         return { success: true };
@@ -771,6 +880,12 @@ export const mergeTransaction = mutation({
 
         await ctx.db.replace(existingTransactionId, mergedTransaction);
 
+        // Sync goal contributions for LINKED_ACCOUNT goals
+        await updateContributionsForTransaction(
+            ctx, existingTransactionId,
+            newTransactionData.amount, newTransactionData.date, newTransactionData.description,
+        );
+
         return { success: true };
     },
 });
@@ -824,6 +939,12 @@ export const addAsNewTransaction = mutation({
         if (newTransactionData.amount > 0) {
             await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
         }
+
+        // Auto-create goal contributions for LINKED_ACCOUNT goals on this account
+        await createContributionsForTransaction(
+            ctx, userId, accountId, insertedId as any,
+            newTransactionData.amount, newTransactionData.date, newTransactionData.description,
+        );
 
         return { success: true, transactionId: insertedId };
     },
@@ -924,12 +1045,16 @@ export const createManualTransaction = mutation({
             await ctx.scheduler.runAfter(0, internal.allocations.verifyAccountAllocations, { accountId });
         }
 
+        // Auto-create goal contributions for LINKED_ACCOUNT goals on this account
+        await createContributionsForTransaction(
+            ctx, userId, accountId, insertedId as any,
+            amount, date, description,
+        );
+
         return { success: true, transactionId: insertedId };
     },
 });
 
-// Update a transaction's category and optionally save a new rule for that pattern.
-// Called when the user manually changes a category and opts to "remember this".
 export const updateTransactionAndCreateRule = mutation({
     args: {
         transactionId: v.id("transactions"),
@@ -1197,6 +1322,8 @@ export const getDashboardStats = query({
         const dailyStats: Record<string, { income: number; expenses: number; goals: number; txs: { description: string; amount: number; category?: string }[] }> =
             Object.fromEntries(dailyStatsMap);
 
+        const flowRows = computeFlowRows(transactions, categories, categoryGroups, totalGoals);
+
         return {
             totalIncome,
             totalExpenses,
@@ -1207,6 +1334,7 @@ export const getDashboardStats = query({
             weeklyBreakdown: weekBuckets,
             accountFlows,
             dailyStats,
+            flowRows,
         };
     },
 });

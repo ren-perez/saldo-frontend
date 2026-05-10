@@ -15,9 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { currency } from "@/lib/format";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { currencyExact as currency } from "@/lib/format";
 import { format } from "date-fns";
-import { Plus, Trash2, Pencil, CreditCard, PiggyBank, TrendingUp, Wallet, LayoutGrid, Table as TableIcon, Target, FileText, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Pencil, CreditCard, PiggyBank, TrendingUp, Wallet, LayoutGrid, Table as TableIcon, Target, FileText, ChevronDown, MoreVertical, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type AccountType = "checking" | "savings" | "investment" | "credit";
@@ -34,7 +35,6 @@ const TYPE_ORDER: AccountType[] = ["checking", "savings", "investment", "credit"
 const toAccountType = (t: string): AccountType => (t in TYPE_META ? (t as AccountType) : "checking");
 
 const NUM = "font-['Manrope',sans-serif] tabular-nums";
-const ICON_BTN = "flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors";
 
 type Goal    = { _id: string; name: string; emoji?: string; current_amount?: number; total_amount: number; is_completed?: boolean };
 type Import  = { fileName: string; uploadedAt: number };
@@ -63,24 +63,38 @@ function AccountCard({ account, onEdit, onDelete }: { account: Account; onEdit: 
     const lastImport = account.recentImports[0];
 
     return (
-        <div className="relative group rounded-lg border bg-card p-5 flex flex-col transition-colors shadow-sm">
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 rounded-md border bg-background p-0.5 opacity-0 transition-opacity group-hover:opacity-100 z-10">
-                <button className={cn(ICON_BTN, "hover:bg-muted hover:text-foreground")} onClick={onEdit}><Pencil className="h-3 w-3" /></button>
-                <button className={cn(ICON_BTN, "hover:bg-destructive/10 hover:text-destructive")} onClick={onDelete}><Trash2 className="h-3 w-3" /></button>
-            </div>
-
+        <div className="group rounded-lg border bg-card p-5 flex flex-col transition-colors shadow-sm min-w-72">
             {/* Name + balance */}
-            <div className="flex items-start justify-between gap-3 pr-8">
-                <div className="min-w-0">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">
                         {account.name}
                         {account.number && <span className="text-muted-foreground font-normal"> · {account.number}</span>}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">{account.bank}</p>
                 </div>
-                <span className={cn(NUM, "text-sm font-semibold shrink-0", balance < 0 ? "text-destructive" : "text-foreground")}>
-                    {currency(balance)}
-                </span>
+                <div className="flex flex-col items-end justify-between self-stretch">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 -mt-1.5 -mr-1.5">
+                                <MoreVertical className="h-3.5 w-3.5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-36">
+                            <DropdownMenuItem onClick={onEdit}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onDelete} className="text-red-600 hover:text-red-800">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <span className={cn(NUM, "text-sm font-semibold", balance < 0 ? "text-destructive" : "text-foreground")}>
+                        {currency(balance)}
+                    </span>
+                </div>
             </div>
 
             {/* Goals */}
@@ -114,7 +128,7 @@ function AccountCard({ account, onEdit, onDelete }: { account: Account; onEdit: 
                             <FileText className="size-3" /> Last import
                         </p>
                         {account.recentImports.length > 1 && (
-                            <button className="text-xs text-primary hover:underline">
+                            <button className="text-xs text-muted-foreground hover:underline">
                                 See all ({account.recentImports.length})
                             </button>
                         )}
@@ -237,7 +251,7 @@ export default function AccountsPage() {
                                             <SectionHeader type={type} count={accs.length} collapsed={collapsed.has(type)} onToggle={() => toggle(type)} />
                                             <div className={cn("grid transition-[grid-template-rows] duration-300 ease-in-out", collapsed.has(type) ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
                                                 <div className="overflow-hidden">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-1">
+                                                    <div className="grid gap-3 pb-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(18rem, 1fr))" }}>
                                                         {accs.map((a) => (
                                                             <AccountCard
                                                                 key={a._id}
@@ -323,10 +337,23 @@ export default function AccountsPage() {
                                                                         {currency(bal)}
                                                                     </td>
                                                                     <td className="px-4 py-3">
-                                                                        <div className="flex items-center gap-0.5 justify-end">
-                                                                            <button className={cn(ICON_BTN, "hover:bg-muted hover:text-foreground")} onClick={() => openEdit(a)}><Pencil className="h-3 w-3" /></button>
-                                                                            <button className={cn(ICON_BTN, "hover:bg-destructive/10 hover:text-destructive")} onClick={() => confirm("Delete this account?") && deleteAccountMut({ accountId: a._id })}><Trash2 className="h-3 w-3" /></button>
-                                                                        </div>
+                                                                        <DropdownMenu>
+                                                                            <DropdownMenuTrigger asChild>
+                                                                                <Button variant="ghost" size="icon" className="h-7 w-7 p-0 text-muted-foreground">
+                                                                                    <MoreVertical className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </DropdownMenuTrigger>
+                                                                            <DropdownMenuContent align="end" className="w-36">
+                                                                                <DropdownMenuItem onClick={() => openEdit(a)}>
+                                                                                    <Edit className="h-4 w-4 mr-2" />
+                                                                                    Edit
+                                                                                </DropdownMenuItem>
+                                                                                <DropdownMenuItem onClick={() => confirm("Delete this account?") && deleteAccountMut({ accountId: a._id })} className="text-red-600 hover:text-red-800">
+                                                                                    <Trash2 className="h-4 w-4 mr-2" />
+                                                                                    Delete
+                                                                                </DropdownMenuItem>
+                                                                            </DropdownMenuContent>
+                                                                        </DropdownMenu>
                                                                     </td>
                                                                 </tr>
                                                             );

@@ -142,6 +142,7 @@ export default function CategoriesPage() {
     name: "",
     groupId: "",
     transactionType: "",
+    stsFlowType: "",
   });
 
   const [groupForm, setGroupForm] = useState({ name: "" });
@@ -192,8 +193,11 @@ export default function CategoriesPage() {
         ? (categoryForm.groupId as Id<"category_groups">)
         : undefined,
       transactionType: categoryForm.transactionType || undefined,
+      stsFlowType: categoryForm.stsFlowType
+        ? (categoryForm.stsFlowType as "fundamental" | "flexible" | "wealth")
+        : undefined,
     });
-    setCategoryForm({ name: "", groupId: "", transactionType: "" });
+    setCategoryForm({ name: "", groupId: "", transactionType: "", stsFlowType: "" });
     setShowCategoryDialog(false);
   };
 
@@ -206,6 +210,7 @@ export default function CategoriesPage() {
         name: editingCategory.name,
         groupId: editingCategory.groupId || undefined,
         transactionType: editingCategory.transactionType || undefined,
+        stsFlowType: editingCategory.stsFlowType || undefined,
       },
     });
     setEditingCategory(null);
@@ -292,7 +297,7 @@ export default function CategoriesPage() {
   const openEditCategory = (cat: Category) => setEditingCategory(cat);
   const openEditGroup = (g: CategoryGroup) => setEditingGroup(g);
   const openAddCategory = (group: CategoryGroup | null) => {
-    setCategoryForm({ name: "", groupId: group?._id ?? "", transactionType: "" });
+    setCategoryForm({ name: "", groupId: group?._id ?? "", transactionType: "", stsFlowType: "" });
     setShowCategoryDialog(true);
   };
 

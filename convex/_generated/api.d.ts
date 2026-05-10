@@ -18,6 +18,7 @@ import type * as chatHistory from "../chatHistory.js";
 import type * as chatTools from "../chatTools.js";
 import type * as contributions from "../contributions.js";
 import type * as crons from "../crons.js";
+import type * as engine_snapshot from "../engine/snapshot.js";
 import type * as goals from "../goals.js";
 import type * as importActions from "../importActions.js";
 import type * as imports from "../imports.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   chatTools: typeof chatTools;
   contributions: typeof contributions;
   crons: typeof crons;
+  "engine/snapshot": typeof engine_snapshot;
   goals: typeof goals;
   importActions: typeof importActions;
   imports: typeof imports;

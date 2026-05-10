@@ -142,7 +142,7 @@ export function GoalDialog({
         linked_account_id: null as Id<"accounts"> | null,
         color: "#3b82f6",
         emoji: "",
-        priority: 3,
+        priority: 2,
         image: null as File | null,
         imageChanged: false,
     })
@@ -166,7 +166,9 @@ export function GoalDialog({
     // Mutations
     const createGoalMutation = useMutation(api.goals.createGoal)
     const updateGoalMutation = useMutation(api.goals.updateGoal)
+    const deleteGoalMutation = useMutation(api.goals.deleteGoal)
     const getGoalImageUploadUrl = useAction(api.importActions.getGoalImageUploadUrl);
+    const deleteGoalImageAction = useAction(api.importActions.deleteGoalImage);
 
     // Get selected account details
     const selectedAccount = accounts.find(
@@ -231,7 +233,7 @@ export function GoalDialog({
                 linked_account_id: null,
                 color: getRandomColor(),
                 emoji: "🎯",
-                priority: 3,
+                priority: 2,
                 image: null,
                 imageChanged: false,
             })
@@ -337,9 +339,13 @@ export function GoalDialog({
 
         setIsUploading(true);
 
+        let goalId: Id<"goals"> | null = null
+        let createdGoal: Record<string, unknown> | null = null
+        let goalCreated = false
+        let imageUploaded = false
+
         try {
             let imageUrl: string | undefined
-            let goalId: Id<"goals">
 
             if (mode === "edit" && editingGoal) {
                 goalId = editingGoal._id
@@ -362,6 +368,8 @@ export function GoalDialog({
                     image_url: undefined,
                 });
                 goalId = newGoal._id as Id<"goals">
+                createdGoal = newGoal as unknown as Record<string, unknown>
+                goalCreated = true
             }
 
             // Handle image upload
@@ -383,35 +391,44 @@ export function GoalDialog({
                     headers: { "Content-Type": compressedFile.type },
                 })
 
+                imageUploaded = true
+
                 imageUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${fileKey}?v=${Date.now()}`
 
                 toast.loading("Finalizing...", { id: "goal-save" });
 
-                const updatedGoal = await updateGoalMutation({
-                    goalId: goalId,
-                    userId: convexUser._id,
-                    name: formData.name,
-                    note: formData.note,
-                    total_amount: formData.total_amount,
-                    monthly_contribution: formData.monthly_contribution,
-                    due_date: formData.due_date,
-                    calculation_type: formData.calculation_type,
-                    tracking_type: formData.tracking_type,
-                    linked_account_id: formData.linked_account_id,
-
-                    color: formData.color,
-                    emoji: formData.emoji,
-                    priority: formData.priority,
-                    image_url: imageUrl,
-                });
+                // In create mode, goal was just created — only image_url changed.
+                // In edit mode, user may have changed any field.
+                const updatedGoal = await updateGoalMutation(
+                    mode === "create"
+                        ? { goalId: goalId, userId: convexUser._id, image_url: imageUrl }
+                        : {
+                            goalId: goalId, userId: convexUser._id,
+                            name: formData.name, note: formData.note,
+                            total_amount: formData.total_amount,
+                            monthly_contribution: formData.monthly_contribution,
+                            due_date: formData.due_date,
+                            calculation_type: formData.calculation_type,
+                            tracking_type: formData.tracking_type,
+                            linked_account_id: formData.linked_account_id,
+                            color: formData.color, emoji: formData.emoji,
+                            priority: formData.priority,
+                            image_url: imageUrl,
+                        }
+                );
 
                 if (mode === "create") {
-                    onCreateGoal(updatedGoal as Goal);
+                    onCreateGoal({ ...(createdGoal as unknown as Goal), image_url: imageUrl });
                 } else {
                     onUpdateGoal(updatedGoal as Goal);
                 }
             } else if (imageState?.type === "removed") {
                 toast.loading("Updating goal...", { id: "goal-save" });
+
+                // Clean up old image from R2
+                if (editingGoal?.image_url) {
+                    deleteGoalImageAction({ userId: convexUser._id, goalId }).catch(() => { })
+                }
 
                 const updatedGoal = await updateGoalMutation({
                     goalId: goalId,
@@ -455,32 +472,23 @@ export function GoalDialog({
 
                 onUpdateGoal(updatedGoal as Goal);
             } else {
-                // Create mode without image
-                const newGoal = await createGoalMutation({
-                    userId: convexUser._id,
-                    name: formData.name,
-                    note: formData.note,
-                    total_amount: formData.total_amount,
-                    monthly_contribution: formData.monthly_contribution,
-                    due_date: formData.due_date,
-                    calculation_type: formData.calculation_type,
-                    tracking_type: formData.tracking_type,
-                    linked_account_id: formData.linked_account_id,
-
-                    color: formData.color,
-                    emoji: formData.emoji,
-                    priority: formData.priority,
-                    image_url: undefined,
-                });
-
-                onCreateGoal(newGoal as Goal);
+                onCreateGoal(createdGoal as unknown as Goal);
             }
 
             toast.success(mode === "edit" ? "Goal updated successfully" : "Goal created successfully", { id: "goal-save" });
             onOpenChange(false);
         } catch (error) {
             console.error("Error saving goal:", error);
-            toast.error("Failed to save goal. Please try again.", { id: "goal-save" });
+
+            if (goalCreated && goalId) {
+                try { await deleteGoalMutation({ userId: convexUser._id, goalId }); } catch { /* best effort */ }
+            }
+            if (imageUploaded && goalId) {
+                try { await deleteGoalImageAction({ userId: convexUser._id, goalId }); } catch { /* best effort */ }
+            }
+
+            const message = error instanceof Error ? error.message : "Please try again.";
+            toast.error(`Failed to save goal: ${message}`, { id: "goal-save" });
         } finally {
             setIsUploading(false);
         }

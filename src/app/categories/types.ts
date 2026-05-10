@@ -1,10 +1,13 @@
 import { Id } from "../../../convex/_generated/dataModel";
 
+export type FlowType = "fundamental" | "flexible" | "wealth";
+
 export type Category = {
   _id: Id<"categories">;
   name: string;
   groupId?: Id<"category_groups">;
   transactionType?: string;
+  stsFlowType?: FlowType;
 };
 
 export type CategoryGroup = {

@@ -23,12 +23,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Info } from "lucide-react";
-import { Category, CategoryGroup } from "../types";
+import { Category, CategoryGroup, FlowType } from "../types";
 
 type CategoryForm = {
   name: string;
   groupId: string;
   transactionType: string;
+  stsFlowType: string;
 };
 
 export function CategoryDialogs({
@@ -84,7 +85,7 @@ export function CategoryDialogs({
                 required
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-medium">Transaction Type</label>
                 <Select
@@ -104,6 +105,28 @@ export function CategoryDialogs({
                     <SelectItem value="income">Income</SelectItem>
                     <SelectItem value="expense">Expense</SelectItem>
                     <SelectItem value="transfer">Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Flow Type</label>
+                <Select
+                  value={categoryForm.stsFlowType || "none"}
+                  onValueChange={(val) =>
+                    setCategoryForm((p) => ({
+                      ...p,
+                      stsFlowType: val === "none" ? "" : val,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Flexible" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Flexible</SelectItem>
+                    <SelectItem value="fundamental">Fundamental</SelectItem>
+                    <SelectItem value="flexible">Flexible</SelectItem>
+                    <SelectItem value="wealth">Wealth Building</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -183,7 +206,7 @@ export function CategoryDialogs({
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium">Transaction Type</label>
                   <Select
@@ -208,6 +231,35 @@ export function CategoryDialogs({
                       <SelectItem value="income">Income</SelectItem>
                       <SelectItem value="expense">Expense</SelectItem>
                       <SelectItem value="transfer">Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Flow Type</label>
+                  <Select
+                    value={editingCategory.stsFlowType || "none"}
+                    onValueChange={(val) =>
+                      setEditingCategory((p) =>
+                        p
+                          ? {
+                              ...p,
+                              stsFlowType:
+                                val === "none"
+                                  ? undefined
+                                  : (val as FlowType),
+                            }
+                          : null
+                      )
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Flexible" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Flexible</SelectItem>
+                      <SelectItem value="fundamental">Fundamental</SelectItem>
+                      <SelectItem value="flexible">Flexible</SelectItem>
+                      <SelectItem value="wealth">Wealth Building</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

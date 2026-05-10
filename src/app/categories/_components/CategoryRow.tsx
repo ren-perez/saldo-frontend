@@ -8,6 +8,7 @@ import {
 import { MoreHorizontal, Pencil, Tag, Trash2 } from "lucide-react";
 import { Category } from "../types";
 import { TransactionTypeBadge } from "./TransactionTypeBadge";
+import { FlowTypeBadge } from "./FlowTypeBadge";
 
 export function CategoryRow({
   cat,
@@ -24,6 +25,7 @@ export function CategoryRow({
         <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
         <span className="text-sm font-medium truncate">{cat.name}</span>
         <TransactionTypeBadge type={cat.transactionType} />
+        <FlowTypeBadge type={cat.stsFlowType} />
       </div>
 
       <DropdownMenu>

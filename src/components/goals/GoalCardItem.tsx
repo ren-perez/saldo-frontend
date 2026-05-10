@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { GoalCard, GoalCardHeader, GoalCardContent, GoalCardFooter } from "@/components/goals/goal-card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useMutation } from "convex/react"
+import { useMutation, useAction } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
 import { toast } from "sonner"
@@ -40,6 +40,7 @@ export function GoalCardItem({
 }: GoalCardItemProps) {
   const { convexUser } = useConvexUser()
   const deleteGoalMutation = useMutation(api.goals.deleteGoal)
+  const deleteGoalImageAction = useAction(api.importActions.deleteGoalImage)
   const [showActionDialog, setShowActionDialog] = useState(false)
 
   const progressPercentage = getProgressPercentage(goal.current_amount || 0, goal.total_amount);
@@ -54,10 +55,15 @@ export function GoalCardItem({
         userId: convexUser._id,
         goalId: goal._id
       })
+
+      if (goal.image_url) {
+        deleteGoalImageAction({ userId: convexUser._id, goalId: goal._id }).catch(() => {})
+      }
+
       toast.success("Goal deleted successfully")
     } catch (error) {
-      toast.error("Failed to delete goal. Please try again.")
       console.error("Error deleting goal:", error)
+      toast.error(`Failed to delete goal: ${error instanceof Error ? error.message : "Please try again."}`)
     }
   }
 

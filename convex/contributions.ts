@@ -544,21 +544,28 @@ export const getContributionHistory = query({
         startDate: v.optional(v.string()),
         endDate: v.optional(v.string()),
         limit: v.optional(v.number()),
+        sortOrder: v.optional(v.string()), // "asc" | "desc"
     },
     handler: async (ctx, args) => {
         let contributions;
+        const sortOrder = args.sortOrder || "desc";
 
         if (args.goalId) {
             const goalId = args.goalId;
             contributions = await ctx.db
                 .query("goal_contributions")
                 .withIndex("by_goal", (q) => q.eq("goalId", goalId))
-                .order("desc")
-                .take(args.limit || 100);
+                .collect();
+            contributions.sort((a, b) =>
+                sortOrder === "asc"
+                    ? a.contribution_date.localeCompare(b.contribution_date)
+                    : b.contribution_date.localeCompare(a.contribution_date)
+            );
+            contributions = contributions.slice(0, args.limit || 100);
         } else {
             contributions = await ctx.db
                 .query("goal_contributions")
-                .withIndex("by_user", (q) => q.eq("userId", args.userId))
+                .withIndex("by_date")
                 .order("desc")
                 .take(args.limit || 100);
         }
@@ -905,7 +912,7 @@ export const getImportAllocationStatus = query({
 });
 
 // Helper function to update goal completion status
-async function updateGoalCompletionStatus(ctx: any, goalId: Id<"goals">) {
+export async function updateGoalCompletionStatus(ctx: any, goalId: Id<"goals">) {
     const goal = await ctx.db.get(goalId);
     if (!goal) return;
 

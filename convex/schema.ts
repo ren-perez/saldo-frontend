@@ -87,10 +87,12 @@ export default defineSchema({
         name: v.string(),
         transactionType: v.optional(v.string()),
         groupId: v.optional(v.id("category_groups")),
+        stsFlowType: v.optional(v.union(v.literal("fundamental"), v.literal("flexible"), v.literal("wealth"))),
         createdAt: v.optional(v.number()),
     }).index("by_user", ["userId"])
         .index("by_group", ["groupId"])
-        .index("by_type", ["transactionType"]),
+        .index("by_type", ["transactionType"])
+        .index("by_flow_type", ["stsFlowType"]),
 
     category_groups: defineTable({
         userId: v.id("users"),
@@ -134,7 +136,6 @@ export default defineSchema({
         transfer_pair_id: v.optional(v.string()), // For goal-to-goal transfers
         is_withdrawal: v.optional(v.boolean()), // Track negative contributions
         createdAt: v.number(),
-        updatedAt: v.optional(v.number()),
     }).index("by_user", ["userId"])
         .index("by_goal", ["goalId"])
         .index("by_transaction", ["transactionId"])

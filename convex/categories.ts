@@ -1,6 +1,8 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+const FLOW_TYPES = v.union(v.literal("fundamental"), v.literal("flexible"), v.literal("wealth"));
+
 // 📌 Create a new category
 export const createCategory = mutation({
     args: {
@@ -8,6 +10,7 @@ export const createCategory = mutation({
         name: v.string(),
         groupId: v.optional(v.id("category_groups")),
         transactionType: v.optional(v.string()),
+        stsFlowType: v.optional(FLOW_TYPES),
     },
     handler: async (ctx, args) => {
         const categoryId = await ctx.db.insert("categories", {
@@ -15,6 +18,7 @@ export const createCategory = mutation({
             name: args.name,
             groupId: args.groupId || undefined,
             transactionType: args.transactionType || undefined,
+            stsFlowType: args.stsFlowType || undefined,
             createdAt: Date.now(),
         });
         return categoryId;
@@ -42,10 +46,23 @@ export const updateCategory = mutation({
             name: v.optional(v.string()),
             groupId: v.optional(v.id("category_groups")),
             transactionType: v.optional(v.string()),
+            stsFlowType: v.optional(FLOW_TYPES),
         }),
     },
     handler: async (ctx, { categoryId, updates }) => {
         await ctx.db.patch(categoryId, updates);
+        return await ctx.db.get(categoryId);
+    },
+});
+
+// 📌 Set flow type for a category (convenience wrapper)
+export const setFlowType = mutation({
+    args: {
+        categoryId: v.id("categories"),
+        stsFlowType: v.optional(FLOW_TYPES),
+    },
+    handler: async (ctx, { categoryId, stsFlowType }) => {
+        await ctx.db.patch(categoryId, { stsFlowType: stsFlowType || undefined });
         return await ctx.db.get(categoryId);
     },
 });

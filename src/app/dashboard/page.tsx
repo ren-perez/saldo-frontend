@@ -1,44 +1,27 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo } from "react"
 import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
-import { AccountsSnapshot } from "@/components/dashboard/accounts-snapshot"
-import { MonthlyOverview } from "@/components/dashboard/monthly-overview"
-import { GoalsProgress } from "@/components/dashboard/goals-progress"
 import AppLayout from "@/components/AppLayout"
 import InitUser from "@/components/InitUser"
+import { DashboardProvider, useDashboard } from "@/components/dashboard/dashboard-context"
 
-export default function DashboardPage() {
+// Dashboard Modules
+import { TimeToolbar } from "@/components/dashboard/time-toolbar"
+import { CommandHUD } from "@/components/dashboard/command-hud"
+import { ActionCards } from "@/components/dashboard/action-cards"
+import { GoalsProgress } from "@/components/dashboard/goals-progress"
+import { MoneyFlow } from "@/components/dashboard/money-flow"
+import { AccountsSnapshot } from "@/components/dashboard/accounts-snapshot"
+import { CashflowCommand } from "@/components/dashboard/cashflow-command"
+import { Affordability } from "@/components/dashboard/affordability"
+import { SpendingRhythm } from "@/components/dashboard/spending-rhythm"
+
+function DashboardContent() {
   const { convexUser } = useConvexUser()
-
-  // Month navigation state
-  const now = new Date()
-  const [month, setMonth] = useState(now.getMonth())
-  const [year, setYear] = useState(now.getFullYear())
-
-  const { startDate, endDate } = useMemo(() => {
-    const start = new Date(year, month, 1).getTime()
-    const end = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime()
-    return { startDate: start, endDate: end }
-  }, [month, year])
-
-  function handleMonthChange(delta: number) {
-    setMonth((prev) => {
-      let newMonth = prev + delta
-      let newYear = year
-      if (newMonth < 0) {
-        newMonth = 11
-        newYear -= 1
-      } else if (newMonth > 11) {
-        newMonth = 0
-        newYear += 1
-      }
-      setYear(newYear)
-      return newMonth
-    })
-  }
+  const { startDate, endDate, month, year } = useDashboard()
 
   // Fetch data from Convex
   const accounts = useQuery(
@@ -61,44 +44,122 @@ export default function DashboardPage() {
     convexUser ? { userId: convexUser._id } : "skip"
   )
 
-  // Only block on initial data – avoid full-page flash when month changes
+  const allPlans = useQuery(
+    convexUser ? api.incomePlans.listIncomePlans : ("skip" as never),
+    convexUser ? { userId: convexUser._id } : "skip"
+  )
+
+  const potentialTransfers = useQuery(
+    convexUser ? api.transfers.getPotentialTransfers : ("skip" as never),
+    convexUser ? { userId: convexUser._id } : "skip"
+  )
+
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`
+  const budgetContext = useQuery(
+    convexUser ? api.allocations.getMonthlyBudgetContext : ("skip" as never),
+    convexUser ? { userId: convexUser._id, monthKey } : "skip"
+  )
+
+  const accountBalanceHistories = useQuery(
+    convexUser ? api.accounts.getAccountBalanceHistories : ("skip" as never),
+    convexUser ? { userId: convexUser._id } : "skip"
+  )
+
+  const plannedIncomes = useMemo(() => {
+    if (!allPlans) return []
+    return allPlans
+      .filter(p => p.status === "planned")
+      .filter(p => {
+        const d = new Date(p.expected_date).getTime()
+        return d >= startDate && d <= endDate
+      })
+      .map(p => ({ _id: p._id, expected_date: p.expected_date, expected_amount: p.expected_amount, label: p.label }))
+  }, [allPlans, startDate, endDate])
+
+  const monthPlans = useMemo(() => {
+    if (!allPlans) return []
+    return allPlans.filter(p => {
+      const d = new Date(p.expected_date).getTime()
+      return d >= startDate && d <= endDate
+    })
+  }, [allPlans, startDate, endDate])
+
+  const unmatchedIncomeCount = incomeSummary?.thisMonth?.plannedCount ?? 0
+  const pendingTransferCount = potentialTransfers?.length ?? 0
+  const activeGoalCount = (goals ?? []).filter((g) => !g.is_completed).length
+
   const isInitialLoad =
     accounts === undefined ||
     goals === undefined ||
-    incomeSummary === undefined
+    dashboardStats === undefined ||
+    budgetContext === undefined ||
+    accountBalanceHistories === undefined
 
+  return (
+    <div className="container max-w-7xl mx-auto flex flex-col pb-12">
+      {/* Global Period Toolbar - sticky */}
+      <TimeToolbar />
+
+      <div className="flex flex-col gap-4 p-4 md:p-6">
+        {isInitialLoad ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="text-sm text-muted-foreground animate-pulse">Initializing Command Center...</div>
+          </div>
+        ) : (
+          <>
+            {/* HUD: Mission Center + Command Center KPIs + Strategic Briefing + Module Focus Nav */}
+            <CommandHUD stats={dashboardStats} accounts={accounts} goals={goals ?? []} incomeSummary={incomeSummary} />
+            {/* <ActionCards
+              unmatchedIncomeCount={unmatchedIncomeCount}
+              pendingTransferCount={pendingTransferCount}
+              activeGoalCount={activeGoalCount}
+            /> */}
+
+            {/* Spending Rhythm / Heatmap */}
+            <div id="cc-module-rhythm">
+              <SpendingRhythm stats={dashboardStats} goals={goals} plannedIncomes={plannedIncomes} />
+            </div>
+
+            {/* Money Flow + Accounts Snapshot */}
+            <div id="cc-module-money-flow">
+              <div className="lg:col-span-7">
+                <MoneyFlow stats={dashboardStats} incomeSummary={incomeSummary} goals={goals} incomePlans={monthPlans} />
+              </div>
+              {/* <div className="lg:col-span-5">
+                <AccountsSnapshot accounts={accounts ?? []} incomeSummary={incomeSummary} />
+              </div> */}
+            </div>
+
+            {/* Cashflow + Affordability */}
+            <div className="">
+              <div id="cc-module-cashflow">
+                <CashflowCommand stats={dashboardStats} incomeSummary={incomeSummary} goals={goals} />
+              </div>
+            </div>
+            <div id="cc-module-affordability">
+              <Affordability
+                accounts={accounts ?? []}
+                dashboardStats={dashboardStats}
+                budgetContext={budgetContext}
+                incomeSummary={incomeSummary}
+                goals={goals ?? []}
+                accountBalanceHistories={accountBalanceHistories ?? {}}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function DashboardPage() {
   return (
     <AppLayout>
       <InitUser />
-      <div className="container flex flex-col">
-        <div className="flex flex-col gap-10 p-6">
-          {isInitialLoad ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-sm text-muted-foreground">Loading dashboard...</div>
-            </div>
-          ) : (
-            <>
-              <GoalsProgress goals={goals ?? []} />
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <MonthlyOverview
-                  stats={dashboardStats}
-                  month={month}
-                  year={year}
-                  onMonthChange={handleMonthChange}
-                  onGoToToday={() => {
-                    const today = new Date()
-                    setMonth(today.getMonth())
-                    setYear(today.getFullYear())
-                  }}
-                />
-                
-                <AccountsSnapshot accounts={accounts ?? []} incomeSummary={incomeSummary} />
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      <DashboardProvider>
+        <DashboardContent />
+      </DashboardProvider>
     </AppLayout>
   )
 }
