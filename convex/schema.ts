@@ -270,6 +270,7 @@ export default defineSchema({
     allocation_rules: defineTable({
         userId: v.id("users"),
         accountId: v.id("accounts"),
+        label: v.optional(v.string()),  // display name, e.g. "Survival Costs" or "Emergency Fund"
         category: v.string(),           // "savings" | "investing" | "spending" | "debt"
         ruleType: v.string(),           // "percent" | "fixed"
         value: v.number(),

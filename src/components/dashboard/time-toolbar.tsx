@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { ChevronLeft, ChevronRight, Settings2 } from "lucide-react"
+import { useMemo } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useDashboard, type Granularity } from "./dashboard-context"
-import { ConfigDialog } from "./config-dialog"
 
 const monthShort = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -22,7 +21,6 @@ const granularities: { key: Granularity; label: string }[] = [
 export function TimeToolbar() {
   const { month, year, handleMonthChange, goToToday, granularity, setGranularity, periodOffset, setPeriodOffset } = useDashboard()
   const now = useMemo(() => new Date(), [])
-  const [configOpen, setConfigOpen] = useState(false)
 
   const daysInMonth = useMemo(() => new Date(year, month + 1, 0).getDate(), [month, year])
   const weekCount = useMemo(() => Math.ceil(daysInMonth / 7), [daysInMonth])
@@ -79,56 +77,42 @@ export function TimeToolbar() {
   }
 
   return (
-    <>
-      <div className="sticky top-[76px] z-20 flex flex-wrap justify-between items-center gap-x-3 gap-y-2 px-4 py-2.5 mt-6 mx-4 md:mx-6 bg-card/70 backdrop-blur-md border border-border rounded-xl shadow-sm">
+    <div className="sticky top-[76px] z-20 bg-card/80 backdrop-blur-[12px] border border-border/80 rounded-xl shadow-sm p-[10px_16px] mt-3">
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="size-7" onClick={() => nav(-1)}>
             <ChevronLeft className="size-4" />
           </Button>
-
-          <span className="text-[13px] font-medium text-foreground tabular-nums w-[92px] text-center leading-none">
+          <span className="font-bold leading-none tracking-tight text-foreground block text-[15px]">
             {formatPeriodLabel(month, year, granularity, periodOffset)}
           </span>
-
           <Button variant="ghost" size="icon" className="size-7" onClick={() => nav(1)} disabled={isNextDisabled}>
             <ChevronRight className="size-4" />
           </Button>
         </div>
-
-        <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" onClick={goToToday} disabled={isAtCurrentView}>
-          Today
-        </Button>
-
-        <div className="flex bg-muted/60 rounded-lg p-0.5">
-          {granularities.map((g) => (
-            <button
-              key={g.key}
-              onClick={() => setGranularity(g.key)}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-all whitespace-nowrap",
-                granularity === g.key
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {g.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 ml-auto">
+          <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" onClick={goToToday} disabled={isAtCurrentView}>
+            Today
+          </Button>
+          <div className="flex bg-muted/60 rounded-lg p-0.5">
+            {granularities.map((g) => (
+              <button
+                key={g.key}
+                onClick={() => setGranularity(g.key)}
+                className={cn(
+                  "px-2.5 py-1 text-[11px] font-medium rounded-md transition-all whitespace-nowrap",
+                  granularity === g.key
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
         </div>
-
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-7"
-          onClick={() => setConfigOpen(true)}
-          title="Configure goals, rules & flow mapping"
-        >
-          <Settings2 className="size-3.5" />
-        </Button>
       </div>
-
-      <ConfigDialog open={configOpen} onOpenChange={setConfigOpen} />
-    </>
+    </div>
   )
 }
 

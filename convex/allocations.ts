@@ -175,6 +175,74 @@ export const updateAllocationAmount = mutation({
     },
 });
 
+// Get allocation records enriched with real amounts computed from transaction data.
+// Real amount source:
+//   spending (discretionary/refill): outflow transactions from the account in the income month
+//   savings/debt/investing (transfer): inflow transactions to the account in the income month
+export const getAllocationsWithReal = query({
+    args: { incomePlanId: v.id("income_plans") },
+    handler: async (ctx, { incomePlanId }) => {
+        const plan = await ctx.db.get(incomePlanId);
+        if (!plan) return [];
+
+        const records = await ctx.db
+            .query("allocation_records")
+            .withIndex("by_income_plan", (q) => q.eq("income_plan_id", incomePlanId))
+            .collect();
+
+        const monthPrefix = plan.expected_date.slice(0, 7); // "YYYY-MM"
+        const [year, month] = monthPrefix.split("-").map(Number);
+        const monthStart = new Date(year, month - 1, 1).getTime();
+        const monthEnd = new Date(year, month, 1).getTime();
+
+        const allGoals = await ctx.db
+            .query("goals")
+            .withIndex("by_user", (q) => q.eq("userId", plan.userId))
+            .collect();
+
+        const enriched = await Promise.all(
+            records.map(async (record) => {
+                const account = await ctx.db.get(record.accountId);
+                const linkedGoal = allGoals.find(
+                    (g) => g.linked_account_id === record.accountId && !g.is_completed
+                );
+
+                const txs = await ctx.db
+                    .query("transactions")
+                    .withIndex("by_account", (q) => q.eq("accountId", record.accountId))
+                    .collect();
+
+                // Fetch the rule to get its label
+                const rule = await ctx.db.get(record.rule_id);
+
+                let realAmount = 0;
+                if (record.category === "spending") {
+                    // Discretionary: money spent from this account (outflows, excluding transfers)
+                    realAmount = txs
+                        .filter((t) => t.date >= monthStart && t.date < monthEnd && t.amount < 0 && t.transactionType !== "transfer")
+                        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+                } else {
+                    // Fundamental (savings/debt) + Goals (investing): inflows to target account
+                    realAmount = txs
+                        .filter((t) => t.date >= monthStart && t.date < monthEnd && t.amount > 0)
+                        .reduce((sum, t) => sum + t.amount, 0);
+                }
+
+                return {
+                    ...record,
+                    label: rule?.label ?? null,
+                    accountName: account?.name ?? "Unknown",
+                    goalName: linkedGoal?.name ?? null,
+                    goalEmoji: linkedGoal?.emoji ?? null,
+                    realAmount: Math.round(realAmount * 100) / 100,
+                };
+            })
+        );
+
+        return enriched;
+    },
+});
+
 // Get allocation records for a specific income plan, enriched with account/goal info
 export const getAllocationsForPlan = query({
     args: { incomePlanId: v.id("income_plans") },

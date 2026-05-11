@@ -20,6 +20,7 @@ import {
   Trash2,
   ShieldCheck,
   Check,
+  CheckCircle2,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -47,12 +48,16 @@ import {
   formatDate,
 } from "./income-shared"
 import { Goal } from "@/types/goals"
+import { AllocationWaterfall } from "./AllocationWaterfall"
+
+// Disable legacy match UI — keeps all matching code intact for later restoration
+const LEGACY_MATCH_ENABLED = false
 
 const statusIcons = {
   planned: Clock,
-  matched: CircleDashed,
-  completed: PartyPopper,
-  missed: AlertTriangle,
+  matched: CircleDashed,     // legacy-match
+  completed: CheckCircle2,
+  missed: AlertTriangle,     // legacy-match
 } as const
 
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
@@ -343,45 +348,33 @@ export function IncomePlanCard({
 }) {
   const [showAllocations, setShowAllocations] = useState(false)
 
+  // legacy-match: smart match CTA (disabled when LEGACY_MATCH_ENABLED = false)
   const suggestedMatches = useQuery(
     api.incomePlans.getSuggestedMatches,
-    plan.status === "planned" ? { planId: plan._id, userId } : "skip"
+    LEGACY_MATCH_ENABLED && plan.status === "planned" ? { planId: plan._id, userId } : "skip"
   )
-  const smartMatch = suggestedMatches?.find(
-    (s) => !s.alreadyMatched && s.amountDiff / plan.expected_amount < 0.05
-  )
+  const smartMatch = LEGACY_MATCH_ENABLED
+    ? suggestedMatches?.find((s) => !s.alreadyMatched && s.amountDiff / plan.expected_amount < 0.05)
+    : undefined
 
-  const allocations = useQuery(api.allocations.getAllocationsForPlan, {
+  const allocations = useQuery(api.allocations.getAllocationsWithReal, {
     incomePlanId: plan._id,
   }) as AllocationRecord[] | undefined
 
-  // "completed" is now persisted in the DB; derive client-side only as a fallback
-  // for plans that completed before the migration.
-  const clientCompleted =
-    plan.status === "matched" &&
-    !!allocations &&
-    allocations.length > 0 &&
-    allocations.every((a) => a.verification_status === "verified")
-
-  const effectiveStatus =
-    plan.status === "completed" || clientCompleted
-      ? ("completed" as const)
-      : (plan.status as keyof typeof statusConfig)
+  const effectiveStatus = plan.status as keyof typeof statusConfig
   const config = statusConfig[effectiveStatus] ?? statusConfig.planned
   const StatusIcon = statusIcons[effectiveStatus] ?? Clock
 
-  const unmatchAndReset = useMutation(api.incomePlans.unmatchAndResetAllocations)
-  const markMissed = useMutation(api.incomePlans.markMissed)
-  const markPlanned = useMutation(api.incomePlans.markPlanned)
+  const completePlan = useMutation(api.incomePlans.completePlan)
+  const unmatchAndReset = useMutation(api.incomePlans.unmatchAndResetAllocations) // legacy-match
+  const markMissed = useMutation(api.incomePlans.markMissed)                     // legacy-match
+  const markPlanned = useMutation(api.incomePlans.markPlanned)                   // legacy-match
   const deletePlan = useMutation(api.incomePlans.deleteIncomePlan)
   const runAllocations = useMutation(api.allocations.runAllocationsForPlan)
 
-  const displayAmount = plan.actual_amount ?? plan.expected_amount
-  const hasDiff =
-    plan.actual_amount !== undefined &&
-    plan.actual_amount !== plan.expected_amount
-  const isMatched = plan.status === "matched" || plan.status === "completed"
+  const displayAmount = plan.expected_amount
   const isPlanned = plan.status === "planned"
+  const isCompleted = plan.status === "completed"
 
   return (
     <Card className="border border-border transition-colors relative overflow-hidden">
@@ -432,27 +425,11 @@ export function IncomePlanCard({
               </div>
             </div>
 
-            {/* Conditional: received date & amount diff */}
-            {((plan.date_received && plan.date_received !== plan.expected_date) || hasDiff) && (
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-                {plan.date_received && plan.date_received !== plan.expected_date && (
-                  <span className="text-emerald-600">
-                    Received {formatDate(plan.date_received)}
-                  </span>
-                )}
-                {hasDiff && (
-                  <span
-                    className={
-                      plan.actual_amount! > plan.expected_amount
-                        ? "text-emerald-600"
-                        : "text-amber-600"
-                    }
-                  >
-                    {plan.actual_amount! > plan.expected_amount ? "+" : ""}
-                    {formatCurrency(plan.actual_amount! - plan.expected_amount)} vs expected
-                  </span>
-                )}
-              </div>
+            {/* legacy-match: received date + diff shown only when old match data exists */}
+            {LEGACY_MATCH_ENABLED && plan.date_received && plan.date_received !== plan.expected_date && (
+              <span className="text-[11px] text-emerald-600">
+                Received {formatDate(plan.date_received)}
+              </span>
             )}
           </div>
 
@@ -461,11 +438,6 @@ export function IncomePlanCard({
               <div className="text-sm font-semibold tabular-nums text-foreground">
                 {formatCurrency(displayAmount)}
               </div>
-              {hasDiff && (
-                <div className="text-[10px] text-muted-foreground tabular-nums line-through">
-                  {formatCurrency(plan.expected_amount)}
-                </div>
-              )}
             </div>
 
             <DropdownMenu>
@@ -480,46 +452,68 @@ export function IncomePlanCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {plan.status === "planned" && (
+                {isPlanned && (
                   <>
-                    <DropdownMenuItem onClick={() => onMatchClick(plan)} className="gap-2">
-                      <Link2 className="size-3.5" />
-                      Match to transaction
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onEdit(plan)} className="gap-2">
                       <Settings2 className="size-3.5" />
                       Edit plan
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => {
-                        if (window.confirm(`Mark "${plan.label}" as missed? This will delete its allocations.`)) {
-                          markMissed({ planId: plan._id })
-                        }
-                      }}
-                      className="gap-2 text-destructive"
-                    >
-                      <Ban className="size-3.5" />
-                      Mark as missed
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {(plan.status === "matched" || plan.status === "completed") && (
-                  <>
-                    <DropdownMenuItem
-                      onClick={() => unmatchAndReset({ planId: plan._id, userId })}
+                      onClick={() => completePlan({ planId: plan._id })}
                       className="gap-2"
                     >
-                      <Unlink className="size-3.5" />
-                      Unmatch transaction
+                      <CheckCircle2 className="size-3.5" />
+                      Mark as done
                     </DropdownMenuItem>
+                    {/* legacy-match: match + missed actions kept but hidden */}
+                    {LEGACY_MATCH_ENABLED && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onMatchClick(plan)} className="gap-2">
+                          <Link2 className="size-3.5" />
+                          Match to transaction
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (window.confirm(`Mark "${plan.label}" as missed? This will delete its allocations.`)) {
+                              markMissed({ planId: plan._id })
+                            }
+                          }}
+                          className="gap-2 text-destructive"
+                        >
+                          <Ban className="size-3.5" />
+                          Mark as missed
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </>
+                )}
+                {isCompleted && (
+                  <>
                     <DropdownMenuItem onClick={() => onEdit(plan)} className="gap-2">
                       <Settings2 className="size-3.5" />
                       Edit plan
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => markPlanned({ planId: plan._id })}
+                      className="gap-2"
+                    >
+                      <RotateCcw className="size-3.5" />
+                      Reopen plan
+                    </DropdownMenuItem>
                   </>
                 )}
-                {plan.status === "missed" && (
+                {/* legacy-match: matched/missed actions kept for backward compat */}
+                {LEGACY_MATCH_ENABLED && plan.status === "matched" && (
+                  <DropdownMenuItem
+                    onClick={() => unmatchAndReset({ planId: plan._id, userId })}
+                    className="gap-2"
+                  >
+                    <Unlink className="size-3.5" />
+                    Unmatch transaction
+                  </DropdownMenuItem>
+                )}
+                {LEGACY_MATCH_ENABLED && plan.status === "missed" && (
                   <DropdownMenuItem
                     onClick={() => markPlanned({ planId: plan._id })}
                     className="gap-2"
@@ -545,8 +539,8 @@ export function IncomePlanCard({
           </div>
         </div>
 
-        {/* ── Smart Match CTA ── */}
-        {isPlanned && smartMatch && (
+        {/* legacy-match: smart match CTA — hidden when LEGACY_MATCH_ENABLED = false */}
+        {LEGACY_MATCH_ENABLED && isPlanned && smartMatch && (
           <div className="border-t border-emerald-500/20 bg-emerald-500/[0.07] px-6 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex flex-col gap-0.5 min-w-0">
@@ -591,7 +585,7 @@ export function IncomePlanCard({
           </div>
         )}
 
-        {/* ── Allocation detail panel ── */}
+        {/* ── Allocation waterfall panel ── */}
         <div
           className={cn(
             "grid transition-[grid-template-rows] duration-300 ease-in-out",
@@ -599,33 +593,12 @@ export function IncomePlanCard({
           )}
         >
           <div className="overflow-hidden">
-            {/* <div className="border-t border-border px-6 pt-3 pb-3"> */}
-            <div className="px-6 pb-3">
-              {allocations === undefined ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" />
-                  Loading allocations...
-                </div>
-              ) : allocations.length === 0 ? (
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">No allocations yet.</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 text-xs gap-1"
-                    onClick={() => runAllocations({ userId, incomePlanId: plan._id })}
-                  >
-                    Run allocations
-                  </Button>
-                </div>
-              ) : plan.status !== "missed" ? (
-                <AllocationRows
-                  allocations={allocations}
-                  userId={userId}
-                  planId={plan._id}
-                  isMatched={isMatched}
-                />
-              ) : null}
+            <div className="px-6 pb-4 pt-1">
+              <AllocationWaterfall
+                incomePlanId={plan._id}
+                userId={userId}
+                isPlanned={isPlanned}
+              />
             </div>
           </div>
         </div>

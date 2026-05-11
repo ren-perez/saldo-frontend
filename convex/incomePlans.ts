@@ -1,5 +1,5 @@
 // convex/incomePlans.ts
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { calculateAllocations } from "./allocations";
 
@@ -536,6 +536,55 @@ export const getPlansForTransaction = query({
             .filter((p) => p.dateDiff <= dayRange)
             .sort((a, b) => a.amountDiff - b.amountDiff)
             .slice(0, 10);
+    },
+});
+
+// New model: manually mark a plan as completed (no transaction matching required)
+export const completePlan = mutation({
+    args: { planId: v.id("income_plans") },
+    handler: async (ctx, { planId }) => {
+        const plan = await ctx.db.get(planId);
+        if (!plan) throw new Error("Plan not found");
+        await ctx.db.patch(planId, { status: "completed" });
+    },
+});
+
+// Internal: auto-close all "planned" income plans from the given month.
+// Called by the monthly cron on the 1st of each new month for the previous month.
+export const autoCloseMonthPlansInternal = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const now = new Date();
+        const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
+
+        const allPlanned = await ctx.db
+            .query("income_plans")
+            .withIndex("by_status", (q) => q.eq("status", "planned"))
+            .collect();
+
+        const toClose = allPlanned.filter((p) => p.expected_date.startsWith(monthKey));
+        for (const plan of toClose) {
+            await ctx.db.patch(plan._id, { status: "completed" });
+        }
+        return toClose.length;
+    },
+});
+
+// Public version for manual testing via Convex dashboard
+export const autoCloseMonthPlans = mutation({
+    args: { monthKey: v.string() },
+    handler: async (ctx, { monthKey }) => {
+        const allPlanned = await ctx.db
+            .query("income_plans")
+            .withIndex("by_status", (q) => q.eq("status", "planned"))
+            .collect();
+
+        const toClose = allPlanned.filter((p) => p.expected_date.startsWith(monthKey));
+        for (const plan of toClose) {
+            await ctx.db.patch(plan._id, { status: "completed" });
+        }
+        return toClose.length;
     },
 });
 

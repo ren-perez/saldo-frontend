@@ -37,6 +37,7 @@ export interface AllocationRecord {
   goalEmoji?: string | null
   category: string
   amount: number
+  realAmount?: number // populated by getAllocationsWithReal
   is_forecast: boolean
   verification_status?: "pending" | "reserved" | "verified"
   transfer_transaction_id?: Id<"transactions">
@@ -45,26 +46,28 @@ export interface AllocationRecord {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 export const statusConfig = {
+  // New simplified statuses
   planned: {
-    label: "Planned",
+    label: "Planning",
     badgeClass: "border-border text-muted-foreground bg-muted",
     rowClass: "border-border",
     dotClass: "border-muted-foreground/40 bg-muted",
     accentColor: null,
   },
+  completed: {
+    label: "Done",
+    badgeClass: "border-emerald-500/30 text-emerald-600 bg-emerald-500/10",
+    rowClass: "border-border",
+    dotClass: "border-emerald-500 bg-emerald-500/10",
+    accentColor: "#10b981",
+  },
+  // Legacy statuses — kept for backward compat, not shown in new UI
   matched: {
     label: "Matched",
     badgeClass: "border-sky-400/30 text-sky-600 bg-sky-400/10",
     rowClass: "border-border",
     dotClass: "border-sky-400 bg-sky-400/10",
     accentColor: "#0ea5e9",
-  },
-  completed: {
-    label: "Completed",
-    badgeClass: "border-emerald-500/30 text-emerald-600 bg-emerald-500/10",
-    rowClass: "border-border",
-    dotClass: "border-emerald-500 bg-emerald-500/10",
-    accentColor: "#10b981",
   },
   missed: {
     label: "Missed",

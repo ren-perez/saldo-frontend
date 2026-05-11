@@ -27,6 +27,9 @@ import { useUnmatchedIncomeCount } from "@/components/wealth/unmatched-income-se
 import { MatchTransactionDialog } from "@/components/wealth/match-transaction-dialog"
 import { formatCurrency, type UnmatchedTransaction } from "@/components/wealth/income-shared"
 
+// Disable legacy match UI — keeps all matching code intact for later restoration
+const LEGACY_MATCH_ENABLED = false
+
 export default function IncomePage() {
   const { convexUser } = useConvexUser()
   const userId = convexUser?._id
@@ -95,7 +98,8 @@ export default function IncomePage() {
         />
       </div>
 
-      {userId && (
+      {/* legacy-match: unmatched income modal + match transaction dialog */}
+      {LEGACY_MATCH_ENABLED && userId && (
         <UnmatchedIncomeModal
           userId={userId}
           open={unmatchedOpen}
@@ -104,7 +108,7 @@ export default function IncomePage() {
         />
       )}
 
-      {userId && (
+      {LEGACY_MATCH_ENABLED && userId && (
         <MatchTransactionDialog
           transaction={matchingTx}
           userId={userId}

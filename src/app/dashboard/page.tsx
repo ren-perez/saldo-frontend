@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useRef } from "react"
 import { useQuery } from "convex/react"
 import { api } from "../../../convex/_generated/api"
 import { useConvexUser } from "@/hooks/useConvexUser"
@@ -12,8 +12,6 @@ import { DashboardProvider, useDashboard } from "@/components/dashboard/dashboar
 import { TimeToolbar } from "@/components/dashboard/time-toolbar"
 import { CommandHUD } from "@/components/dashboard/command-hud"
 import { MoneyFlow } from "@/components/dashboard/money-flow"
-import { CashflowCommand } from "@/components/dashboard/cashflow-command"
-import { Affordability } from "@/components/dashboard/affordability"
 import { SpendingRhythm } from "@/components/dashboard/spending-rhythm"
 
 function DashboardContent() {
@@ -76,27 +74,28 @@ function DashboardContent() {
     })
   }, [allPlans, startDate, endDate])
 
-  const isInitialLoad =
-    accounts === undefined ||
-    goals === undefined ||
-    dashboardStats === undefined ||
-    budgetContext === undefined ||
-    accountBalanceHistories === undefined
+  const hasLoaded = useRef(false)
+  const allLoaded =
+    accounts !== undefined &&
+    goals !== undefined &&
+    dashboardStats !== undefined &&
+    budgetContext !== undefined &&
+    incomeSummary !== undefined &&
+    accountBalanceHistories !== undefined
+
+  if (allLoaded) hasLoaded.current = true
 
   return (
     <div className="container max-w-7xl mx-auto flex flex-col pb-12">
-      {/* Global Period Toolbar - sticky */}
-      <TimeToolbar />
-
-      <div className="flex flex-col gap-4 p-4 md:p-6">
-        {isInitialLoad ? (
+      <div className="flex flex-col gap-4 p-4 md:px-6 md:pb-6">
+        {!hasLoaded.current ? (
           <div className="flex items-center justify-center py-24">
             <div className="text-sm text-muted-foreground animate-pulse">Initializing Command Center...</div>
           </div>
         ) : (
           <>
-            {/* HUD: Mission Center + Command Center KPIs + Strategic Briefing + Module Focus Nav */}
-            <CommandHUD stats={dashboardStats} accounts={accounts} goals={goals ?? []} incomeSummary={incomeSummary} />
+            <TimeToolbar />
+            <CommandHUD stats={dashboardStats} accounts={accounts} goals={goals ?? []} incomeSummary={incomeSummary} accountBalanceHistories={accountBalanceHistories ?? {}} budgetContext={budgetContext} />
             {/* <ActionCards
               unmatchedIncomeCount={unmatchedIncomeCount}
               pendingTransferCount={pendingTransferCount}
@@ -105,7 +104,7 @@ function DashboardContent() {
 
             {/* Spending Rhythm / Heatmap */}
             <div id="cc-module-rhythm">
-              <SpendingRhythm stats={dashboardStats} goals={goals} plannedIncomes={plannedIncomes} />
+              <SpendingRhythm stats={dashboardStats} goals={goals} plannedIncomes={plannedIncomes} accounts={accounts ?? []} accountBalanceHistories={accountBalanceHistories ?? {}} />
             </div>
 
             {/* Money Flow + Accounts Snapshot */}
@@ -118,22 +117,6 @@ function DashboardContent() {
               </div> */}
             </div>
 
-            {/* Cashflow + Affordability */}
-            <div className="">
-              <div id="cc-module-cashflow">
-                <CashflowCommand stats={dashboardStats} incomeSummary={incomeSummary} goals={goals} />
-              </div>
-            </div>
-            <div id="cc-module-affordability">
-              <Affordability
-                accounts={accounts ?? []}
-                dashboardStats={dashboardStats}
-                budgetContext={budgetContext}
-                incomeSummary={incomeSummary}
-                goals={goals ?? []}
-                accountBalanceHistories={accountBalanceHistories ?? {}}
-              />
-            </div>
           </>
         )}
       </div>

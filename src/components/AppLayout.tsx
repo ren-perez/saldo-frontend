@@ -93,11 +93,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 </div>
                                 
                                 <div className="flex items-center gap-3 pr-4">
-                                    <PendingActionsDropdown />
                                     <Separator orientation="vertical" className="h-4" />
-                                    <div className="text-sm text-gray-500 font-medium">
+                                    <div className="text-xs text-gray-500 font-medium">
                                         {today}
                                     </div>
+                                    <PendingActionsDropdown />
                                 </div>
                             </div>
 

@@ -12,6 +12,7 @@ interface DashboardContextValue {
   selectedDate: string | null
   granularity: Granularity
   periodOffset: number
+  configOpen: boolean
   setMonth: (month: number) => void
   setYear: (year: number) => void
   handleMonthChange: (delta: number) => void
@@ -19,6 +20,7 @@ interface DashboardContextValue {
   setSelectedDate: (date: string | null) => void
   setGranularity: (g: Granularity) => void
   setPeriodOffset: (offset: number) => void
+  setConfigOpen: (open: boolean) => void
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null)
@@ -30,6 +32,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [granularity, setGranularity] = useState<Granularity>("monthly")
   const [periodOffset, setPeriodOffset] = useState(0)
+  const [configOpen, setConfigOpen] = useState(false)
 
   const { startDate, endDate } = useMemo(() => {
     switch (granularity) {
@@ -100,6 +103,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         selectedDate,
         granularity,
         periodOffset,
+        configOpen,
         setMonth,
         setYear,
         handleMonthChange,
@@ -107,6 +111,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setSelectedDate,
         setGranularity: handleSetGranularity,
         setPeriodOffset,
+        setConfigOpen,
       }}
     >
       {children}
