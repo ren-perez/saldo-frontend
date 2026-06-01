@@ -1,9 +1,14 @@
+"use client"
+
 import { cn } from "@/lib/utils"
 import { currency, currencyExact } from "@/lib/format"
 import { monthNames, SUBSCRIPTIONS, type DailyStats, type DailyTx } from "./types"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { AccountsRail } from "../accounts-rail"
 import { WaterfallAllocations as PlannedIncomeAllocations } from "../money-flow/waterfall/WaterfallAllocations"
+import { useMoneyFlowData } from "../money-flow/hooks/use-money-flow-data"
+import { Waterfall } from "../money-flow/waterfall/Waterfall"
+import { MoneyFlowProvider } from "../money-flow/context/money-flow-context"
 
 
 type KpiStats = { income: number; expenses: number; goals: number }
@@ -83,19 +88,49 @@ type IdleRailProps = {
   month: number
   year: number
   periodStats: KpiStats
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  stats: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  incomeSummary?: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  goals?: any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  incomePlans?: any[]
 }
 
 function IdleRail(props: IdleRailProps) {
+  const waterfallData = useMoneyFlowData({
+    stats: props.stats,
+    incomeSummary: props.incomeSummary,
+    goals: props.goals,
+    incomePlans: props.incomePlans,
+  })
+
   return (
     <div className="bg-muted/30 border border-border rounded-xl flex flex-col h-full min-h-[300px] overflow-hidden">
-      <Tabs defaultValue="accounts" className="flex flex-col h-full">
+      <Tabs defaultValue="waterfall" className="flex flex-col h-full">
         <div className="px-3 pt-3 pb-0 flex flex-col gap-2.5">
           <KpiPills stats={props.periodStats} />
           <TabsList className="w-full h-8 text-[11px]">
+            <TabsTrigger value="waterfall" className="flex-1 text-[11px]">Waterfall</TabsTrigger>
             <TabsTrigger value="accounts" className="flex-1 text-[11px]">Accounts</TabsTrigger>
             <TabsTrigger value="subscriptions" className="flex-1 text-[11px]">Subscriptions</TabsTrigger>
           </TabsList>
         </div>
+
+        <TabsContent value="waterfall" className="flex-1 overflow-y-auto flex flex-col">
+          <MoneyFlowProvider>
+            <Waterfall
+              incomeNode={waterfallData.incomeNode}
+              flowNodes={waterfallData.flowNodes}
+              totalIncome={waterfallData.totalIncome}
+              runningRemainder={waterfallData.runningRemainder}
+              matchedTotal={waterfallData.matchedTotal}
+              plannedTotal={waterfallData.plannedTotal}
+              expectedTotal={waterfallData.expectedTotal}
+            />
+          </MoneyFlowProvider>
+        </TabsContent>
 
         <TabsContent value="accounts" className="flex-1 overflow-y-auto p-2">
           <AccountsRail
@@ -134,7 +169,7 @@ function IdleRail(props: IdleRailProps) {
   )
 }
 
-export function DetailsPane({ displayDate, displayStats, isPreview, month, year, plannedItems, accounts, operatingCash, creditExposure, emergencyReserve, flowMap, accountBalanceHistories, periodStats }: {
+export function DetailsPane({ displayDate, displayStats, isPreview, month, year, plannedItems, accounts, operatingCash, creditExposure, emergencyReserve, flowMap, accountBalanceHistories, periodStats, stats, incomeSummary, goals, incomePlans }: {
   displayDate: string | null
   displayStats: DailyStats | null
   isPreview: boolean
@@ -151,6 +186,14 @@ export function DetailsPane({ displayDate, displayStats, isPreview, month, year,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   accountBalanceHistories: Record<string, any[]>
   periodStats: KpiStats
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  stats: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  incomeSummary?: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  goals?: any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  incomePlans?: any[]
 }) {
   const hasContent = displayStats || (plannedItems && plannedItems.length > 0)
   if (!displayDate || !hasContent) return (
@@ -164,6 +207,10 @@ export function DetailsPane({ displayDate, displayStats, isPreview, month, year,
       month={month}
       year={year}
       periodStats={periodStats}
+      stats={stats}
+      incomeSummary={incomeSummary}
+      goals={goals}
+      incomePlans={incomePlans}
     />
   )
 

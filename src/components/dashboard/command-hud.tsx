@@ -1,11 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { currency } from "@/lib/format"
-import { Calculator, Info, Settings2 } from "lucide-react"
+import { ArrowDownToLine, Calculator, Info, Settings2 } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useDashboard } from "./dashboard-context"
 import type { GoalData } from "../GoalCard"
@@ -176,6 +177,8 @@ export function CommandHUD({
   const unallocated = Math.max(0, income - expenses - goalsTotal)
   const protectedCapital = operatingCash + emergencyReserve
 
+  const router = useRouter()
+
   // ── Component state ──
   const [hoveredNote, setHoveredNote] = useState<number | null>(null)
   const [affordabilityOpen, setAffordabilityOpen] = useState(false)
@@ -335,6 +338,14 @@ export function CommandHUD({
 
           {/* Actions */}
           <div className="flex items-center gap-2 pl-5 border-l border-border/40 ml-2">
+            <Button
+              size="sm"
+              className="h-7 text-[11px] gap-1.5 px-3 font-medium"
+              onClick={() => router.push("/import-csv")}
+            >
+              <ArrowDownToLine size={12} />
+              Import
+            </Button>
             <Button
               variant="outline"
               size="sm"

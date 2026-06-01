@@ -151,16 +151,21 @@ export const importTransactions = mutation({
             .withIndex("by_account", (q) => q.eq("accountId", accountId))
             .collect();
 
-        // Build deduplication lookup
-        const existingTransactionKeys = new Map<string, {
+        const DUPLICATE_DATE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+        // Build deduplication lookup grouped by account+amount+description
+        const existingTransactionKeys = new Map<string, Array<{
             _id: Id<"transactions">;
             amount: number;
             description: string;
+            date: number;
             [key: string]: unknown;
-        }>();
+        }>>();
         for (const existing of existingTransactions) {
             const key = createDeduplicationKey(accountId, existing.amount, existing.description);
-            existingTransactionKeys.set(key, existing);
+            const group = existingTransactionKeys.get(key) ?? [];
+            group.push(existing);
+            existingTransactionKeys.set(key, group);
         }
 
         // Pre-load categories + groups for name-based lookup (CSV wins over rules engine)
@@ -210,9 +215,12 @@ export const importTransactions = mutation({
                     continue;
                 }
 
-                // Check for duplicates
+                // Check for duplicates — same key AND within 7-day window
                 const deduplicationKey = createDeduplicationKey(accountId, transaction.amount, transaction.description);
-                const existingTransaction = existingTransactionKeys.get(deduplicationKey);
+                const candidates = existingTransactionKeys.get(deduplicationKey) ?? [];
+                const existingTransaction = candidates.find(
+                    (e) => Math.abs(e.date - transaction.date) <= DUPLICATE_DATE_WINDOW_MS
+                );
 
                 if (existingTransaction) {
                     if (args.trustSource) {

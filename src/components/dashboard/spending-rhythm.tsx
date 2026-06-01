@@ -10,7 +10,7 @@ import { YearlyView, MonthlyView, WeeklyView, DailyView } from "./spending-rhyth
 import { type DailyStats, type PlannedIncome, type DayCell } from "./spending-rhythm/types"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function SpendingRhythm({ stats, goals, plannedIncomes, accounts: _accounts = [], accountBalanceHistories = {} }: { stats: any; goals?: GoalData[] | null; plannedIncomes?: PlannedIncome[]; accounts?: any[]; accountBalanceHistories?: any }) {
+export function SpendingRhythm({ stats, goals, plannedIncomes, accounts: _accounts = [], accountBalanceHistories = {}, incomeSummary, incomePlans }: { stats: any; goals?: GoalData[] | null; plannedIncomes?: PlannedIncome[]; accounts?: any[]; accountBalanceHistories?: any; incomeSummary?: any; incomePlans?: any[] }) {
   const { month, year, selectedDate, setSelectedDate, granularity, periodOffset } = useDashboard()
   const accounts = _accounts ?? []
   const [hoveredDate, setHoveredDate] = useState<string | null>(null)
@@ -165,6 +165,10 @@ export function SpendingRhythm({ stats, goals, plannedIncomes, accounts: _accoun
               expenses: stats?.totalExpenses ?? 0,
               goals: stats?.totalGoals ?? 0,
             }}
+            stats={stats}
+            incomeSummary={incomeSummary}
+            goals={goals ?? undefined}
+            incomePlans={incomePlans}
           />
         </div>
 

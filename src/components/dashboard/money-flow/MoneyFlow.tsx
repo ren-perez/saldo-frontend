@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback } from "react"
 import { Card } from "@/components/ui/card"
-import { MoneyFlowProvider, useMoneyFlowLayout, useResizeHandler } from "./context/money-flow-context"
+import { MoneyFlowProvider } from "./context/money-flow-context"
 import { useMoneyFlowData } from "./hooks/use-money-flow-data"
 import { SankeyChart } from "./sankey/SankeyChart"
-import { Waterfall } from "./waterfall/Waterfall"
 
 // ── Types (matching dashboard page props) ─────────────────────────────────────
 
@@ -43,13 +42,10 @@ export interface MoneyFlowProps {
   incomePlans?: IncomePlanItem[]
 }
 
-// ── Inner grid (needs layout context) ────────────────────────────────────────
+// ── Inner grid ────────────────────────────────────────────────────────────────
 
 function MoneyFlowGrid({ stats, incomeSummary, goals, incomePlans }: MoneyFlowProps) {
-  const { moneyFlowSplit } = useMoneyFlowLayout()
   const [sankeyZoom, setSankeyZoom] = useState(1)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const { beginResize } = useResizeHandler(containerRef)
 
   const data = useMoneyFlowData({ stats, incomeSummary, goals, incomePlans })
 
@@ -58,14 +54,7 @@ function MoneyFlowGrid({ stats, incomeSummary, goals, incomePlans }: MoneyFlowPr
   const zoomReset = useCallback(() => setSankeyZoom(1), [])
 
   return (
-    <div
-      ref={containerRef}
-      className="cc-flow"
-      style={{
-        display: "grid",
-        gridTemplateColumns: `minmax(0, ${moneyFlowSplit.toFixed(1)}fr) 8px minmax(0, ${(100 - moneyFlowSplit).toFixed(1)}fr)`,
-      }}
-    >
+    <div className="cc-flow">
       {/* ── Sankey panel ── */}
       <div className="cc-flow-col min-w-0 overflow-hidden">
         <div className="cc-sankey-head flex items-center justify-between px-3 pt-3 pb-1">
@@ -103,31 +92,6 @@ function MoneyFlowGrid({ stats, incomeSummary, goals, incomePlans }: MoneyFlowPr
             zoom={sankeyZoom}
           />
         </div>
-      </div>
-
-      {/* ── Resize divider ── */}
-      <div
-        className="bg-border cursor-col-resize hover:bg-primary/50 transition-colors relative"
-        onPointerDown={beginResize}
-        title="Drag to resize"
-      >
-        <div className="absolute inset-y-0 -left-1 -right-1" />
-      </div>
-
-      {/* ── Waterfall panel ── */}
-      <div className="cc-flow-col cc-waterfall-col flex flex-col min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">
-          Waterfall
-        </p>
-        <Waterfall
-          incomeNode={data.incomeNode}
-          flowNodes={data.flowNodes}
-          totalIncome={data.totalIncome}
-          runningRemainder={data.runningRemainder}
-          matchedTotal={data.matchedTotal}
-          plannedTotal={data.plannedTotal}
-          expectedTotal={data.expectedTotal}
-        />
       </div>
     </div>
   )

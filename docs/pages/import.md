@@ -120,7 +120,14 @@ Runs the same steps as above once per account group (transactions are grouped by
 
 ### Deduplication key
 
-`accountId:amount:normalized_description` — case-insensitive, whitespace-normalized description.
+A transaction is flagged as a potential duplicate when **all three** of the following are true:
+
+- Same `accountId`
+- Same `amount`
+- Same description (case-insensitive, whitespace-normalized)
+- Date is within **7 days** of an existing transaction with the above match
+
+The 7-day window prevents monthly recurring charges (subscriptions, rent) from being incorrectly flagged as duplicates of earlier identical entries while still catching re-imports of the same file or overlapping date-range exports.
 
 ---
 
@@ -294,5 +301,6 @@ Two modes:
 | Transfer pair group has ≠ 2 transactions | Counted as `ambiguous`; not paired; user directed to transfers inbox |
 | Both transfer pair transactions in same account | Counted as `skipped`; not paired |
 | Gemini API unavailable or returns invalid JSON | Falls back to heuristic result; confidence marked `"low"` |
+| Same amount + description but date > 7 days from any existing transaction | Treated as a new transaction, not a duplicate (e.g. monthly subscriptions) |
 | Page refreshed mid-import | Session ID from localStorage re-hydrates review state |
 | Multi-account import interrupted | `import_multi_sessions` in localStorage tracks progress; resumes at first pending session |

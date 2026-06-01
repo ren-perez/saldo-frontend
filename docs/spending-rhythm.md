@@ -55,6 +55,47 @@ Spending Rhythm measures the consistency and frequency of financial activity thr
 - Period-specific; may vary with income timing or life events
 - Thresholds (18 days) are fixed and may not suit all users
 
+## Dashboard Widget
+
+The `SpendingRhythm` component lives on the dashboard and renders a two-column card: a calendar/chart on the left and a details pane on the right.
+
+### Granularity Modes
+
+Controlled by `granularity` from `DashboardContext`. The subtitle line updates to reflect the active mode.
+
+| Mode | View | Data |
+|------|------|------|
+| `monthly` | Full month calendar grid | Per-day income/expense/goal cells; planned income markers |
+| `weekly` | 7-day strip | Active week based on `periodOffset` |
+| `daily` | Single day cell | Day pointed to by `periodOffset` |
+| `yearly` | Bar chart of 12 months | Aggregated from `dailyStats` keys |
+
+### Interaction Model
+
+- **Hover** a cell → details pane shows a live preview (dimmed) for that date.
+- **Click** a cell → pins the selection; clicking again deselects.
+- **Escape** → clears the pinned selection.
+- `hoveredDate` takes display priority over `selectedDate`; when both are null the details pane shows period-level summaries.
+
+### Details Pane (right column)
+
+Shows context for the selected or hovered date:
+- **Transaction list** for the date (income, expenses, goal contributions).
+- **Planned income items** — entries from `plannedIncomes` that fall on that date.
+- **Account health strip** — operating cash (checking accounts), credit exposure (negative credit balances), emergency reserve (savings accounts).
+- **Account flows** — per-account inflow/outflow sourced from `stats.accountFlows`.
+- **Period totals** — income, expenses, goal contributions for the whole visible period.
+
+### Props
+
+| Prop | Type | Notes |
+|------|------|-------|
+| `stats` | `any` | Dashboard stats including `dailyStats`, `totalIncome/Expenses/Goals`, `accountFlows` |
+| `goals` | `GoalData[]` | Used by the (currently commented-out) `GoalRail` |
+| `plannedIncomes` | `PlannedIncome[]` | Shown as markers on calendar cells and listed in the details pane |
+| `accounts` | `any[]` | Used to compute operating cash, credit exposure, emergency reserve |
+| `accountBalanceHistories` | `any` | Passed to the details pane for balance trend rendering |
+
 ## Related Metrics
 
 - **Cashflow Score**: Incorporates expense efficiency but not activity frequency

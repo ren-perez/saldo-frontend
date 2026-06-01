@@ -104,7 +104,7 @@ function DashboardContent() {
 
             {/* Spending Rhythm / Heatmap */}
             <div id="cc-module-rhythm">
-              <SpendingRhythm stats={dashboardStats} goals={goals} plannedIncomes={plannedIncomes} accounts={accounts ?? []} accountBalanceHistories={accountBalanceHistories ?? {}} />
+              <SpendingRhythm stats={dashboardStats} goals={goals} plannedIncomes={plannedIncomes} accounts={accounts ?? []} accountBalanceHistories={accountBalanceHistories ?? {}} incomeSummary={incomeSummary} incomePlans={monthPlans} />
             </div>
 
             {/* Money Flow + Accounts Snapshot */}

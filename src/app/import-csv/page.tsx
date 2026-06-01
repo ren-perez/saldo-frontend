@@ -872,8 +872,8 @@ function CsvImporterPageContent() {
                         {preset && (
                             <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                                 <div className="flex flex-col gap-0.5">
-                                    <Label htmlFor="trust-source" className="text-sm font-medium cursor-pointer">Trust source file</Label>
-                                    <p className="text-xs text-muted-foreground">Auto-skip duplicates — use when importing a cleaned master file</p>
+                                    <Label htmlFor="trust-source" className="text-sm font-medium cursor-pointer">Auto-skip duplicates</Label>
+                                    <p className="text-xs text-muted-foreground">Rows matching an existing transaction (same amount + description) are silently skipped. Disable to review each match manually.</p>
                                 </div>
                                 <Switch id="trust-source" checked={trustSource} onCheckedChange={setTrustSource} />
                             </div>

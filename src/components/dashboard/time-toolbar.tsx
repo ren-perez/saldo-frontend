@@ -35,13 +35,6 @@ export function TimeToolbar() {
     || (granularity === "daily" && periodOffset === now.getDate() - 1)
   )
 
-  const isNextDisabled = (granularity === "yearly" && year >= now.getFullYear())
-    || (isCurrentPeriod && (
-      granularity === "monthly"
-      || (granularity === "weekly" && periodOffset >= currentWeekOffset)
-      || (granularity === "daily" && periodOffset >= now.getDate() - 1)
-    ))
-
   function nav(delta: number) {
     if (granularity === "daily") {
       const newOffset = periodOffset + delta
@@ -86,7 +79,7 @@ export function TimeToolbar() {
           <span className="font-bold leading-none tracking-tight text-foreground block text-[15px]">
             {formatPeriodLabel(month, year, granularity, periodOffset)}
           </span>
-          <Button variant="ghost" size="icon" className="size-7" onClick={() => nav(1)} disabled={isNextDisabled}>
+          <Button variant="ghost" size="icon" className="size-7" onClick={() => nav(1)}>
             <ChevronRight className="size-4" />
           </Button>
         </div>
